@@ -23,8 +23,7 @@
 #include <emscripten/html5.h>
 
 dawn::Device CreateCppDawnDevice() {
-    //return dawn::Device::Acquire(emscripten_webgpu_create_device());
-    return dawn::Device::Acquire(reinterpret_cast<DawnDeviceImpl*>(1));
+    return dawn::Device::Acquire(emscripten_webgpu_get_device());
 }
 #else
 #include <dawn_native/DawnNative.h>
