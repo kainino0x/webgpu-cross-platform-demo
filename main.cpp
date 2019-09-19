@@ -14,6 +14,7 @@
 
 #include <dawn/dawncpp.h>
 
+#undef NDEBUG
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -48,35 +49,68 @@ dawn::Device CreateCppDawnDevice() {
 #endif
 
 static const uint32_t testData = 1337;
+static const size_t size = sizeof(testData);
 
 static dawn::Device device;
+static dawn::Queue queue;
+static dawn::Buffer readBuffer, writeBuffer;
 static bool done = false;
 
-void callback(DawnBufferMapAsyncStatus status, const void* ptr, uint64_t size, void* userdata) {
+void readCallback(DawnBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
     assert(status == DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS);
-    assert(size == sizeof(int32_t));
+    assert(size == size);
+    printf("mapped read %p\n", ptr);
     int32_t readback = static_cast<const int32_t*>(ptr)[0];
+    readBuffer.Unmap();
+    printf("unmapped\n");
+
     printf("Got %d, expected %d\n", readback, testData);
     assert(readback == testData);
     if (readback != testData) {
         abort();
     }
-    *static_cast<bool*>(userdata) = true;
+
+    done = true;
 };
+
+void writeCallback(DawnBufferMapAsyncStatus status, void* ptr, uint64_t size, void*) {
+    assert(status == DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS);
+    assert(size == size);
+    printf("mapped write %p\n", ptr);
+    static_cast<int32_t*>(ptr)[0] = testData;
+    writeBuffer.Unmap();
+    printf("unmapped\n");
+
+    dawn::CommandEncoder enc = device.CreateCommandEncoder();
+    enc.CopyBufferToBuffer(writeBuffer, 0, readBuffer, 0, size);
+    dawn::CommandBuffer cb = enc.Finish();
+    queue.Submit(1, &cb);
+
+    printf("mapping read...\n");
+    readBuffer.MapReadAsync(readCallback, nullptr);
+}
 
 void init() {
     device = CreateCppDawnDevice();
+    queue = device.CreateQueue();
 
-    dawn::Buffer buffer;
     {
         dawn::BufferDescriptor descriptor;
-        descriptor.size = sizeof(testData);
+        descriptor.size = size;
         descriptor.usage = dawn::BufferUsage::CopyDst | dawn::BufferUsage::MapRead;
 
-        buffer = device.CreateBuffer(&descriptor);
-        buffer.SetSubData(0, sizeof(testData), &testData);
+        readBuffer = device.CreateBuffer(&descriptor);
     }
-    buffer.MapReadAsync(callback, &done);
+    {
+        dawn::BufferDescriptor descriptor;
+        descriptor.size = size;
+        descriptor.usage = dawn::BufferUsage::CopySrc | dawn::BufferUsage::MapWrite;
+
+        writeBuffer = device.CreateBuffer(&descriptor);
+    }
+
+    printf("mapping write...\n");
+    writeBuffer.MapWriteAsync(writeCallback, nullptr);
 }
 
 int main() {
