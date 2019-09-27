@@ -39,6 +39,7 @@ if(EMSCRIPTEN)
         PRIVATE "SHELL:-g1"
         PRIVATE "SHELL:-s USE_WEBGPU=1"
         PRIVATE "SHELL:-s ASSERTIONS=1"
+        #PRIVATE "SHELL:-s ERROR_ON_UNDEFINED_SYMBOLS=0"
         #PRIVATE "SHELL:--closure 1"
         #PRIVATE "SHELL:-s VERBOSE=1"
         )

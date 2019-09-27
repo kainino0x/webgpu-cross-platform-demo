@@ -616,7 +616,7 @@ function updateGlobalBufferViews() {
  Module["HEAPF64"] = HEAPF64 = new Float64Array(buffer);
 }
 
-var STACK_BASE = 15840, STACK_MAX = 5258720, DYNAMIC_BASE = 5258720, DYNAMICTOP_PTR = 15808;
+var STACK_BASE = 17312, STACK_MAX = 5260192, DYNAMIC_BASE = 5260192, DYNAMICTOP_PTR = 17280;
 
 assert(STACK_BASE % 16 === 0, "stack must start aligned");
 
@@ -1013,7 +1013,7 @@ var tempDouble;
 
 var tempI64;
 
-var tempDoublePtr = 15824;
+var tempDoublePtr = 17296;
 
 assert(tempDoublePtr % 8 == 0);
 
@@ -1273,60 +1273,82 @@ function _abort() {
 }
 
 var WebGPU = {
- makeManager: function() {
-  return {
-   objects: [ null ],
-   create: function(object) {
-    var id = this.objects.length;
-    assert(typeof this.objects[id] === "undefined");
-    this.objects[id] = {
-     refcount: 1,
-     object: object
-    };
-    return id;
-   },
-   get: function(id) {
-    assert(typeof this.objects[id] !== "undefined");
-    return this.objects[id].object;
-   },
-   reference: function(id) {
-    var o = this.objects[id];
-    assert(typeof o !== "undefined");
-    this.objects[id].refcount++;
-   },
-   release: function(id) {
-    var o = this.objects[id];
-    assert(typeof o !== "undefined");
-    assert(o.refcount > 0);
-    o.refcount--;
-    if (o.refcount <= 0) {
-     delete this.objects[id];
+ initManagers: function() {
+  function makeManager() {
+   return {
+    objects: [ null ],
+    create: function(object) {
+     var id = this.objects.length;
+     assert(typeof this.objects[id] === "undefined");
+     this.objects[id] = {
+      refcount: 1,
+      object: object
+     };
+     return id;
+    },
+    get: function(id) {
+     assert(typeof this.objects[id] !== "undefined");
+     return this.objects[id].object;
+    },
+    reference: function(id) {
+     var o = this.objects[id];
+     assert(typeof o !== "undefined");
+     this.objects[id].refcount++;
+    },
+    release: function(id) {
+     var o = this.objects[id];
+     assert(typeof o !== "undefined");
+     assert(o.refCount > 0);
+     o.refcount--;
+     if (o.refcount <= 0) {
+      delete this.objects[id];
+     }
     }
-   }
-  };
+   };
+  }
+  this.mgrDevice = this.mgrDevice || makeManager();
+  this.mgrQueue = this.mgrQueue || makeManager();
+  this.mgrCommandBuffer = this.mgrCommandBuffer || makeManager();
+  this.mgrCommandEncoder = this.mgrCommandEncoder || makeManager();
+  this.mgrRenderPassEncoder = this.mgrRenderPassEncoder || makeManager();
+  this.mgrBuffer = this.mgrBuffer || makeManager();
+  this.mgrTexture = this.mgrTexture || makeManager();
+  this.mgrTextureView = this.mgrTextureView || makeManager();
+  this.mgrRenderPipeline = this.mgrRenderPipeline || makeManager();
+  this.mgrPipelineLayout = this.mgrPipelineLayout || makeManager();
+  this.mgrShaderModule = this.mgrShaderModule || makeManager();
  },
- mgrDevice: function() {
-  return this._mgrDevice || (this._mgrDevice = this.makeManager());
+ getColor: function(ptr) {
+  return [ HEAPF32[ptr >> 2], HEAPF32[ptr + 4 >> 2], HEAPF32[ptr + 8 >> 2], HEAPF32[ptr + 12 >> 2] ];
  },
- mgrQueue: function() {
-  return this._mgrQueue || (this._mgrQueue = this.makeManager());
- },
- mgrBuffer: function() {
-  return this._mgrBuffer || (this._mgrBuffer = this.makeManager());
- },
- mgrTexture: function() {
-  return this._mgrTexture || (this._mgrTexture = this.makeManager());
- },
- mgrCommandBuffer: function() {
-  return this._mgrCommandBuffer || (this._mgrCommandBuffer = this.makeManager());
- },
- mgrCommandEncoder: function() {
-  return this._mgrCommandEncoder || (this._mgrCommandEncoder = this.makeManager());
- }
+ AddressMode: [ "repeat", "mirror-repeat", "clamp-to-edge" ],
+ BindingType: [ "uniform-buffer", "storage-buffer", "readonly-storage-buffer", "sampler", "sampled-texture", "storage-texture" ],
+ BlendFactor: [ "zero", "one", "src-color", "one-minus-src-color", "src-alpha", "one-minus-src-alpha", "dst-color", "one-minus-dst-color", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "blend-color", "one-minus-blend-color" ],
+ BlendOperation: [ "add", "subtract", "reverse-subtract", "min", "max" ],
+ BufferMapAsyncStatus: [ "success", "error", "unknown", "device-lost" ],
+ CompareFunction: [ "never", "less", "less-equal", "greater", "greater-equal", "equal", "not-equal", "always" ],
+ CullMode: [ "none", "front", "back" ],
+ ErrorFilter: [ "none", "validation", "out-of-memory" ],
+ ErrorType: [ "no-error", "validation", "out-of-memory", "unknown", "device-lost" ],
+ FenceCompletionStatus: [ "success", "error", "unknown", "device-lost" ],
+ FilterMode: [ "nearest", "linear" ],
+ FrontFace: [ "ccw", "cw" ],
+ IndexFormat: [ "uint16", "uint32" ],
+ InputStepMode: [ "vertex", "instance" ],
+ LoadOp: [ "clear", "load" ],
+ PrimitiveTopology: [ "point-list", "line-list", "line-strip", "triangle-list", "triangle-strip" ],
+ StencilOperation: [ "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap" ],
+ StoreOp: [ "store" ],
+ TextureAspect: [ "all", "stencil-only", "depth-only" ],
+ TextureComponentType: [ "float", "sint", "uint" ],
+ TextureDimension: [ "1d", "2d", "3d" ],
+ TextureFormat: [ "undefined", "r8-unorm", "r8-snorm", "r8-uint", "r8-sint", "r16-uint", "r16-sint", "r16-float", "rg8-unorm", "rg8-snorm", "rg8-uint", "rg8-sint", "r32-float", "r32-uint", "r32-sint", "rg16-uint", "rg16-sint", "rg16-float", "rgba8-unorm", "rgba8-unorm-srgb", "rgba8-snorm", "rgba8-uint", "rgba8-sint", "bgra8-unorm", "bgra8-unorm-srgb", "rgb10-a2-unorm", "rg11-b10-float", "rg32-float", "rg32-uint", "rg32-sint", "rgba16-uint", "rgba16-sint", "rgba16-float", "rgba32-float", "rgba32-uint", "rgba32-sint", "depth32-float", "depth24-plus", "depth24-plus-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-sfloat", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb" ],
+ TextureViewDimension: [ "undefined", "1d", "2d", "2d-array", "cube", "cube-array", "3d" ],
+ VertexFormat: [ "uchar2", "uchar4", "char2", "char4", "uchar2-norm", "uchar4-norm", "char2-norm", "char4-norm", "ushort2", "ushort4", "short2", "short4", "ushort2-norm", "ushort4-norm", "short2-norm", "short4-norm", "half2", "half4", "float", "float2", "float3", "float4", "uint", "uint2", "uint3", "uint4", "int", "int2", "int3", "int4" ]
 };
 
 function _dawnBufferMapReadAsync(bufferId, callback, userdata) {
- var bufferEntry = WebGPU.mgrBuffer().objects[bufferId];
+ var bufferEntry = WebGPU.mgrBuffer.objects[bufferId];
  bufferEntry.mapped = "write";
  var buffer = bufferEntry.object;
  buffer.mapReadAsync().then(function(mapped) {
@@ -1342,30 +1364,16 @@ function _dawnBufferMapReadAsync(bufferId, callback, userdata) {
  });
 }
 
-function _dawnBufferMapWriteAsync(bufferId, callback, userdata) {
- var e = WebGPU.mgrBuffer().objects[bufferId];
- var buffer = e.object;
- buffer.mapWriteAsync().then(function(mapped) {
-  var DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS = 0;
-  var data = _malloc(mapped.byteLength);
-  HEAP8.fill(0, data, mapped.byteLength);
-  e.mapWriteSrc = data;
-  e.mapWriteDst = mapped;
-  var dataLength_h = mapped.byteLength / 4294967296 | 0;
-  var dataLength_l = mapped.byteLength | 0;
-  dynCall("viiji", callback, [ DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS, data, dataLength_l, dataLength_h, userdata ]);
- }, function() {
-  var DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR = 1;
-  dynCall("viiji", callback, [ DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR, 0, 0, 0, userdata ]);
- });
+function _dawnBufferReference(id) {
+ WebGPU.mgrBuffer.reference(id);
 }
 
 function _dawnBufferRelease(id) {
- WebGPU.mgrBuffer().release(id);
+ WebGPU.mgrBuffer.release(id);
 }
 
 function _dawnBufferUnmap(bufferId) {
- var e = WebGPU.mgrBuffer().objects[bufferId];
+ var e = WebGPU.mgrBuffer.objects[bufferId];
  if (e.mapWriteSrc) {
   new Uint8Array(e.mapWriteDst).set(HEAP8.subarray(e.mapWriteSrc, e.mapWriteSrc + e.mapWriteDst.byteLength));
  }
@@ -1375,68 +1383,310 @@ function _dawnBufferUnmap(bufferId) {
 }
 
 function _dawnCommandBufferRelease(id) {
- WebGPU.mgrCommandBuffer().release(id);
+ WebGPU.mgrCommandBuffer.release(id);
 }
 
-function _dawnCommandEncoderCopyBufferToBuffer(commandEncoderId, srcId, srcOffset_l, srcOffset_h, dstId, dstOffset_l, dstOffset_h, size_l, size_h) {
- var commandEncoder = WebGPU.mgrCommandEncoder().get(commandEncoderId);
- var src = WebGPU.mgrBuffer().get(srcId);
- var dst = WebGPU.mgrBuffer().get(dstId);
- commandEncoder.copyBufferToBuffer(src, (assert(srcOffset_h < 2097152), srcOffset_h * 4294967296 + srcOffset_l), dst, (assert(dstOffset_h < 2097152), 
- dstOffset_h * 4294967296 + dstOffset_l), (assert(size_h < 2097152), size_h * 4294967296 + size_l));
+function _dawnCommandEncoderBeginRenderPass(commandEncoderId, descriptor) {
+ assert(descriptor !== 0);
+ function makeColorAttachment(caPtr) {
+  return {
+   attachment: WebGPU.mgrTextureView.get(HEAPU32[caPtr >> 2]),
+   resolveTarget: WebGPU.mgrTextureView.get(HEAPU32[caPtr + 4 >> 2]),
+   loadOp: WebGPU.LoadOp[HEAPU32[caPtr + 8 >> 2]],
+   storeOp: WebGPU.StoreOp[HEAPU32[caPtr + 12 >> 2]],
+   clearColor: WebGPU.getColor(caPtr + 16)
+  };
+ }
+ function makeColorAttachments(count, caPtrs) {
+  var attachments = [];
+  for (var i = 0; i < count; ++i) {
+   attachments.push(makeColorAttachment(HEAP32[caPtrs + i * 4 >> 2]));
+  }
+  return attachments;
+ }
+ function makeDepthStencilAttachment(dsaPtr) {
+  if (dsaPtr === 0) return undefined;
+  return {
+   attachment: WebGPU.mgrTextureView.get(HEAPU32[dsaPtr >> 2]),
+   depthLoadOp: WebGPU.LoadOp[HEAPU32[dsaPtr + 4 >> 2]],
+   depthStoreOp: WebGPU.StoreOp[HEAPU32[dsaPtr + 8 >> 2]],
+   clearDepth: HEAPF32[dsaPtr + 12 >> 2],
+   stencilLoadOp: WebGPU.LoadOp[HEAPU32[dsaPtr + 16 >> 2]],
+   stencilStoreOp: WebGPU.StoreOp[HEAPU32[dsaPtr + 20 >> 2]],
+   clearStencil: HEAPU32[dsaPtr + 24 >> 2]
+  };
+ }
+ function makeRenderPassDescriptor(descriptor) {
+  return {
+   colorAttachments: makeColorAttachments(HEAPU32[descriptor >> 2], HEAP32[descriptor + 4 >> 2]),
+   depthStencilAttachment: makeDepthStencilAttachment(HEAP32[descriptor + 8 >> 2])
+  };
+ }
+ var commandEncoder = WebGPU.mgrCommandEncoder.get(commandEncoderId);
+ commandEncoder.beginRenderPass(makeRenderPassDescriptor(descriptor));
+}
+
+function _dawnCommandEncoderCopyTextureToBuffer() {
+ console.warn("dawnCommandEncoderCopyTextureToBuffer: unimplemented");
 }
 
 function _dawnCommandEncoderFinish(commandEncoderId) {
- var commandEncoder = WebGPU.mgrCommandEncoder().get(commandEncoderId);
- return WebGPU.mgrCommandBuffer().create(commandEncoder.finish());
+ var commandEncoder = WebGPU.mgrCommandEncoder.get(commandEncoderId);
+ return WebGPU.mgrCommandBuffer.create(commandEncoder.finish());
 }
 
 function _dawnCommandEncoderRelease(id) {
- WebGPU.mgrCommandEncoder().release(id);
+ WebGPU.mgrCommandEncoder.release(id);
 }
 
 function _dawnDeviceCreateBuffer(deviceId, descriptor) {
  assert(descriptor !== 0);
- var nextInChain = HEAP32[descriptor >> 2];
- assert(nextInChain === 0);
+ assert(HEAP32[descriptor >> 2] === 0);
  var desc = {
-  usage: HEAP32[descriptor + 4 >> 2],
-  size: HEAP32[descriptor + 8 >> 2]
+  usage: HEAPU32[descriptor + 4 >> 2],
+  size: HEAPU32[descriptor + 8 >> 2]
  };
- var device = WebGPU.mgrDevice().get(deviceId);
- return WebGPU.mgrBuffer().create(device.createBuffer(desc));
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrBuffer.create(device.createBuffer(desc));
 }
 
 function _dawnDeviceCreateCommandEncoder(deviceId, descriptor) {
  if (descriptor) {
-  var nextInChain = HEAP32[descriptor >> 2];
-  assert(nextInChain === nullptr);
+  assert(descriptor !== 0);
+  assert(HEAP32[descriptor >> 2] === 0);
  }
- var device = WebGPU.mgrDevice().get(deviceId);
- return WebGPU.mgrCommandEncoder().create(device.createCommandEncoder());
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrCommandEncoder.create(device.createCommandEncoder());
+}
+
+function _dawnDeviceCreatePipelineLayout(deviceId, descriptor) {
+ assert(descriptor !== 0);
+ assert(HEAP32[descriptor >> 2] === 0);
+ var bglCount = HEAPU32[descriptor + 4 >> 2];
+ var bglPtr = HEAP32[descriptor + 8 >> 2];
+ var bgls = [];
+ for (var i = 0; i < bglCount; ++i) {
+  bgls.push(WebGPU.mgrBindGroupLayout.get(HEAP32[bindGroupLayoutPtr + 4 * i >> 2]));
+ }
+ var desc = {
+  bindGroupLayouts: bgls
+ };
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrPipelineLayout.create(device.createPipelineLayout(desc));
 }
 
 function _dawnDeviceCreateQueue(deviceId) {
- assert(WebGPU.mgrQueue().objects.length === 1, "there is only one queue");
- var device = WebGPU.mgrDevice().get(deviceId);
- return WebGPU.mgrQueue().create(device.getQueue());
+ assert(WebGPU.mgrQueue.objects.length === 1, "there is only one queue");
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrQueue.create(device.getQueue());
+}
+
+function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
+ assert(descriptor !== 0);
+ assert(HEAP32[descriptor >> 2] === 0);
+ function makeRasterizationState(rsPtr) {
+  if (rsPtr === null) return null;
+  assert(rsPtr !== 0);
+  assert(HEAP32[rsPtr >> 2] === 0);
+  return {
+   frontFace: WebGPU.FrontFace[HEAPU32[rsPtr + 4 >> 2]],
+   cullMode: WebGPU.CullMode[HEAPU32[rsPtr + 4 >> 2]]
+  };
+ }
+ function makeBlendDescriptor(bdPtr) {
+  assert(bdPtr !== 0);
+  return {
+   operation: WebGPU.BlendOperation[HEAPU32[bdPtr >> 2]],
+   srcFactor: WebGPU.BlendFactor[HEAPU32[bdPtr + 4 >> 2]],
+   dstFactor: WebGPU.BlendFactor[HEAPU32[bdPtr + 8 >> 2]]
+  };
+ }
+ function makeColorState(csPtr) {
+  assert(csPtr !== 0);
+  assert(HEAP32[csPtr >> 2] === 0);
+  return {
+   format: WebGPU.TextureFormat[HEAPU32[csPtr + 4 >> 2]],
+   alphaBlend: makeBlendDescriptor(HEAP32[csPtr + 8 >> 2]),
+   colorBlend: makeBlendDescriptor(HEAP32[csPtr + 20 >> 2]),
+   writeMask: HEAPU32[csPtr + 32 >> 2]
+  };
+ }
+ function makeColorStates(count, csPtrs) {
+  if (count === 0) return undefined;
+  var states = [];
+  for (var i = 0; i < count; ++i) {
+   states.push(makeColorState(HEAP32[csPtrs + i * 4 >> 2]));
+  }
+  return states;
+ }
+ function makeStencilStateFace(ssfPtr) {
+  assert(ssfPtr !== 0);
+  return {
+   compare: WebGPU.CompareFunction[HEAPU32[ssfPtr >> 2]],
+   failOp: WebGPU.StencilOperation[HEAPU32[ssfPtr + 4 >> 2]],
+   depthFailOp: WebGPU.StencilOperation[HEAPU32[ssfPtr + 8 >> 2]],
+   passOp: WebGPU.StencilOperation[HEAPU32[ssfPtr + 12 >> 2]]
+  };
+ }
+ function makeDepthStencilState(dssPtr) {
+  assert(dssPtr !== 0);
+  return {
+   format: WebGPU.TextureFormat[HEAPU32[dssPtr + 4 >> 2]],
+   depthWriteEnabled: true,
+   depthCompare: WebGPU.CompareFunction[HEAPU32[dssPtr + 12 >> 2]],
+   stencilFront: makeStencilStateFace(HEAP32[dssPtr + 16 >> 2]),
+   stencilBack: makeStencilStateFace(HEAP32[dssPtr + 32 >> 2]),
+   stencilReadMask: HEAPU32[dssPtr + 48 >> 2],
+   stencilWriteMask: HEAPU32[dssPtr + 52 >> 2]
+  };
+ }
+ function makeVertexAttribute(vaPtr) {
+  assert(vaPtr !== 0);
+  return {
+   offset: HEAPU32[vaPtr + 8 >> 2],
+   format: WebGPU.VertexFormat[HEAPU32[vaPtr + 16 >> 2]],
+   shaderLocation: HEAPU32[vaPtr >> 2]
+  };
+ }
+ function makeVertexAttributes(count, vaPtrs) {
+  var vas = [];
+  for (var i = 0; i < count; ++i) {
+   vas.push(makeVertexAttribute(HEAP32[vaPtrs + i * 4 >> 2]));
+  }
+  return vas;
+ }
+ function makeVertexBuffer(vbPtr) {
+  if (vbPtr === 0) return undefined;
+  return {
+   stride: HEAPU32[vbPtr >> 2],
+   stepMode: WebGPU.InputStepMode[HEAPU32[vbPtr + 8 >> 2]],
+   attributeSet: makeVertexAttributes(HEAPU32[vbPtr + 12 >> 2], HEAP32[vbPtr + 16 >> 2])
+  };
+ }
+ function makeVertexBuffers(count, vbPtrs) {
+  if (count === 0) return undefined;
+  var vbs = [];
+  for (var i = 0; i < count; ++i) {
+   vbs.push(makeVertexBuffer(HEAP32[vbPtrs + i * 4 >> 2]));
+  }
+  return vbs;
+ }
+ function makeVertexInput(viPtr) {
+  assert(viPtr !== 0);
+  assert(HEAP32[viPtr >> 2] === 0);
+  return {
+   indexFormat: WebGPU.IndexFormat[HEAPU32[viPtr + 4 >> 2]],
+   vertexBuffers: makeVertexBuffers(HEAPU32[viPtr + 8 >> 2], HEAP32[viPtr + 12 >> 2])
+  };
+ }
+ var desc = {
+  layout: WebGPU.mgrPipelineLayout.get(HEAP32[descriptor + 4 >> 2]),
+  vertexStage: null,
+  fragmentStage: null,
+  primitiveTopology: WebGPU.PrimitiveTopology[HEAPU32[descriptor + 28 >> 2]],
+  rasterizationState: makeRasterizationState(HEAP32[descriptor + 32 >> 2]),
+  colorStates: makeColorStates(HEAPU32[descriptor + 44 >> 2], HEAP32[descriptor + 48 >> 2]),
+  depthStencilState: makeDepthStencilState(HEAP32[descriptor + 40 >> 2]),
+  vertexInput: makeVertexInput(HEAP32[descriptor + 24 >> 2]),
+  sampleCount: HEAPU32[descriptor + 36 >> 2],
+  sampleMask: HEAPU32[descriptor + 52 >> 2],
+  alphaToCoverageEnabled: true
+ };
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrRenderPipeline.create(device.createRenderPipeline(desc));
+}
+
+function _dawnDeviceCreateShaderModule(descriptor) {
+ assert(descriptor !== 0);
+ assert(HEAP32[descriptor >> 2] === 0);
+ var count = HEAPU32[descriptor + 4 >> 2];
+ var start = HEAP32[descriptor + 8 >> 2];
+ var desc = {
+  code: HEAP32.subarray(start, start + count)
+ };
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrShaderModule.create(device.createShaderModule(desc));
+}
+
+function _dawnDeviceCreateTexture() {
+ console.warn("dawnDeviceCreateTexture: unimplemented");
 }
 
 function _dawnDeviceRelease(id) {
- WebGPU.mgrDevice().release(id);
+ WebGPU.mgrDevice.release(id);
+}
+
+function _dawnDeviceSetUncapturedErrorCallback(deviceId, callback, userdata) {
+ var device = WebGPU.mgrDevice.get(deviceId);
+ device.onuncapturederror = function(ev) {
+  var Validation = 1;
+  var OutOfMemory = 2;
+  var type;
+  if (ev.error instanceof GPUValidationError) type = Validation; else if (ev.error instanceof GPUOutOfMemoryError) type = OutOfMemory;
+  var message = 0;
+  dynCall("viii", callback, [ type, message, userdata ]);
+ };
+}
+
+function _dawnPipelineLayoutRelease(id) {
+ WebGPU.mgrPipelineLayout.release(id);
 }
 
 function _dawnQueueRelease(id) {
- WebGPU.mgrQueue().release(id);
+ WebGPU.mgrQueue.release(id);
 }
 
 function _dawnQueueSubmit(queueId, commandCount, commands) {
  assert(commands % 4 === 0);
- var queue = WebGPU.mgrQueue().get(queueId);
+ var queue = WebGPU.mgrQueue.get(queueId);
  var cmds = Array.from(HEAP32.subarray(commands >> 2, (commands >> 2) + commandCount), function(id) {
-  return WebGPU.mgrCommandBuffer().get(id);
+  return WebGPU.mgrCommandBuffer.get(id);
  });
  queue.submit(cmds);
+}
+
+function _dawnRenderPassEncoderDraw() {
+ console.warn("dawnRenderPassEncoderDraw: unimplemented");
+}
+
+function _dawnRenderPassEncoderEndPass() {
+ console.warn("dawnRenderPassEncoderEndPass: unimplemented");
+}
+
+function _dawnRenderPassEncoderRelease(id) {
+ WebGPU.mgrRenderPassEncoder.release(id);
+}
+
+function _dawnRenderPassEncoderSetPipeline() {
+ console.warn("dawnRenderPassEncoderSetPipeline: unimplemented");
+}
+
+function _dawnRenderPipelineRelease(id) {
+ WebGPU.mgrRenderPipeline.release(id);
+}
+
+function _dawnShaderModuleReference(id) {
+ WebGPU.mgrShaderModule.reference(id);
+}
+
+function _dawnShaderModuleRelease(id) {
+ WebGPU.mgrShaderModule.release(id);
+}
+
+function _dawnTextureCreateView() {
+ console.warn("dawnTextureCreateView: unimplemented");
+}
+
+function _dawnTextureReference(id) {
+ WebGPU.mgrTexture.reference(id);
+}
+
+function _dawnTextureRelease(id) {
+ WebGPU.mgrTexture.release(id);
+}
+
+function _dawnTextureViewRelease(id) {
+ WebGPU.mgrTextureView.release(id);
 }
 
 function _emscripten_get_heap_size() {
@@ -1445,7 +1695,8 @@ function _emscripten_get_heap_size() {
 
 function _emscripten_webgpu_do_get_device() {
  assert(Module["preinitializedWebGPUDevice"]);
- return WebGPU.mgrDevice().create(Module["preinitializedWebGPUDevice"]);
+ WebGPU.initManagers();
+ return WebGPU.mgrDevice.create(Module["preinitializedWebGPUDevice"]);
 }
 
 function _emscripten_webgpu_get_device() {
@@ -1507,6 +1758,10 @@ function nullFunc_vii(x) {
  abortFnPtrError(x, "vii");
 }
 
+function nullFunc_viii(x) {
+ abortFnPtrError(x, "viii");
+}
+
 function nullFunc_viiii(x) {
  abortFnPtrError(x, "viiii");
 }
@@ -1538,6 +1793,7 @@ var asmLibraryArg = {
  "nullFunc_v": nullFunc_v,
  "nullFunc_vi": nullFunc_vi,
  "nullFunc_vii": nullFunc_vii,
+ "nullFunc_viii": nullFunc_viii,
  "nullFunc_viiii": nullFunc_viiii,
  "nullFunc_viiiii": nullFunc_viiiii,
  "nullFunc_viiiiii": nullFunc_viiiiii,
@@ -1558,19 +1814,37 @@ var asmLibraryArg = {
  "___unlock": ___unlock,
  "_abort": _abort,
  "_dawnBufferMapReadAsync": _dawnBufferMapReadAsync,
- "_dawnBufferMapWriteAsync": _dawnBufferMapWriteAsync,
+ "_dawnBufferReference": _dawnBufferReference,
  "_dawnBufferRelease": _dawnBufferRelease,
  "_dawnBufferUnmap": _dawnBufferUnmap,
  "_dawnCommandBufferRelease": _dawnCommandBufferRelease,
- "_dawnCommandEncoderCopyBufferToBuffer": _dawnCommandEncoderCopyBufferToBuffer,
+ "_dawnCommandEncoderBeginRenderPass": _dawnCommandEncoderBeginRenderPass,
+ "_dawnCommandEncoderCopyTextureToBuffer": _dawnCommandEncoderCopyTextureToBuffer,
  "_dawnCommandEncoderFinish": _dawnCommandEncoderFinish,
  "_dawnCommandEncoderRelease": _dawnCommandEncoderRelease,
  "_dawnDeviceCreateBuffer": _dawnDeviceCreateBuffer,
  "_dawnDeviceCreateCommandEncoder": _dawnDeviceCreateCommandEncoder,
+ "_dawnDeviceCreatePipelineLayout": _dawnDeviceCreatePipelineLayout,
  "_dawnDeviceCreateQueue": _dawnDeviceCreateQueue,
+ "_dawnDeviceCreateRenderPipeline": _dawnDeviceCreateRenderPipeline,
+ "_dawnDeviceCreateShaderModule": _dawnDeviceCreateShaderModule,
+ "_dawnDeviceCreateTexture": _dawnDeviceCreateTexture,
  "_dawnDeviceRelease": _dawnDeviceRelease,
+ "_dawnDeviceSetUncapturedErrorCallback": _dawnDeviceSetUncapturedErrorCallback,
+ "_dawnPipelineLayoutRelease": _dawnPipelineLayoutRelease,
  "_dawnQueueRelease": _dawnQueueRelease,
  "_dawnQueueSubmit": _dawnQueueSubmit,
+ "_dawnRenderPassEncoderDraw": _dawnRenderPassEncoderDraw,
+ "_dawnRenderPassEncoderEndPass": _dawnRenderPassEncoderEndPass,
+ "_dawnRenderPassEncoderRelease": _dawnRenderPassEncoderRelease,
+ "_dawnRenderPassEncoderSetPipeline": _dawnRenderPassEncoderSetPipeline,
+ "_dawnRenderPipelineRelease": _dawnRenderPipelineRelease,
+ "_dawnShaderModuleReference": _dawnShaderModuleReference,
+ "_dawnShaderModuleRelease": _dawnShaderModuleRelease,
+ "_dawnTextureCreateView": _dawnTextureCreateView,
+ "_dawnTextureReference": _dawnTextureReference,
+ "_dawnTextureRelease": _dawnTextureRelease,
+ "_dawnTextureViewRelease": _dawnTextureViewRelease,
  "_emscripten_get_heap_size": _emscripten_get_heap_size,
  "_emscripten_memcpy_big": _emscripten_memcpy_big,
  "_emscripten_resize_heap": _emscripten_resize_heap,
@@ -1733,6 +2007,12 @@ var dynCall_vii = Module["dynCall_vii"] = function() {
  assert(runtimeInitialized, "you need to wait for the runtime to be ready (e.g. wait for main() to be called)");
  assert(!runtimeExited, "the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)");
  return Module["asm"]["dynCall_vii"].apply(null, arguments);
+};
+
+var dynCall_viii = Module["dynCall_viii"] = function() {
+ assert(runtimeInitialized, "you need to wait for the runtime to be ready (e.g. wait for main() to be called)");
+ assert(!runtimeExited, "the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)");
+ return Module["asm"]["dynCall_viii"].apply(null, arguments);
 };
 
 var dynCall_viiii = Module["dynCall_viiii"] = function() {
