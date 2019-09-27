@@ -1276,7 +1276,7 @@ var WebGPU = {
  initManagers: function() {
   function makeManager() {
    return {
-    objects: [ null ],
+    objects: [ undefined ],
     create: function(object) {
      var id = this.objects.length;
      assert(typeof this.objects[id] === "undefined");
@@ -1287,6 +1287,7 @@ var WebGPU = {
      return id;
     },
     get: function(id) {
+     if (id === 0) return undefined;
      assert(typeof this.objects[id] !== "undefined");
      return this.objects[id].object;
     },
@@ -1298,7 +1299,7 @@ var WebGPU = {
     release: function(id) {
      var o = this.objects[id];
      assert(typeof o !== "undefined");
-     assert(o.refCount > 0);
+     assert(o.refcount > 0);
      o.refcount--;
      if (o.refcount <= 0) {
       delete this.objects[id];
@@ -1318,8 +1319,47 @@ var WebGPU = {
   this.mgrPipelineLayout = this.mgrPipelineLayout || makeManager();
   this.mgrShaderModule = this.mgrShaderModule || makeManager();
  },
- getColor: function(ptr) {
-  return [ HEAPF32[ptr >> 2], HEAPF32[ptr + 4 >> 2], HEAPF32[ptr + 8 >> 2], HEAPF32[ptr + 12 >> 2] ];
+ makeColor: function(ptr) {
+  return {
+   r: HEAPF32[ptr >> 2],
+   g: HEAPF32[ptr + 4 >> 2],
+   b: HEAPF32[ptr + 8 >> 2],
+   a: HEAPF32[ptr + 12 >> 2]
+  };
+ },
+ makeExtent3D: function(ptr) {
+  return {
+   width: HEAPU32[ptr >> 2],
+   height: HEAPU32[ptr + 4 >> 2],
+   depth: HEAPU32[ptr + 8 >> 2]
+  };
+ },
+ makeOrigin3D: function(ptr) {
+  return {
+   x: HEAPU32[ptr >> 2],
+   y: HEAPU32[ptr + 4 >> 2],
+   z: HEAPU32[ptr + 8 >> 2]
+  };
+ },
+ makeTextureCopyView: function(ptr) {
+  assert(ptr !== 0);
+  assert(HEAP32[ptr >> 2] === 0);
+  return {
+   texture: this.mgrTexture.get(HEAP32[ptr + 4 >> 2]),
+   mipLevel: HEAPU32[ptr + 8 >> 2],
+   arrayLayer: HEAPU32[ptr + 12 >> 2],
+   origin: WebGPU.makeOrigin3D(ptr + 16)
+  };
+ },
+ makeBufferCopyView: function(ptr) {
+  assert(ptr !== 0);
+  assert(HEAP32[ptr >> 2] === 0);
+  return {
+   buffer: this.mgrBuffer.get(HEAP32[ptr + 4 >> 2]),
+   offset: HEAPU32[ptr + 8 >> 2],
+   rowPitch: HEAPU32[ptr + 16 >> 2],
+   imageHeight: HEAPU32[ptr + 20 >> 2]
+  };
  },
  AddressMode: [ "repeat", "mirror-repeat", "clamp-to-edge" ],
  BindingType: [ "uniform-buffer", "storage-buffer", "readonly-storage-buffer", "sampler", "sampled-texture", "storage-texture" ],
@@ -1342,9 +1382,9 @@ var WebGPU = {
  TextureAspect: [ "all", "stencil-only", "depth-only" ],
  TextureComponentType: [ "float", "sint", "uint" ],
  TextureDimension: [ "1d", "2d", "3d" ],
- TextureFormat: [ "undefined", "r8-unorm", "r8-snorm", "r8-uint", "r8-sint", "r16-uint", "r16-sint", "r16-float", "rg8-unorm", "rg8-snorm", "rg8-uint", "rg8-sint", "r32-float", "r32-uint", "r32-sint", "rg16-uint", "rg16-sint", "rg16-float", "rgba8-unorm", "rgba8-unorm-srgb", "rgba8-snorm", "rgba8-uint", "rgba8-sint", "bgra8-unorm", "bgra8-unorm-srgb", "rgb10-a2-unorm", "rg11-b10-float", "rg32-float", "rg32-uint", "rg32-sint", "rgba16-uint", "rgba16-sint", "rgba16-float", "rgba32-float", "rgba32-uint", "rgba32-sint", "depth32-float", "depth24-plus", "depth24-plus-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-sfloat", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb" ],
- TextureViewDimension: [ "undefined", "1d", "2d", "2d-array", "cube", "cube-array", "3d" ],
- VertexFormat: [ "uchar2", "uchar4", "char2", "char4", "uchar2-norm", "uchar4-norm", "char2-norm", "char4-norm", "ushort2", "ushort4", "short2", "short4", "ushort2-norm", "ushort4-norm", "short2-norm", "short4-norm", "half2", "half4", "float", "float2", "float3", "float4", "uint", "uint2", "uint3", "uint4", "int", "int2", "int3", "int4" ]
+ TextureFormat: [ "undefined", "r8unorm", "r8snorm", "r8uint", "r8sint", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2unorm", "rg11b10float", "rg32float", "rg32uint", "rg32sint", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "depth32float", "depth24plus", "depth24plusstencil8", "bc1rgbaunorm", "bc1rgbaunorm-srgb", "bc2rgbaunorm", "bc2rgbaunorm-srgb", "bc3rgbaunorm", "bc3rgbaunorm-srgb", "bc4runorm", "bc4rsnorm", "bc5rgunorm", "bc5rgsnorm", "bc6hrgbufloat", "bc6hrgbsfloat", "bc7rgbaunorm", "bc7rgbaunorm-srgb" ],
+ TextureViewDimension: [ "undefined", "1d", "2d", "2darray", "cube", "cube-array", "3d" ],
+ VertexFormat: [ "uchar2", "uchar4", "char2", "char4", "uchar2norm", "uchar4norm", "char2norm", "char4norm", "ushort2", "ushort4", "short2", "short4", "ushort2norm", "ushort4norm", "short2norm", "short4norm", "half2", "half4", "float", "float2", "float3", "float4", "uint", "uint2", "uint3", "uint4", "int", "int2", "int3", "int4" ]
 };
 
 function _dawnBufferMapReadAsync(bufferId, callback, userdata) {
@@ -1386,7 +1426,7 @@ function _dawnCommandBufferRelease(id) {
  WebGPU.mgrCommandBuffer.release(id);
 }
 
-function _dawnCommandEncoderBeginRenderPass(commandEncoderId, descriptor) {
+function _dawnCommandEncoderBeginRenderPass(encoderId, descriptor) {
  assert(descriptor !== 0);
  function makeColorAttachment(caPtr) {
   return {
@@ -1394,7 +1434,7 @@ function _dawnCommandEncoderBeginRenderPass(commandEncoderId, descriptor) {
    resolveTarget: WebGPU.mgrTextureView.get(HEAPU32[caPtr + 4 >> 2]),
    loadOp: WebGPU.LoadOp[HEAPU32[caPtr + 8 >> 2]],
    storeOp: WebGPU.StoreOp[HEAPU32[caPtr + 12 >> 2]],
-   clearColor: WebGPU.getColor(caPtr + 16)
+   loadValue: WebGPU.makeColor(caPtr + 16)
   };
  }
  function makeColorAttachments(count, caPtrs) {
@@ -1422,16 +1462,18 @@ function _dawnCommandEncoderBeginRenderPass(commandEncoderId, descriptor) {
    depthStencilAttachment: makeDepthStencilAttachment(HEAP32[descriptor + 8 >> 2])
   };
  }
- var commandEncoder = WebGPU.mgrCommandEncoder.get(commandEncoderId);
- commandEncoder.beginRenderPass(makeRenderPassDescriptor(descriptor));
+ var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
+ return WebGPU.mgrRenderPassEncoder.create(commandEncoder.beginRenderPass(makeRenderPassDescriptor(descriptor)));
 }
 
-function _dawnCommandEncoderCopyTextureToBuffer() {
- console.warn("dawnCommandEncoderCopyTextureToBuffer: unimplemented");
+function _dawnCommandEncoderCopyTextureToBuffer(encoderId, srcPtr, dstPtr, copySizePtr) {
+ var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
+ var copySize = WebGPU.makeExtent3D(copySizePtr);
+ commandEncoder.copyTextureToBuffer(WebGPU.makeTextureCopyView(srcPtr), WebGPU.makeBufferCopyView(dstPtr), copySize);
 }
 
-function _dawnCommandEncoderFinish(commandEncoderId) {
- var commandEncoder = WebGPU.mgrCommandEncoder.get(commandEncoderId);
+function _dawnCommandEncoderFinish(encoderId) {
+ var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
  return WebGPU.mgrCommandBuffer.create(commandEncoder.finish());
 }
 
@@ -1484,8 +1526,15 @@ function _dawnDeviceCreateQueue(deviceId) {
 function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
  assert(descriptor !== 0);
  assert(HEAP32[descriptor >> 2] === 0);
+ function makeStage(ptr) {
+  if (ptr === 0) return undefined;
+  return {
+   module: WebGPU.mgrShaderModule.get(HEAPU32[ptr + 4 >> 2]),
+   entryPoint: UTF8ToString(HEAP32[ptr + 8 >> 2])
+  };
+ }
  function makeRasterizationState(rsPtr) {
-  if (rsPtr === null) return null;
+  if (rsPtr === 0) return undefined;
   assert(rsPtr !== 0);
   assert(HEAP32[rsPtr >> 2] === 0);
   return {
@@ -1494,6 +1543,7 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeBlendDescriptor(bdPtr) {
+  if (bdPtr === 0) return undefined;
   assert(bdPtr !== 0);
   return {
    operation: WebGPU.BlendOperation[HEAPU32[bdPtr >> 2]],
@@ -1529,6 +1579,7 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeDepthStencilState(dssPtr) {
+  if (dssPtr === 0) return undefined;
   assert(dssPtr !== 0);
   return {
    format: WebGPU.TextureFormat[HEAPU32[dssPtr + 4 >> 2]],
@@ -1572,6 +1623,7 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
   return vbs;
  }
  function makeVertexInput(viPtr) {
+  if (viPtr === 0) return undefined;
   assert(viPtr !== 0);
   assert(HEAP32[viPtr >> 2] === 0);
   return {
@@ -1581,35 +1633,46 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
  }
  var desc = {
   layout: WebGPU.mgrPipelineLayout.get(HEAP32[descriptor + 4 >> 2]),
-  vertexStage: null,
-  fragmentStage: null,
+  vertexStage: makeStage(descriptor + 8),
+  fragmentStage: makeStage(HEAP32[descriptor + 20 >> 2]),
   primitiveTopology: WebGPU.PrimitiveTopology[HEAPU32[descriptor + 28 >> 2]],
   rasterizationState: makeRasterizationState(HEAP32[descriptor + 32 >> 2]),
   colorStates: makeColorStates(HEAPU32[descriptor + 44 >> 2], HEAP32[descriptor + 48 >> 2]),
   depthStencilState: makeDepthStencilState(HEAP32[descriptor + 40 >> 2]),
   vertexInput: makeVertexInput(HEAP32[descriptor + 24 >> 2]),
   sampleCount: HEAPU32[descriptor + 36 >> 2],
-  sampleMask: HEAPU32[descriptor + 52 >> 2],
-  alphaToCoverageEnabled: true
+  sampleMask: HEAPU32[descriptor + 52 >> 2]
  };
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrRenderPipeline.create(device.createRenderPipeline(desc));
 }
 
-function _dawnDeviceCreateShaderModule(descriptor) {
+function _dawnDeviceCreateShaderModule(deviceId, descriptor) {
  assert(descriptor !== 0);
  assert(HEAP32[descriptor >> 2] === 0);
  var count = HEAPU32[descriptor + 4 >> 2];
  var start = HEAP32[descriptor + 8 >> 2];
  var desc = {
-  code: HEAP32.subarray(start, start + count)
+  code: HEAPU32.subarray(start >> 2, (start >> 2) + count)
  };
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrShaderModule.create(device.createShaderModule(desc));
 }
 
-function _dawnDeviceCreateTexture() {
- console.warn("dawnDeviceCreateTexture: unimplemented");
+function _dawnDeviceCreateTexture(deviceId, descriptor) {
+ assert(descriptor !== 0);
+ assert(HEAP32[descriptor >> 2] === 0);
+ var desc = {
+  size: WebGPU.makeExtent3D(descriptor + 12),
+  arrayLayerCount: HEAPU32[descriptor + 24 >> 2],
+  mipLevelCount: HEAPU32[descriptor + 32 >> 2],
+  sampleCount: HEAPU32[descriptor + 36 >> 2],
+  dimension: WebGPU.TextureDimension[HEAPU32[descriptor + 8 >> 2]],
+  format: WebGPU.TextureFormat[HEAPU32[descriptor + 28 >> 2]],
+  usage: HEAPU32[descriptor + 4 >> 2]
+ };
+ var device = WebGPU.mgrDevice.get(deviceId);
+ return WebGPU.mgrTexture.create(device.createTexture(desc));
 }
 
 function _dawnDeviceRelease(id) {
@@ -1645,20 +1708,24 @@ function _dawnQueueSubmit(queueId, commandCount, commands) {
  queue.submit(cmds);
 }
 
-function _dawnRenderPassEncoderDraw() {
- console.warn("dawnRenderPassEncoderDraw: unimplemented");
+function _dawnRenderPassEncoderDraw(passId, vertexCount, instanceCount, firstVertex, firstInstance) {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ pass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
 }
 
-function _dawnRenderPassEncoderEndPass() {
- console.warn("dawnRenderPassEncoderEndPass: unimplemented");
+function _dawnRenderPassEncoderEndPass(passId) {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ pass.endPass();
 }
 
 function _dawnRenderPassEncoderRelease(id) {
  WebGPU.mgrRenderPassEncoder.release(id);
 }
 
-function _dawnRenderPassEncoderSetPipeline() {
- console.warn("dawnRenderPassEncoderSetPipeline: unimplemented");
+function _dawnRenderPassEncoderSetPipeline(passId, pipelineId) {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ var pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+ pass.setPipeline(pipeline);
 }
 
 function _dawnRenderPipelineRelease(id) {
@@ -1673,8 +1740,23 @@ function _dawnShaderModuleRelease(id) {
  WebGPU.mgrShaderModule.release(id);
 }
 
-function _dawnTextureCreateView() {
- console.warn("dawnTextureCreateView: unimplemented");
+function _dawnTextureCreateView(textureId, descriptor) {
+ var desc;
+ if (descriptor !== 0) {
+  assert(descriptor !== 0);
+  assert(HEAP32[descriptor >> 2] === 0);
+  desc = {
+   format: WebGPU.TextureFormat[HEAPU32[descriptor + 4 >> 2]],
+   dimension: WebGPU.TextureViewDimension[HEAPU32[descriptor + 8 >> 2]],
+   baseMipLevel: HEAPU32[descriptor + 12 >> 2],
+   mipLevelCount: HEAPU32[descriptor + 16 >> 2],
+   baseArrayLayer: HEAPU32[descriptor + 20 >> 2],
+   arrayLayerCount: HEAPU32[descriptor + 24 >> 2],
+   aspect: WebGPU.TextureAspect[HEAPU32[descriptor + 28 >> 2]]
+  };
+ }
+ var texture = WebGPU.mgrTexture.get(textureId);
+ return WebGPU.mgrTextureView.create(texture.createView(desc));
 }
 
 function _dawnTextureReference(id) {

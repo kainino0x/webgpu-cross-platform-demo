@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "make -C out/web",
+            "type": "shell",
+            "command": "make -C out/web clean hello",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "make -C out/native",
+            "type": "shell",
+            "command": "make -C out/native clean hello",
+            "group": {
+                "kind": "build"
+            }
+        }
+    ]
+}
