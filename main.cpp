@@ -81,7 +81,6 @@ void readCallback(DawnBufferMapAsyncStatus status, const void* ptr, uint64_t siz
 
 void printDeviceError(DawnErrorType errorType, const char* message, void*) {
     printf("%d: %s\n", errorType, message);
-    abort();
 }
 
 void init() {

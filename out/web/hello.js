@@ -581,6 +581,13 @@ function lengthBytesUTF8(str) {
 
 var UTF16Decoder = typeof TextDecoder !== "undefined" ? new TextDecoder("utf-16le") : undefined;
 
+function allocateUTF8(str) {
+ var size = lengthBytesUTF8(str) + 1;
+ var ret = _malloc(size);
+ if (ret) stringToUTF8Array(str, HEAP8, ret, size);
+ return ret;
+}
+
 function allocateUTF8OnStack(str) {
  var size = lengthBytesUTF8(str) + 1;
  var ret = stackAlloc(size);
@@ -1583,7 +1590,7 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
   assert(dssPtr !== 0);
   return {
    format: WebGPU.TextureFormat[HEAPU32[dssPtr + 4 >> 2]],
-   depthWriteEnabled: true,
+   depthWriteEnabled: HEAP32[dssPtr + 8 >> 2] !== 0,
    depthCompare: WebGPU.CompareFunction[HEAPU32[dssPtr + 12 >> 2]],
    stencilFront: makeStencilStateFace(HEAP32[dssPtr + 16 >> 2]),
    stencilBack: makeStencilStateFace(HEAP32[dssPtr + 32 >> 2]),
@@ -1641,7 +1648,8 @@ function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
   depthStencilState: makeDepthStencilState(HEAP32[descriptor + 40 >> 2]),
   vertexInput: makeVertexInput(HEAP32[descriptor + 24 >> 2]),
   sampleCount: HEAPU32[descriptor + 36 >> 2],
-  sampleMask: HEAPU32[descriptor + 52 >> 2]
+  sampleMask: HEAPU32[descriptor + 52 >> 2],
+  alphaToCoverageEnabled: HEAP32[descriptor + 56 >> 2] !== 0
  };
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrRenderPipeline.create(device.createRenderPipeline(desc));
@@ -1686,8 +1694,9 @@ function _dawnDeviceSetUncapturedErrorCallback(deviceId, callback, userdata) {
   var OutOfMemory = 2;
   var type;
   if (ev.error instanceof GPUValidationError) type = Validation; else if (ev.error instanceof GPUOutOfMemoryError) type = OutOfMemory;
-  var message = 0;
-  dynCall("viii", callback, [ type, message, userdata ]);
+  var messagePtr = allocateUTF8(ev.error.message);
+  dynCall("viii", callback, [ type, messagePtr, userdata ]);
+  _free(messagePtr);
  };
 }
 
