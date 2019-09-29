@@ -2082,12 +2082,15 @@ function copyTempDouble(ptr) {
         this.mgrCommandEncoder = this.mgrCommandEncoder || makeManager();
         this.mgrRenderPassEncoder = this.mgrRenderPassEncoder || makeManager();
   
+        this.mgrBindGroup = this.mgrBindGroup || makeManager();
         this.mgrBuffer = this.mgrBuffer || makeManager();
+        this.mgrSampler = this.mgrSampler || makeManager();
         this.mgrTexture = this.mgrTexture || makeManager();
         this.mgrTextureView = this.mgrTextureView || makeManager();
   
-        this.mgrRenderPipeline = this.mgrRenderPipeline || makeManager();
+        this.mgrBindGroupLayout = this.mgrBindGroupLayout || makeManager();
         this.mgrPipelineLayout = this.mgrPipelineLayout || makeManager();
+        this.mgrRenderPipeline = this.mgrRenderPipeline || makeManager();
         this.mgrShaderModule = this.mgrShaderModule || makeManager();
       },makeColor:function (ptr) {
         return {
@@ -2185,11 +2188,10 @@ function copyTempDouble(ptr) {
         };
       }
   
-      function makeColorAttachments(count, caPtrs) {
+      function makeColorAttachments(count, caPtr) {
         var attachments = [];
         for (var i = 0; i < count; ++i) {
-          attachments.push(makeColorAttachment(
-            HEAP32[(((caPtrs)+(i * 4))>>2)]));
+          attachments.push(makeColorAttachment(caPtr + 32 * i));
         }
         return attachments;
       }
@@ -2334,13 +2336,12 @@ function copyTempDouble(ptr) {
         };
       }
   
-      function makeColorStates(count, csPtrs) {
+      function makeColorStates(count, csPtr) {
         if (count === 0) return undefined;
   
         var states = [];
         for (var i = 0; i < count; ++i) {
-          states.push(makeColorState(
-            HEAP32[(((csPtrs)+(i * 4))>>2)]));
+          states.push(makeColorState(csPtr + 36 * i));
         }
         return states;
       }
@@ -2366,7 +2367,7 @@ function copyTempDouble(ptr) {
         return {
           format: WebGPU.TextureFormat[
             HEAPU32[(((dssPtr)+(4))>>2)]],
-          depthWriteEnabled: (HEAP32[(((dssPtr)+(8))>>2)] !== 0),
+          depthWriteEnabled: (HEAP8[(((dssPtr)+(8))>>0)] !== 0),
           depthCompare: WebGPU.CompareFunction[
             HEAPU32[(((dssPtr)+(12))>>2)]],
           stencilFront: makeStencilStateFace(
@@ -2404,6 +2405,7 @@ function copyTempDouble(ptr) {
           stride: HEAPU32[((vbPtr)>>2)],
           stepMode: WebGPU.InputStepMode[
             HEAPU32[(((vbPtr)+(8))>>2)]],
+          // TODO(kainino0x): Update naming once Dawn matches WebGPU.
           attributeSet: makeVertexAttributes(
             HEAPU32[(((vbPtr)+(12))>>2)],
             HEAP32[(((vbPtr)+(16))>>2)]),
@@ -2453,7 +2455,7 @@ function copyTempDouble(ptr) {
           HEAP32[(((descriptor)+(24))>>2)]),
         sampleCount: HEAPU32[(((descriptor)+(36))>>2)],
         sampleMask: HEAPU32[(((descriptor)+(52))>>2)],
-        alphaToCoverageEnabled: (HEAP32[(((descriptor)+(56))>>2)] !== 0),
+        alphaToCoverageEnabled: (HEAP8[(((descriptor)+(56))>>0)] !== 0),
       };
   
       var device = WebGPU.mgrDevice.get(deviceId);

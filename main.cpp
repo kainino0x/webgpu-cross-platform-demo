@@ -114,8 +114,6 @@ void init() {
         dawn::ColorStateDescriptor colorStateDescriptor = {};
         colorStateDescriptor.format = dawn::TextureFormat::BGRA8Unorm;
 
-        dawn::ColorStateDescriptor* colorStates[] = {&colorStateDescriptor};
-
         dawn::PipelineLayoutDescriptor pl = {};
         pl.bindGroupLayoutCount = 0;
         pl.bindGroupLayouts = nullptr;
@@ -126,7 +124,7 @@ void init() {
         descriptor.vertexStage.entryPoint = "main";
         descriptor.fragmentStage = &fragmentStage;
         descriptor.colorStateCount = 1;
-        descriptor.colorStates = colorStates;
+        descriptor.colorStates = &colorStateDescriptor;
         descriptor.primitiveTopology = dawn::PrimitiveTopology::TriangleList;
         pipeline = device.CreateRenderPipeline(&descriptor);
     }
@@ -139,11 +137,9 @@ void render(dawn::Texture texture) {
     attachment.storeOp = dawn::StoreOp::Store;
     attachment.clearColor = {0, 0, 0, 1};
 
-    dawn::RenderPassColorAttachmentDescriptor* attachments[1] = {&attachment};
-
     dawn::RenderPassDescriptor renderpass = {};
     renderpass.colorAttachmentCount = 1;
-    renderpass.colorAttachments = attachments;
+    renderpass.colorAttachments = &attachment;
 
     dawn::CommandBuffer commands;
     {

@@ -23,14 +23,14 @@ set(HELLO_SOURCES
     )
 if(EMSCRIPTEN)
     set(HELLO_SOURCES ${HELLO_SOURCES}
-        "${DAWN_BUILD_DIR}/gen/src/dawn/dawn/dawncpp.cpp"
+        "${DAWN_BUILD_DIR}/gen/src/dawn/dawncpp.cpp"
         )
 endif()
 
 add_executable(hello ${HELLO_SOURCES})
 
 target_include_directories(hello
-    PRIVATE "${DAWN_BUILD_DIR}/gen"
+    PRIVATE "${DAWN_BUILD_DIR}/gen/src/include"
     PRIVATE "${DAWN_SOURCE_DIR}/src/include"
     )
 
