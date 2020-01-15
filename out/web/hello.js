@@ -65,13 +65,6 @@ if (Module['ENVIRONMENT']) {
 }
 
 
-// Three configurations we can be running in:
-// 1) We could be the application main() thread running in the main JS UI thread. (ENVIRONMENT_IS_WORKER == false and ENVIRONMENT_IS_PTHREAD == false)
-// 2) We could be the application main() thread proxied to worker. (with Emscripten -s PROXY_TO_WORKER=1) (ENVIRONMENT_IS_WORKER == true, ENVIRONMENT_IS_PTHREAD == false)
-// 3) We could be an application pthread running in a worker. (ENVIRONMENT_IS_WORKER == true and ENVIRONMENT_IS_PTHREAD == true)
-
-
-
 
 // `/` should be present at the end if `scriptDirectory` is not empty
 var scriptDirectory = '';
@@ -88,21 +81,18 @@ var read_,
     readBinary,
     setWindowTitle;
 
+var nodeFS;
+var nodePath;
+
 if (ENVIRONMENT_IS_NODE) {
   scriptDirectory = __dirname + '/';
 
-  // Expose functionality in the same simple way that the shells work
-  // Note that we pollute the global namespace here, otherwise we break in node
-  var nodeFS;
-  var nodePath;
 
   read_ = function shell_read(filename, binary) {
-    var ret;
-      if (!nodeFS) nodeFS = require('fs');
-      if (!nodePath) nodePath = require('path');
-      filename = nodePath['normalize'](filename);
-      ret = nodeFS['readFileSync'](filename);
-    return binary ? ret : ret.toString();
+    if (!nodeFS) nodeFS = require('fs');
+    if (!nodePath) nodePath = require('path');
+    filename = nodePath['normalize'](filename);
+    return nodeFS['readFileSync'](filename, binary ? null : 'utf8');
   };
 
   readBinary = function readBinary(filename) {
@@ -113,6 +103,9 @@ if (ENVIRONMENT_IS_NODE) {
     assert(ret.buffer);
     return ret;
   };
+
+
+
 
   if (process['argv'].length > 1) {
     thisProgram = process['argv'][1].replace(/\\/g, '/');
@@ -138,6 +131,8 @@ if (ENVIRONMENT_IS_NODE) {
   };
 
   Module['inspect'] = function () { return '[Emscripten Module object]'; };
+
+
 } else
 if (ENVIRONMENT_IS_SHELL) {
 
@@ -177,6 +172,10 @@ if (ENVIRONMENT_IS_SHELL) {
     console.warn = console.error = typeof printErr !== 'undefined' ? printErr : print;
   }
 } else
+
+// Note that this includes Node.js workers when relevant (pthreads is enabled).
+// Node.js workers are detected as a combination of ENVIRONMENT_IS_WORKER and
+// ENVIRONMENT_HAS_NODE.
 if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
   if (ENVIRONMENT_IS_WORKER) { // Check worker, not web, since window could be polyfilled
     scriptDirectory = self.location.href;
@@ -192,6 +191,11 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
   } else {
     scriptDirectory = '';
   }
+
+
+  // Differentiate the Web Worker from the Node Worker case, as reading must
+  // be done differently.
+  {
 
 
   read_ = function shell_read(url) {
@@ -226,11 +230,17 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
     xhr.send(null);
   };
 
+
+
+
+  }
+
   setWindowTitle = function(title) { document.title = title };
 } else
 {
   throw new Error('environment detection error');
 }
+
 
 // Set up the out() and err() hooks, which are how we can print to stdout or
 // stderr, respectively.
@@ -251,9 +261,9 @@ moduleOverrides = null;
 // to the proper local x. This has two benefits: first, we only emit it if it is
 // expected to arrive, and second, by using a local everywhere else that can be
 // minified.
-if (Module['arguments']) arguments_ = Module['arguments'];if (!Object.getOwnPropertyDescriptor(Module, 'arguments')) Object.defineProperty(Module, 'arguments', { get: function() { abort('Module.arguments has been replaced with plain arguments_') } });
-if (Module['thisProgram']) thisProgram = Module['thisProgram'];if (!Object.getOwnPropertyDescriptor(Module, 'thisProgram')) Object.defineProperty(Module, 'thisProgram', { get: function() { abort('Module.thisProgram has been replaced with plain thisProgram') } });
-if (Module['quit']) quit_ = Module['quit'];if (!Object.getOwnPropertyDescriptor(Module, 'quit')) Object.defineProperty(Module, 'quit', { get: function() { abort('Module.quit has been replaced with plain quit_') } });
+if (Module['arguments']) arguments_ = Module['arguments'];if (!Object.getOwnPropertyDescriptor(Module, 'arguments')) Object.defineProperty(Module, 'arguments', { configurable: true, get: function() { abort('Module.arguments has been replaced with plain arguments_') } });
+if (Module['thisProgram']) thisProgram = Module['thisProgram'];if (!Object.getOwnPropertyDescriptor(Module, 'thisProgram')) Object.defineProperty(Module, 'thisProgram', { configurable: true, get: function() { abort('Module.thisProgram has been replaced with plain thisProgram') } });
+if (Module['quit']) quit_ = Module['quit'];if (!Object.getOwnPropertyDescriptor(Module, 'quit')) Object.defineProperty(Module, 'quit', { configurable: true, get: function() { abort('Module.quit has been replaced with plain quit_') } });
 
 // perform assertions in shell.js after we set up out() and err(), as otherwise if an assertion fails it cannot print the message
 // Assertions on removed incoming Module JS APIs.
@@ -265,10 +275,14 @@ assert(typeof Module['read'] === 'undefined', 'Module.read option was removed (m
 assert(typeof Module['readAsync'] === 'undefined', 'Module.readAsync option was removed (modify readAsync in JS)');
 assert(typeof Module['readBinary'] === 'undefined', 'Module.readBinary option was removed (modify readBinary in JS)');
 assert(typeof Module['setWindowTitle'] === 'undefined', 'Module.setWindowTitle option was removed (modify setWindowTitle in JS)');
-if (!Object.getOwnPropertyDescriptor(Module, 'read')) Object.defineProperty(Module, 'read', { get: function() { abort('Module.read has been replaced with plain read_') } });
-if (!Object.getOwnPropertyDescriptor(Module, 'readAsync')) Object.defineProperty(Module, 'readAsync', { get: function() { abort('Module.readAsync has been replaced with plain readAsync') } });
-if (!Object.getOwnPropertyDescriptor(Module, 'readBinary')) Object.defineProperty(Module, 'readBinary', { get: function() { abort('Module.readBinary has been replaced with plain readBinary') } });
-// TODO: add when SDL2 is fixed if (!Object.getOwnPropertyDescriptor(Module, 'setWindowTitle')) Object.defineProperty(Module, 'setWindowTitle', { get: function() { abort('Module.setWindowTitle has been replaced with plain setWindowTitle') } });
+if (!Object.getOwnPropertyDescriptor(Module, 'read')) Object.defineProperty(Module, 'read', { configurable: true, get: function() { abort('Module.read has been replaced with plain read_') } });
+if (!Object.getOwnPropertyDescriptor(Module, 'readAsync')) Object.defineProperty(Module, 'readAsync', { configurable: true, get: function() { abort('Module.readAsync has been replaced with plain readAsync') } });
+if (!Object.getOwnPropertyDescriptor(Module, 'readBinary')) Object.defineProperty(Module, 'readBinary', { configurable: true, get: function() { abort('Module.readBinary has been replaced with plain readBinary') } });
+// TODO: add when SDL2 is fixed if (!Object.getOwnPropertyDescriptor(Module, 'setWindowTitle')) Object.defineProperty(Module, 'setWindowTitle', { configurable: true, get: function() { abort('Module.setWindowTitle has been replaced with plain setWindowTitle') } });
+var IDBFS = 'IDBFS is no longer included by default; build with -lidbfs.js';
+var PROXYFS = 'PROXYFS is no longer included by default; build with -lproxyfs.js';
+var WORKERFS = 'WORKERFS is no longer included by default; build with -lworkerfs.js';
+var NODEFS = 'NODEFS is no longer included by default; build with -lnodefs.js';
 
 
 // TODO remove when SDL2 is fixed (also see above)
@@ -340,25 +354,33 @@ function warnOnce(text) {
   }
 }
 
-var asm2wasmImports = { // special asm2wasm imports
-    "f64-rem": function(x, y) {
-        return x % y;
-    },
-    "debugger": function() {
-        debugger;
-    }
-};
 
 
 
-var jsCallStartIndex = 1;
-var functionPointers = new Array(0);
 
 // Wraps a JS function as a wasm function with a given signature.
-// In the future, we may get a WebAssembly.Function constructor. Until then,
-// we create a wasm module that takes the JS function as an import with a given
-// signature, and re-exports that as a wasm function.
 function convertJsFunctionToWasm(func, sig) {
+
+  // If the type reflection proposal is available, use the new
+  // "WebAssembly.Function" constructor.
+  // Otherwise, construct a minimal wasm module importing the JS function and
+  // re-exporting it.
+  if (typeof WebAssembly.Function === "function") {
+    var typeNames = {
+      'i': 'i32',
+      'j': 'i64',
+      'f': 'f32',
+      'd': 'f64'
+    };
+    var type = {
+      parameters: [],
+      results: sig[0] == 'v' ? [] : [typeNames[sig[0]]]
+    };
+    for (var i = 1; i < sig.length; ++i) {
+      type.parameters.push(typeNames[sig[i]]);
+    }
+    return new WebAssembly.Function(type, func);
+  }
 
   // The module is static, with the exception of the type section, which is
   // generated based on the signature passed in.
@@ -412,11 +434,11 @@ function convertJsFunctionToWasm(func, sig) {
   // This accepts an import (at "e.f"), that it reroutes to an export (at "f")
   var module = new WebAssembly.Module(bytes);
   var instance = new WebAssembly.Instance(module, {
-    e: {
-      f: func
+    'e': {
+      'f': func
     }
   });
-  var wrappedFunc = instance.exports.f;
+  var wrappedFunc = instance.exports['f'];
   return wrappedFunc;
 }
 
@@ -429,7 +451,7 @@ function addFunctionWasm(func, sig) {
   try {
     table.grow(1);
   } catch (err) {
-    if (!err instanceof RangeError) {
+    if (!(err instanceof RangeError)) {
       throw err;
     }
     throw 'Unable to grow wasm table. Use a higher value for RESERVED_FUNCTION_POINTERS or set ALLOW_TABLE_GROWTH.';
@@ -440,7 +462,7 @@ function addFunctionWasm(func, sig) {
     // Attempting to call this with JS function will cause of table.set() to fail
     table.set(ret, func);
   } catch (err) {
-    if (!err instanceof TypeError) {
+    if (!(err instanceof TypeError)) {
       throw err;
     }
     assert(typeof sig !== 'undefined', 'Missing signature argument to addFunction');
@@ -458,22 +480,13 @@ function removeFunctionWasm(index) {
 // 'sig' parameter is required for the llvm backend but only when func is not
 // already a WebAssembly function.
 function addFunction(func, sig) {
+  assert(typeof func !== 'undefined');
 
-
-  var base = 0;
-  for (var i = base; i < base + 0; i++) {
-    if (!functionPointers[i]) {
-      functionPointers[i] = func;
-      return jsCallStartIndex + i;
-    }
-  }
-  throw 'Finished up all reserved function pointers. Use a higher value for RESERVED_FUNCTION_POINTERS.';
-
+  return addFunctionWasm(func, sig);
 }
 
 function removeFunction(index) {
-
-  functionPointers[index-jsCallStartIndex] = null;
+  removeFunctionWasm(index);
 }
 
 var funcWrappers = {};
@@ -512,6 +525,7 @@ function makeBigInt(low, high, unsigned) {
 
 function dynCall(sig, ptr, args) {
   if (args && args.length) {
+    // j (64-bit integer) must be passed in as two numbers [low 32, high 32].
     assert(args.length === sig.substring(1).replace(/j/g, '--').length);
     assert(('dynCall_' + sig) in Module, 'bad function pointer type - no table for sig \'' + sig + '\'');
     return Module['dynCall_' + sig].apply(null, [ptr].concat(args));
@@ -563,7 +577,8 @@ var GLOBAL_BASE = 1024;
 //    is up at http://kripken.github.io/emscripten-site/docs/api_reference/preamble.js.html
 
 
-var wasmBinary;if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];if (!Object.getOwnPropertyDescriptor(Module, 'wasmBinary')) Object.defineProperty(Module, 'wasmBinary', { get: function() { abort('Module.wasmBinary has been replaced with plain wasmBinary') } });
+var wasmBinary;if (Module['wasmBinary']) wasmBinary = Module['wasmBinary'];if (!Object.getOwnPropertyDescriptor(Module, 'wasmBinary')) Object.defineProperty(Module, 'wasmBinary', { configurable: true, get: function() { abort('Module.wasmBinary has been replaced with plain wasmBinary') } });
+var noExitRuntime;if (Module['noExitRuntime']) noExitRuntime = Module['noExitRuntime'];if (!Object.getOwnPropertyDescriptor(Module, 'noExitRuntime')) Object.defineProperty(Module, 'noExitRuntime', { configurable: true, get: function() { abort('Module.noExitRuntime has been replaced with plain noExitRuntime') } });
 
 
 if (typeof WebAssembly !== 'object') {
@@ -615,8 +630,14 @@ function getValue(ptr, type, noSafe) {
 
 var wasmMemory;
 
-// Potentially used for direct table calls.
-var wasmTable;
+// In fastcomp asm.js, we don't need a wasm Table at all.
+// In the wasm backend, we polyfill the WebAssembly object,
+// so this creates a (non-native-wasm) table for us.
+var wasmTable = new WebAssembly.Table({
+  'initial': 13,
+  'maximum': 13 + 0,
+  'element': 'anyfunc'
+});
 
 
 //========================================
@@ -689,7 +710,6 @@ function ccall(ident, returnType, argTypes, args, opts) {
     }
   }
   var ret = func.apply(null, cArgs);
-  assert(!(opts && opts.async), 'async call is only supported with Emterpretify for now, see #9029');
 
   ret = convertReturnValue(ret);
   if (stack !== 0) stackRestore(stack);
@@ -800,11 +820,6 @@ function getMemory(size) {
 
 
 
-
-/** @type {function(number, number=)} */
-function Pointer_stringify(ptr, length) {
-  abort("this function has been removed - you should use UTF8ToString(ptr, maxBytesToRead) instead!");
-}
 
 // Given a pointer 'ptr' to a null-terminated ASCII-encoded string in the emscripten HEAP, returns
 // a copy of that string as a Javascript String object.
@@ -1206,24 +1221,24 @@ var HEAP,
 /** @type {Float64Array} */
   HEAPF64;
 
-function updateGlobalBufferViews() {
-  Module['HEAP8'] = HEAP8 = new Int8Array(buffer);
-  Module['HEAP16'] = HEAP16 = new Int16Array(buffer);
-  Module['HEAP32'] = HEAP32 = new Int32Array(buffer);
-  Module['HEAPU8'] = HEAPU8 = new Uint8Array(buffer);
-  Module['HEAPU16'] = HEAPU16 = new Uint16Array(buffer);
-  Module['HEAPU32'] = HEAPU32 = new Uint32Array(buffer);
-  Module['HEAPF32'] = HEAPF32 = new Float32Array(buffer);
-  Module['HEAPF64'] = HEAPF64 = new Float64Array(buffer);
+function updateGlobalBufferAndViews(buf) {
+  buffer = buf;
+  Module['HEAP8'] = HEAP8 = new Int8Array(buf);
+  Module['HEAP16'] = HEAP16 = new Int16Array(buf);
+  Module['HEAP32'] = HEAP32 = new Int32Array(buf);
+  Module['HEAPU8'] = HEAPU8 = new Uint8Array(buf);
+  Module['HEAPU16'] = HEAPU16 = new Uint16Array(buf);
+  Module['HEAPU32'] = HEAPU32 = new Uint32Array(buf);
+  Module['HEAPF32'] = HEAPF32 = new Float32Array(buf);
+  Module['HEAPF64'] = HEAPF64 = new Float64Array(buf);
 }
 
-
 var STATIC_BASE = 1024,
-    STACK_BASE = 17312,
+    STACK_BASE = 5248368,
     STACKTOP = STACK_BASE,
-    STACK_MAX = 5260192,
-    DYNAMIC_BASE = 5260192,
-    DYNAMICTOP_PTR = 17280;
+    STACK_MAX = 5488,
+    DYNAMIC_BASE = 5248368,
+    DYNAMICTOP_PTR = 5328;
 
 assert(STACK_BASE % 16 === 0, 'stack must start aligned');
 assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1233,7 +1248,7 @@ assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
 var TOTAL_STACK = 5242880;
 if (Module['TOTAL_STACK']) assert(TOTAL_STACK === Module['TOTAL_STACK'], 'the stack size can no longer be determined at runtime')
 
-var INITIAL_TOTAL_MEMORY = Module['TOTAL_MEMORY'] || 16777216;if (!Object.getOwnPropertyDescriptor(Module, 'TOTAL_MEMORY')) Object.defineProperty(Module, 'TOTAL_MEMORY', { get: function() { abort('Module.TOTAL_MEMORY has been replaced with plain INITIAL_TOTAL_MEMORY') } });
+var INITIAL_TOTAL_MEMORY = Module['TOTAL_MEMORY'] || 16777216;if (!Object.getOwnPropertyDescriptor(Module, 'TOTAL_MEMORY')) Object.defineProperty(Module, 'TOTAL_MEMORY', { configurable: true, get: function() { abort('Module.TOTAL_MEMORY has been replaced with plain INITIAL_TOTAL_MEMORY') } });
 
 assert(INITIAL_TOTAL_MEMORY >= TOTAL_STACK, 'TOTAL_MEMORY should be larger than TOTAL_STACK, was ' + INITIAL_TOTAL_MEMORY + '! (TOTAL_STACK=' + TOTAL_STACK + ')');
 
@@ -1246,6 +1261,11 @@ assert(typeof Int32Array !== 'undefined' && typeof Float64Array !== 'undefined' 
 
 
 
+// In standalone mode, the wasm creates the memory, and the user can't provide it.
+// In non-standalone/normal mode, we create the memory here.
+
+// Create the main memory. (Note: this isn't used in STANDALONE_WASM mode since the wasm
+// memory is created in the wasm, not in JS.)
 
   if (Module['wasmMemory']) {
     wasmMemory = Module['wasmMemory'];
@@ -1267,23 +1287,29 @@ if (wasmMemory) {
 // specifically provide the memory length with Module['TOTAL_MEMORY'].
 INITIAL_TOTAL_MEMORY = buffer.byteLength;
 assert(INITIAL_TOTAL_MEMORY % WASM_PAGE_SIZE === 0);
-updateGlobalBufferViews();
+updateGlobalBufferAndViews(buffer);
 
 HEAP32[DYNAMICTOP_PTR>>2] = DYNAMIC_BASE;
+
+
 
 
 // Initializes the stack cookie. Called at the startup of main and at the startup of each thread in pthreads mode.
 function writeStackCookie() {
   assert((STACK_MAX & 3) == 0);
-  HEAPU32[(STACK_MAX >> 2)-1] = 0x02135467;
-  HEAPU32[(STACK_MAX >> 2)-2] = 0x89BACDFE;
+  // The stack grows downwards
+  HEAPU32[(STACK_MAX >> 2)+1] = 0x2135467;
+  HEAPU32[(STACK_MAX >> 2)+2] = 0x89BACDFE;
+  // Also test the global address 0 for integrity.
+  // We don't do this with ASan because ASan does its own checks for this.
+  HEAP32[0] = 0x63736d65; /* 'emsc' */
 }
 
 function checkStackCookie() {
-  var cookie1 = HEAPU32[(STACK_MAX >> 2)-1];
-  var cookie2 = HEAPU32[(STACK_MAX >> 2)-2];
-  if (cookie1 != 0x02135467 || cookie2 != 0x89BACDFE) {
-    abort('Stack overflow! Stack cookie has been overwritten, expected hex dwords 0x89BACDFE and 0x02135467, but received 0x' + cookie2.toString(16) + ' ' + cookie1.toString(16));
+  var cookie1 = HEAPU32[(STACK_MAX >> 2)+1];
+  var cookie2 = HEAPU32[(STACK_MAX >> 2)+2];
+  if (cookie1 != 0x2135467 || cookie2 != 0x89BACDFE) {
+    abort('Stack overflow! Stack cookie has been overwritten, expected hex dwords 0x89BACDFE and 0x2135467, but received 0x' + cookie2.toString(16) + ' ' + cookie1.toString(16));
   }
   // Also test the global address 0 for integrity.
   // We don't do this with ASan because ASan does its own checks for this.
@@ -1295,13 +1321,15 @@ function abortStackOverflow(allocSize) {
 }
 
 
-  HEAP32[0] = 0x63736d65; /* 'emsc' */
-
 
 
 // Endianness check (note: assumes compiler arch was little-endian)
-HEAP16[1] = 0x6373;
-if (HEAPU8[2] !== 0x73 || HEAPU8[3] !== 0x63) throw 'Runtime error: expected the system to be little-endian!';
+(function() {
+  var h16 = new Int16Array(1);
+  var h8 = new Int8Array(h16.buffer);
+  h16[0] = 0x6373;
+  if (h8[0] !== 0x73 || h8[1] !== 0x63) throw 'Runtime error: expected the system to be little-endian!';
+})();
 
 function abortFnPtrError(ptr, sig) {
 	abort("Invalid function pointer " + ptr + " called with signature '" + sig + "'. Perhaps this is an invalid value (e.g. caused by calling a virtual method on a NULL pointer)? Or calling a function with an incorrect type, which will fail? (it is worth building your source files with -Werror (warnings are errors), as warnings can indicate undefined behavior which can cause this). Build with ASSERTIONS=2 for more info.");
@@ -1540,8 +1568,29 @@ Module["preloadedImages"] = {}; // maps url to image data
 Module["preloadedAudios"] = {}; // maps url to audio data
 
 
-var memoryInitializer = null;
+function abort(what) {
+  if (Module['onAbort']) {
+    Module['onAbort'](what);
+  }
 
+  what += '';
+  out(what);
+  err(what);
+
+  ABORT = true;
+  EXITSTATUS = 1;
+
+  var output = 'abort(' + what + ') at ' + stackTrace();
+  what = output;
+
+  // Throw a wasm runtime error, because a JS error might be seen as a foreign
+  // exception, which means we'd run destructors on it. We need the error to
+  // simply make the program stop.
+  throw new WebAssembly.RuntimeError(what);
+}
+
+
+var memoryInitializer = null;
 
 
 
@@ -1630,18 +1679,11 @@ function getBinaryPromise() {
 
 // Create the wasm instance.
 // Receives the wasm imports, returns the exports.
-function createWasm(env) {
-
+function createWasm() {
   // prepare imports
   var info = {
-    'env': env
-    ,
-    'global': {
-      'NaN': NaN,
-      'Infinity': Infinity
-    },
-    'global.Math': Math,
-    'asm2wasm': asm2wasmImports
+    'env': asmLibraryArg,
+    'wasi_snapshot_preview1': asmLibraryArg
   };
   // Load the wasm module and create an instance of using native support in the JS engine.
   // handle a generated wasm instance, receiving its exports and
@@ -1716,30 +1758,6 @@ function createWasm(env) {
   return {}; // no exports yet; we'll fill them in later
 }
 
-// Provide an "asm.js function" for the application, called to "link" the asm.js module. We instantiate
-// the wasm module at that time, and it receives imports and provides exports and so forth, the app
-// doesn't need to care that it is wasm or asm.js.
-
-Module['asm'] = function(global, env, providedBuffer) {
-  // memory was already allocated (so js could use the buffer)
-  env['memory'] = wasmMemory
-  ;
-  // import table
-  env['table'] = wasmTable = new WebAssembly.Table({
-    'initial': 1894,
-    'maximum': 1894,
-    'element': 'anyfunc'
-  });
-  // With the wasm backend __memory_base and __table_base and only needed for
-  // relocatable output.
-  env['__memory_base'] = 1024; // tell the memory segments where to place themselves
-  // table starts at 0 by default (even in dynamic linking, for the main module)
-  env['__table_base'] = 0;
-
-  var exports = createWasm(env);
-  assert(exports, 'binaryen setup failed (no wasm support?)');
-  return exports;
-};
 
 // Globals used by JS i64 conversions
 var tempDouble;
@@ -1747,44 +1765,20 @@ var tempI64;
 
 // === Body ===
 
-var ASM_CONSTS = [];
+var ASM_CONSTS = {
+  
+};
 
 
 
 
-
-// STATICTOP = STATIC_BASE + 16288;
-/* global initializers */ /*__ATINIT__.push();*/
-
-
-
-
+// STATICTOP = STATIC_BASE + 4464;
+/* global initializers */  __ATINIT__.push({ func: function() { ___wasm_call_ctors() } });
 
 
 
 
 /* no memory initializer */
-var tempDoublePtr = 17296
-assert(tempDoublePtr % 8 == 0);
-
-function copyTempFloat(ptr) { // functions, because inlining this code increases code size too much
-  HEAP8[tempDoublePtr] = HEAP8[ptr];
-  HEAP8[tempDoublePtr+1] = HEAP8[ptr+1];
-  HEAP8[tempDoublePtr+2] = HEAP8[ptr+2];
-  HEAP8[tempDoublePtr+3] = HEAP8[ptr+3];
-}
-
-function copyTempDouble(ptr) {
-  HEAP8[tempDoublePtr] = HEAP8[ptr];
-  HEAP8[tempDoublePtr+1] = HEAP8[ptr+1];
-  HEAP8[tempDoublePtr+2] = HEAP8[ptr+2];
-  HEAP8[tempDoublePtr+3] = HEAP8[ptr+3];
-  HEAP8[tempDoublePtr+4] = HEAP8[ptr+4];
-  HEAP8[tempDoublePtr+5] = HEAP8[ptr+5];
-  HEAP8[tempDoublePtr+6] = HEAP8[ptr+6];
-  HEAP8[tempDoublePtr+7] = HEAP8[ptr+7];
-}
-
 // {{PRE_LIBRARY}}
 
 
@@ -1795,7 +1789,7 @@ function copyTempDouble(ptr) {
 
   function demangleAll(text) {
       var regex =
-        /\b__Z[\w\d_]+/g;
+        /\b_Z[\w\d_]+/g;
       return text.replace(regex,
         function(x) {
           var y = demangle(x);
@@ -1831,778 +1825,51 @@ function copyTempDouble(ptr) {
     }
 
   
-  var ___exception_infos={};
-  
-  var ___exception_caught= [];
-  
-  function ___exception_addRef(ptr) {
-      if (!ptr) return;
-      var info = ___exception_infos[ptr];
-      info.refcount++;
-    }
-  
-  function ___exception_deAdjust(adjusted) {
-      if (!adjusted || ___exception_infos[adjusted]) return adjusted;
-      for (var key in ___exception_infos) {
-        var ptr = +key; // the iteration key is a string, and if we throw this, it must be an integer as that is what we look for
-        var adj = ___exception_infos[ptr].adjusted;
-        var len = adj.length;
-        for (var i = 0; i < len; i++) {
-          if (adj[i] === adjusted) {
-            return ptr;
-          }
-        }
-      }
-      return adjusted;
-    }function ___cxa_begin_catch(ptr) {
-      var info = ___exception_infos[ptr];
-      if (info && !info.caught) {
-        info.caught = true;
-        __ZSt18uncaught_exceptionv.uncaught_exceptions--;
-      }
-      if (info) info.rethrown = false;
-      ___exception_caught.push(ptr);
-      ___exception_addRef(___exception_deAdjust(ptr));
-      return ptr;
-    }
+  function _atexit(func, arg) {
+      warnOnce('atexit() called, but EXIT_RUNTIME is not set, so atexits() will not be called. set EXIT_RUNTIME to 1 (see the FAQ)');
+      __ATEXIT__.unshift({ func: func, arg: arg });
+    }function ___cxa_atexit(
+  ) {
+  return _atexit.apply(null, arguments)
+  }
 
-  function ___cxa_pure_virtual() {
-      ABORT = true;
-  
-      throw 'Pure virtual function called!';
-    }
-
-  function ___cxa_uncaught_exceptions() {
-      return __ZSt18uncaught_exceptionv.uncaught_exceptions;
-    }
-
-  function ___gxx_personality_v0() {
+  function ___handle_stack_overflow() {
+      abort('stack overflow')
     }
 
   function ___lock() {}
 
-  
-  
-  var PATH={splitPath:function (filename) {
-        var splitPathRe = /^(\/?|)([\s\S]*?)((?:\.{1,2}|[^\/]+?|)(\.[^.\/]*|))(?:[\/]*)$/;
-        return splitPathRe.exec(filename).slice(1);
-      },normalizeArray:function (parts, allowAboveRoot) {
-        // if the path tries to go above the root, `up` ends up > 0
-        var up = 0;
-        for (var i = parts.length - 1; i >= 0; i--) {
-          var last = parts[i];
-          if (last === '.') {
-            parts.splice(i, 1);
-          } else if (last === '..') {
-            parts.splice(i, 1);
-            up++;
-          } else if (up) {
-            parts.splice(i, 1);
-            up--;
-          }
-        }
-        // if the path is allowed to go above the root, restore leading ..s
-        if (allowAboveRoot) {
-          for (; up; up--) {
-            parts.unshift('..');
-          }
-        }
-        return parts;
-      },normalize:function (path) {
-        var isAbsolute = path.charAt(0) === '/',
-            trailingSlash = path.substr(-1) === '/';
-        // Normalize the path
-        path = PATH.normalizeArray(path.split('/').filter(function(p) {
-          return !!p;
-        }), !isAbsolute).join('/');
-        if (!path && !isAbsolute) {
-          path = '.';
-        }
-        if (path && trailingSlash) {
-          path += '/';
-        }
-        return (isAbsolute ? '/' : '') + path;
-      },dirname:function (path) {
-        var result = PATH.splitPath(path),
-            root = result[0],
-            dir = result[1];
-        if (!root && !dir) {
-          // No dirname whatsoever
-          return '.';
-        }
-        if (dir) {
-          // It has a dirname, strip trailing slash
-          dir = dir.substr(0, dir.length - 1);
-        }
-        return root + dir;
-      },basename:function (path) {
-        // EMSCRIPTEN return '/'' for '/', not an empty string
-        if (path === '/') return '/';
-        var lastSlash = path.lastIndexOf('/');
-        if (lastSlash === -1) return path;
-        return path.substr(lastSlash+1);
-      },extname:function (path) {
-        return PATH.splitPath(path)[3];
-      },join:function () {
-        var paths = Array.prototype.slice.call(arguments, 0);
-        return PATH.normalize(paths.join('/'));
-      },join2:function (l, r) {
-        return PATH.normalize(l + '/' + r);
-      }};var SYSCALLS={buffers:[null,[],[]],printChar:function (stream, curr) {
-        var buffer = SYSCALLS.buffers[stream];
-        assert(buffer);
-        if (curr === 0 || curr === 10) {
-          (stream === 1 ? out : err)(UTF8ArrayToString(buffer, 0));
-          buffer.length = 0;
-        } else {
-          buffer.push(curr);
-        }
-      },varargs:0,get:function (varargs) {
-        SYSCALLS.varargs += 4;
-        var ret = HEAP32[(((SYSCALLS.varargs)-(4))>>2)];
-        return ret;
-      },getStr:function () {
-        var ret = UTF8ToString(SYSCALLS.get());
-        return ret;
-      },get64:function () {
-        var low = SYSCALLS.get(), high = SYSCALLS.get();
-        if (low >= 0) assert(high === 0);
-        else assert(high === -1);
-        return low;
-      },getZero:function () {
-        assert(SYSCALLS.get() === 0);
-      }};function ___syscall140(which, varargs) {SYSCALLS.varargs = varargs;
-  try {
-   // llseek
-      var stream = SYSCALLS.getStreamFromFD(), offset_high = SYSCALLS.get(), offset_low = SYSCALLS.get(), result = SYSCALLS.get(), whence = SYSCALLS.get();
-      abort('it should not be possible to operate on streams when !SYSCALLS_REQUIRE_FILESYSTEM');
-      return 0;
-    } catch (e) {
-    if (typeof FS === 'undefined' || !(e instanceof FS.ErrnoError)) abort(e);
-    return -e.errno;
-  }
-  }
-
-  
-  function flush_NO_FILESYSTEM() {
-      // flush anything remaining in the buffers during shutdown
-      var fflush = Module["_fflush"];
-      if (fflush) fflush(0);
-      var buffers = SYSCALLS.buffers;
-      if (buffers[1].length) SYSCALLS.printChar(1, 10);
-      if (buffers[2].length) SYSCALLS.printChar(2, 10);
-    }function ___syscall146(which, varargs) {SYSCALLS.varargs = varargs;
-  try {
-   // writev
-      // hack to support printf in SYSCALLS_REQUIRE_FILESYSTEM=0
-      var stream = SYSCALLS.get(), iov = SYSCALLS.get(), iovcnt = SYSCALLS.get();
-      var ret = 0;
-      for (var i = 0; i < iovcnt; i++) {
-        var ptr = HEAP32[(((iov)+(i*8))>>2)];
-        var len = HEAP32[(((iov)+(i*8 + 4))>>2)];
-        for (var j = 0; j < len; j++) {
-          SYSCALLS.printChar(stream, HEAPU8[ptr+j]);
-        }
-        ret += len;
-      }
-      return ret;
-    } catch (e) {
-    if (typeof FS === 'undefined' || !(e instanceof FS.ErrnoError)) abort(e);
-    return -e.errno;
-  }
-  }
-
-  function ___syscall54(which, varargs) {SYSCALLS.varargs = varargs;
-  try {
-   // ioctl
-      return 0;
-    } catch (e) {
-    if (typeof FS === 'undefined' || !(e instanceof FS.ErrnoError)) abort(e);
-    return -e.errno;
-  }
-  }
-
-  function ___syscall6(which, varargs) {SYSCALLS.varargs = varargs;
-  try {
-   // close
-      var stream = SYSCALLS.getStreamFromFD();
-      abort('it should not be possible to operate on streams when !SYSCALLS_REQUIRE_FILESYSTEM');
-      return 0;
-    } catch (e) {
-    if (typeof FS === 'undefined' || !(e instanceof FS.ErrnoError)) abort(e);
-    return -e.errno;
-  }
-  }
-
   function ___unlock() {}
 
   function _abort() {
-      Module['abort']();
+      abort();
     }
-
-  
-  var WebGPU={initManagers:function () {
-        if (this.mgrDevice) return;
-  
-        function makeManager() {
-          return {
-            objects: [undefined],
-            create: function(object) {
-              var id = this.objects.length;
-              assert(typeof this.objects[id] === 'undefined');
-              this.objects[id] = { refcount: 1, object };
-              return id;
-            },
-            get: function(id) {
-              if (id === 0) return undefined;
-              assert(typeof this.objects[id] !== "undefined");
-              return this.objects[id].object;
-            },
-            reference: function(id) {
-              var o = this.objects[id];
-              assert(typeof o !== "undefined");
-              this.objects[id].refcount++;
-            },
-            release: function(id) {
-              var o = this.objects[id];
-              assert(typeof o !== "undefined");
-              assert(o.refcount > 0);
-              o.refcount--;
-              if (o.refcount <= 0) {
-                delete this.objects[id];
-              }
-            },
-          };
-        }
-  
-        this.mgrDevice = this.mgrDevice || makeManager();
-        this.mgrQueue = this.mgrQueue || makeManager();
-  
-        this.mgrCommandBuffer = this.mgrCommandBuffer || makeManager();
-        this.mgrCommandEncoder = this.mgrCommandEncoder || makeManager();
-        this.mgrRenderPassEncoder = this.mgrRenderPassEncoder || makeManager();
-  
-        this.mgrBindGroup = this.mgrBindGroup || makeManager();
-        this.mgrBuffer = this.mgrBuffer || makeManager();
-        this.mgrSampler = this.mgrSampler || makeManager();
-        this.mgrTexture = this.mgrTexture || makeManager();
-        this.mgrTextureView = this.mgrTextureView || makeManager();
-  
-        this.mgrBindGroupLayout = this.mgrBindGroupLayout || makeManager();
-        this.mgrPipelineLayout = this.mgrPipelineLayout || makeManager();
-        this.mgrRenderPipeline = this.mgrRenderPipeline || makeManager();
-        this.mgrShaderModule = this.mgrShaderModule || makeManager();
-      },makeColor:function (ptr) {
-        return {
-          r: HEAPF32[((ptr)>>2)],
-          g: HEAPF32[(((ptr)+(4))>>2)],
-          b: HEAPF32[(((ptr)+(8))>>2)],
-          a: HEAPF32[(((ptr)+(12))>>2)],
-        };
-      },makeExtent3D:function (ptr) {
-        return {
-          width: HEAPU32[((ptr)>>2)],
-          height: HEAPU32[(((ptr)+(4))>>2)],
-          depth: HEAPU32[(((ptr)+(8))>>2)],
-        };
-      },makeOrigin3D:function (ptr) {
-        return {
-          x: HEAPU32[((ptr)>>2)],
-          y: HEAPU32[(((ptr)+(4))>>2)],
-          z: HEAPU32[(((ptr)+(8))>>2)],
-        };
-      },makeTextureCopyView:function (ptr) {
-        assert(ptr !== 0);assert(HEAP32[((ptr)>>2)] === 0);
-        return {
-          texture: this.mgrTexture.get(
-            HEAP32[(((ptr)+(4))>>2)]),
-          mipLevel: HEAPU32[(((ptr)+(8))>>2)],
-          arrayLayer: HEAPU32[(((ptr)+(12))>>2)],
-          origin: WebGPU.makeOrigin3D(ptr + 16),
-        };
-      },makeBufferCopyView:function (ptr) {
-        assert(ptr !== 0);assert(HEAP32[((ptr)>>2)] === 0);
-        return {
-          buffer: this.mgrBuffer.get(
-            HEAP32[(((ptr)+(4))>>2)]),
-          offset: HEAPU32[(((ptr)+(8))>>2)],
-          rowPitch: HEAPU32[(((ptr)+(16))>>2)],
-          imageHeight: HEAPU32[(((ptr)+(20))>>2)],
-        };
-      },AddressMode:["repeat","mirror-repeat","clamp-to-edge"],BindingType:["uniform-buffer","storage-buffer","readonly-storage-buffer","sampler","sampled-texture","storage-texture"],BlendFactor:["zero","one","src-color","one-minus-src-color","src-alpha","one-minus-src-alpha","dst-color","one-minus-dst-color","dst-alpha","one-minus-dst-alpha","src-alpha-saturated","blend-color","one-minus-blend-color"],BlendOperation:["add","subtract","reverse-subtract","min","max"],BufferMapAsyncStatus:["success","error","unknown","device-lost"],CompareFunction:["never","less","less-equal","greater","greater-equal","equal","not-equal","always"],CullMode:["none","front","back"],ErrorFilter:["none","validation","out-of-memory"],ErrorType:["no-error","validation","out-of-memory","unknown","device-lost"],FenceCompletionStatus:["success","error","unknown","device-lost"],FilterMode:["nearest","linear"],FrontFace:["ccw","cw"],IndexFormat:["uint16","uint32"],InputStepMode:["vertex","instance"],LoadOp:["clear","load"],PrimitiveTopology:["point-list","line-list","line-strip","triangle-list","triangle-strip"],StencilOperation:["keep","zero","replace","invert","increment-clamp","decrement-clamp","increment-wrap","decrement-wrap"],StoreOp:["store"],TextureAspect:["all","stencil-only","depth-only"],TextureComponentType:["float","sint","uint"],TextureDimension:["1d","2d","3d"],TextureFormat:["undefined","r8unorm","r8snorm","r8uint","r8sint","r16uint","r16sint","r16float","rg8unorm","rg8snorm","rg8uint","rg8sint","r32float","r32uint","r32sint","rg16uint","rg16sint","rg16float","rgba8unorm","rgba8unorm-srgb","rgba8snorm","rgba8uint","rgba8sint","bgra8unorm","bgra8unorm-srgb","rgb10a2unorm","rg11b10float","rg32float","rg32uint","rg32sint","rgba16uint","rgba16sint","rgba16float","rgba32float","rgba32uint","rgba32sint","depth32float","depth24plus","depth24plusstencil8","bc1rgbaunorm","bc1rgbaunorm-srgb","bc2rgbaunorm","bc2rgbaunorm-srgb","bc3rgbaunorm","bc3rgbaunorm-srgb","bc4runorm","bc4rsnorm","bc5rgunorm","bc5rgsnorm","bc6hrgbufloat","bc6hrgbsfloat","bc7rgbaunorm","bc7rgbaunorm-srgb"],TextureViewDimension:["undefined","1d","2d","2darray","cube","cube-array","3d"],VertexFormat:["uchar2","uchar4","char2","char4","uchar2norm","uchar4norm","char2norm","char4norm","ushort2","ushort4","short2","short4","ushort2norm","ushort4norm","short2norm","short4norm","half2","half4","float","float2","float3","float4","uint","uint2","uint3","uint4","int","int2","int3","int4"]};function _dawnBufferMapReadAsync(bufferId, callback, userdata) {
-      var bufferEntry = WebGPU.mgrBuffer.objects[bufferId];
-      bufferEntry.mapped = 'write';
-      var buffer = bufferEntry.object;
-  
-      buffer.mapReadAsync().then(function(mapped) {
-        var DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS = 0;
-        var data = _malloc(mapped.byteLength);
-        HEAP8.set(new Uint8Array(mapped), data);
-        var dataLength_h = (mapped.byteLength / 0x100000000) | 0;
-        var dataLength_l = mapped.byteLength | 0;
-        // DawnBufferMapAsyncStatus status, const void* data, uint64_t dataLength, void* userdata
-        dynCall('viiji', callback, [DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS, data, dataLength_l, dataLength_h, userdata]);
-      }, function() {
-        // TODO(kainino0x): Figure out how to pick other error status values.
-        var DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR = 1;
-        dynCall('viiji', callback, [DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR, 0, 0, 0, userdata]);
-      });
-    }
-
-  function _dawnBufferReference(id) {
-    WebGPU.mgrBuffer.reference(id);
-  }
-
-  function _dawnBufferRelease(id) {
-    WebGPU.mgrBuffer.release(id);
-  }
-
-  function _dawnBufferUnmap(bufferId) {
-      var e = WebGPU.mgrBuffer.objects[bufferId];
-      if (e.mapWriteSrc) {
-        new Uint8Array(e.mapWriteDst).set(HEAP8.subarray(e.mapWriteSrc, e.mapWriteSrc + e.mapWriteDst.byteLength));
-      }
-      e.mapWriteSrc = undefined;
-      e.mapWriteDst = undefined;
-      e.object.unmap();
-    }
-
-  function _dawnCommandBufferRelease(id) {
-    WebGPU.mgrCommandBuffer.release(id);
-  }
-
-  function _dawnCommandEncoderBeginRenderPass(encoderId, descriptor) {
-      assert(descriptor !== 0);
-  
-      function makeColorAttachment(caPtr) {
-        return {
-          attachment: WebGPU.mgrTextureView.get(
-            HEAPU32[((caPtr)>>2)]),
-          resolveTarget: WebGPU.mgrTextureView.get(
-            HEAPU32[(((caPtr)+(4))>>2)]),
-          loadOp: WebGPU.LoadOp[
-            HEAPU32[(((caPtr)+(8))>>2)]],
-          storeOp: WebGPU.StoreOp[
-            HEAPU32[(((caPtr)+(12))>>2)]],
-          loadValue: WebGPU.makeColor(caPtr + 16),
-        };
-      }
-  
-      function makeColorAttachments(count, caPtr) {
-        var attachments = [];
-        for (var i = 0; i < count; ++i) {
-          attachments.push(makeColorAttachment(caPtr + 32 * i));
-        }
-        return attachments;
-      }
-  
-      function makeDepthStencilAttachment(dsaPtr) {
-        if (dsaPtr === 0) return undefined;
-        return {
-          attachment: WebGPU.mgrTextureView.get(
-            HEAPU32[((dsaPtr)>>2)]),
-          depthLoadOp: WebGPU.LoadOp[
-            HEAPU32[(((dsaPtr)+(4))>>2)]],
-          depthStoreOp: WebGPU.StoreOp[
-            HEAPU32[(((dsaPtr)+(8))>>2)]],
-          clearDepth: HEAPF32[(((dsaPtr)+(12))>>2)],
-          stencilLoadOp: WebGPU.LoadOp[
-            HEAPU32[(((dsaPtr)+(16))>>2)]],
-          stencilStoreOp: WebGPU.StoreOp[
-            HEAPU32[(((dsaPtr)+(20))>>2)]],
-          clearStencil: HEAPU32[(((dsaPtr)+(24))>>2)],
-        };
-      }
-  
-      function makeRenderPassDescriptor(descriptor) {
-        // required sequence<GPURenderPassColorAttachmentDescriptor> colorAttachments;
-        // GPURenderPassDepthStencilAttachmentDescriptor depthStencilAttachment;
-        return {
-          colorAttachments: makeColorAttachments(
-            HEAPU32[((descriptor)>>2)],
-            HEAP32[(((descriptor)+(4))>>2)]),
-          depthStencilAttachment: makeDepthStencilAttachment(
-            HEAP32[(((descriptor)+(8))>>2)]),
-        };
-      }
-  
-      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
-      return WebGPU.mgrRenderPassEncoder.create(commandEncoder.beginRenderPass(makeRenderPassDescriptor(descriptor)));
-    }
-
-  function _dawnCommandEncoderCopyTextureToBuffer(encoderId, srcPtr, dstPtr, copySizePtr) {
-      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
-      var copySize = WebGPU.makeExtent3D(copySizePtr);
-      commandEncoder.copyTextureToBuffer(
-        WebGPU.makeTextureCopyView(srcPtr), WebGPU.makeBufferCopyView(dstPtr), copySize);
-    }
-
-  function _dawnCommandEncoderFinish(encoderId) {
-      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
-      return WebGPU.mgrCommandBuffer.create(commandEncoder.finish());
-    }
-
-  function _dawnCommandEncoderRelease(id) {
-    WebGPU.mgrCommandEncoder.release(id);
-  }
-
-  function _dawnDeviceCreateBuffer(deviceId, descriptor) {
-      assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-      var desc = {
-        usage: HEAPU32[(((descriptor)+(4))>>2)],
-        size: HEAPU32[(((descriptor)+(8))>>2)],
-      };
-  
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrBuffer.create(device.createBuffer(desc));
-    }
-
-  function _dawnDeviceCreateCommandEncoder(deviceId, descriptor) {
-      if (descriptor) {
-        assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-      }
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrCommandEncoder.create(device.createCommandEncoder());
-    }
-
-  function _dawnDeviceCreatePipelineLayout(deviceId, descriptor) {
-      assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-      var bglCount = HEAPU32[(((descriptor)+(4))>>2)];
-      var bglPtr = HEAP32[(((descriptor)+(8))>>2)];
-      var bgls = [];
-      for (var i = 0; i < bglCount; ++i) {
-        bgls.push(WebGPU.mgrBindGroupLayout.get(
-          HEAP32[(((bindGroupLayoutPtr)+(4 * i))>>2)]));
-      }
-      var desc = { bindGroupLayouts: bgls };
-  
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrPipelineLayout.create(device.createPipelineLayout(desc));
-    }
-
-  function _dawnDeviceCreateQueue(deviceId) {
-      assert(WebGPU.mgrQueue.objects.length === 1, 'there is only one queue');
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrQueue.create(device.getQueue());
-    }
-
-  function _dawnDeviceCreateRenderPipeline(deviceId, descriptor) {
-      assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-  
-      function makeStage(ptr) {
-        if (ptr === 0) return undefined;
-        return {
-          module: WebGPU.mgrShaderModule.get(
-            HEAPU32[(((ptr)+(4))>>2)]),
-          entryPoint: UTF8ToString(
-            HEAP32[(((ptr)+(8))>>2)]),
-        };
-      }
-  
-      function makeRasterizationState(rsPtr) {
-        if (rsPtr === 0) return undefined;
-        assert(rsPtr !== 0);assert(HEAP32[((rsPtr)>>2)] === 0);
-        return {
-          frontFace: WebGPU.FrontFace[
-            HEAPU32[(((rsPtr)+(4))>>2)]],
-          cullMode: WebGPU.CullMode[
-            HEAPU32[(((rsPtr)+(4))>>2)]],
-        };
-      }
-  
-      function makeBlendDescriptor(bdPtr) {
-        if (bdPtr === 0) return undefined;
-        assert(bdPtr !== 0);
-        return {
-          operation: WebGPU.BlendOperation[
-            HEAPU32[((bdPtr)>>2)]],
-          srcFactor: WebGPU.BlendFactor[
-            HEAPU32[(((bdPtr)+(4))>>2)]],
-          dstFactor: WebGPU.BlendFactor[
-            HEAPU32[(((bdPtr)+(8))>>2)]],
-        };
-      }
-  
-      function makeColorState(csPtr) {
-        assert(csPtr !== 0);assert(HEAP32[((csPtr)>>2)] === 0);
-        return {
-          format: WebGPU.TextureFormat[
-            HEAPU32[(((csPtr)+(4))>>2)]],
-          alphaBlend: makeBlendDescriptor(
-            HEAP32[(((csPtr)+(8))>>2)]),
-          colorBlend: makeBlendDescriptor(
-            HEAP32[(((csPtr)+(20))>>2)]),
-          writeMask: HEAPU32[(((csPtr)+(32))>>2)],
-        };
-      }
-  
-      function makeColorStates(count, csPtr) {
-        if (count === 0) return undefined;
-  
-        var states = [];
-        for (var i = 0; i < count; ++i) {
-          states.push(makeColorState(csPtr + 36 * i));
-        }
-        return states;
-      }
-  
-      function makeStencilStateFace(ssfPtr) {
-        assert(ssfPtr !== 0);
-        return {
-          compare: WebGPU.CompareFunction[
-            HEAPU32[((ssfPtr)>>2)]],
-          failOp: WebGPU.StencilOperation[
-            HEAPU32[(((ssfPtr)+(4))>>2)]],
-          depthFailOp: WebGPU.StencilOperation[
-            HEAPU32[(((ssfPtr)+(8))>>2)]],
-          passOp: WebGPU.StencilOperation[
-            HEAPU32[(((ssfPtr)+(12))>>2)]],
-        };
-      }
-  
-      function makeDepthStencilState(dssPtr) {
-        if (dssPtr === 0) return undefined;
-  
-        assert(dssPtr !== 0);
-        return {
-          format: WebGPU.TextureFormat[
-            HEAPU32[(((dssPtr)+(4))>>2)]],
-          depthWriteEnabled: (HEAP8[(((dssPtr)+(8))>>0)] !== 0),
-          depthCompare: WebGPU.CompareFunction[
-            HEAPU32[(((dssPtr)+(12))>>2)]],
-          stencilFront: makeStencilStateFace(
-            HEAP32[(((dssPtr)+(16))>>2)]),
-          stencilBack: makeStencilStateFace(
-            HEAP32[(((dssPtr)+(32))>>2)]),
-          stencilReadMask: HEAPU32[(((dssPtr)+(48))>>2)],
-          stencilWriteMask: HEAPU32[(((dssPtr)+(52))>>2)],
-        };
-      }
-  
-      function makeVertexAttribute(vaPtr) {
-        assert(vaPtr !== 0);
-        return {
-          offset: HEAPU32[(((vaPtr)+(8))>>2)],
-          format: WebGPU.VertexFormat[
-            HEAPU32[(((vaPtr)+(16))>>2)]],
-          shaderLocation: HEAPU32[((vaPtr)>>2)],
-        };
-      }
-  
-      function makeVertexAttributes(count, vaPtrs) {
-        var vas = [];
-        for (var i = 0; i < count; ++i) {
-          vas.push(makeVertexAttribute(
-            HEAP32[(((vaPtrs)+(i * 4))>>2)]));
-        }
-        return vas;
-      }
-  
-      function makeVertexBuffer(vbPtr) {
-        if (vbPtr === 0) return undefined;
-  
-        return {
-          stride: HEAPU32[((vbPtr)>>2)],
-          stepMode: WebGPU.InputStepMode[
-            HEAPU32[(((vbPtr)+(8))>>2)]],
-          // TODO(kainino0x): Update naming once Dawn matches WebGPU.
-          attributeSet: makeVertexAttributes(
-            HEAPU32[(((vbPtr)+(12))>>2)],
-            HEAP32[(((vbPtr)+(16))>>2)]),
-        };
-      }
-  
-      function makeVertexBuffers(count, vbPtrs) {
-        if (count === 0) return undefined;
-  
-        var vbs = [];
-        for (var i = 0; i < count; ++i) {
-          vbs.push(makeVertexBuffer(
-            HEAP32[(((vbPtrs)+(i * 4))>>2)]));
-        }
-        return vbs;
-      }
-  
-      function makeVertexInput(viPtr) {
-        if (viPtr === 0) return undefined;
-        assert(viPtr !== 0);assert(HEAP32[((viPtr)>>2)] === 0);
-        return {
-          indexFormat: WebGPU.IndexFormat[
-            HEAPU32[(((viPtr)+(4))>>2)]],
-          vertexBuffers: makeVertexBuffers(
-            HEAPU32[(((viPtr)+(8))>>2)],
-            HEAP32[(((viPtr)+(12))>>2)]),
-        };
-      }
-  
-      var desc = {
-        layout: WebGPU.mgrPipelineLayout.get(
-          HEAP32[(((descriptor)+(4))>>2)]),
-        vertexStage: makeStage(
-          descriptor + 8),
-        fragmentStage: makeStage(
-          HEAP32[(((descriptor)+(20))>>2)]),
-        primitiveTopology: WebGPU.PrimitiveTopology[
-          HEAPU32[(((descriptor)+(28))>>2)]],
-        rasterizationState: makeRasterizationState(
-          HEAP32[(((descriptor)+(32))>>2)]),
-        colorStates: makeColorStates(
-          HEAPU32[(((descriptor)+(44))>>2)],
-          HEAP32[(((descriptor)+(48))>>2)]),
-        depthStencilState: makeDepthStencilState(
-          HEAP32[(((descriptor)+(40))>>2)]),
-        vertexInput: makeVertexInput(
-          HEAP32[(((descriptor)+(24))>>2)]),
-        sampleCount: HEAPU32[(((descriptor)+(36))>>2)],
-        sampleMask: HEAPU32[(((descriptor)+(52))>>2)],
-        alphaToCoverageEnabled: (HEAP8[(((descriptor)+(56))>>0)] !== 0),
-      };
-  
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrRenderPipeline.create(device.createRenderPipeline(desc));
-    }
-
-  function _dawnDeviceCreateShaderModule(deviceId, descriptor) {
-      assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-      var count = HEAPU32[(((descriptor)+(4))>>2)];
-      var start = HEAP32[(((descriptor)+(8))>>2)];
-      var desc = { code: HEAPU32.subarray(start >> 2, (start >> 2) + count) };
-  
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrShaderModule.create(device.createShaderModule(desc));
-    }
-
-  function _dawnDeviceCreateTexture(deviceId, descriptor) {
-      assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-  
-      var desc = {
-        size: WebGPU.makeExtent3D(descriptor + 12),
-        arrayLayerCount: HEAPU32[(((descriptor)+(24))>>2)],
-        mipLevelCount: HEAPU32[(((descriptor)+(32))>>2)],
-        sampleCount: HEAPU32[(((descriptor)+(36))>>2)],
-        dimension: WebGPU.TextureDimension[
-          HEAPU32[(((descriptor)+(8))>>2)]],
-        format: WebGPU.TextureFormat[
-          HEAPU32[(((descriptor)+(28))>>2)]],
-        usage: HEAPU32[(((descriptor)+(4))>>2)],
-      };
-  
-      var device = WebGPU.mgrDevice.get(deviceId);
-      return WebGPU.mgrTexture.create(device.createTexture(desc));
-    }
-
-  function _dawnDeviceRelease(id) {
-    WebGPU.mgrDevice.release(id);
-  }
-
-  function _dawnDeviceSetUncapturedErrorCallback(deviceId, callback, userdata) {
-      var device = WebGPU.mgrDevice.get(deviceId);
-      device.onuncapturederror = function(ev) {
-        // DawnErrorType type, const char* message, void* userdata
-        var Validation = 0x00000001;
-        var OutOfMemory = 0x00000002;
-        var type;
-        if (ev.error instanceof GPUValidationError) type = Validation;
-        else if (ev.error instanceof GPUOutOfMemoryError) type = OutOfMemory;
-        var messagePtr = allocateUTF8(ev.error.message);
-        dynCall('viii', callback, [type, messagePtr, userdata]);
-        _free(messagePtr);
-      };
-    }
-
-  function _dawnPipelineLayoutRelease(id) {
-    WebGPU.mgrPipelineLayout.release(id);
-  }
-
-  function _dawnQueueRelease(id) {
-    WebGPU.mgrQueue.release(id);
-  }
-
-  function _dawnQueueSubmit(queueId, commandCount, commands) {
-      assert(commands % 4 === 0);
-      var queue = WebGPU.mgrQueue.get(queueId);
-      var cmds = Array.from(HEAP32.subarray(commands >> 2, (commands >> 2) + commandCount),
-        function(id) { return WebGPU.mgrCommandBuffer.get(id); });
-      queue.submit(cmds);
-    }
-
-  function _dawnRenderPassEncoderDraw(passId, vertexCount, instanceCount, firstVertex, firstInstance) {
-      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
-      pass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
-    }
-
-  function _dawnRenderPassEncoderEndPass(passId) {
-      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
-      pass.endPass();
-    }
-
-  function _dawnRenderPassEncoderRelease(id) {
-    WebGPU.mgrRenderPassEncoder.release(id);
-  }
-
-  function _dawnRenderPassEncoderSetPipeline(passId, pipelineId) {
-      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
-      var pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
-      pass.setPipeline(pipeline);
-    }
-
-  function _dawnRenderPipelineRelease(id) {
-    WebGPU.mgrRenderPipeline.release(id);
-  }
-
-  function _dawnShaderModuleReference(id) {
-    WebGPU.mgrShaderModule.reference(id);
-  }
-
-  function _dawnShaderModuleRelease(id) {
-    WebGPU.mgrShaderModule.release(id);
-  }
-
-  function _dawnTextureCreateView(textureId, descriptor) {
-      var desc;
-      if (descriptor !== 0) {
-        assert(descriptor !== 0);assert(HEAP32[((descriptor)>>2)] === 0);
-  
-        desc = {
-          format: WebGPU.TextureFormat[
-            HEAPU32[(((descriptor)+(4))>>2)]],
-          dimension: WebGPU.TextureViewDimension[
-            HEAPU32[(((descriptor)+(8))>>2)]],
-          baseMipLevel: HEAPU32[(((descriptor)+(12))>>2)],
-          mipLevelCount: HEAPU32[(((descriptor)+(16))>>2)],
-          baseArrayLayer: HEAPU32[(((descriptor)+(20))>>2)],
-          arrayLayerCount: HEAPU32[(((descriptor)+(24))>>2)],
-          aspect: WebGPU.TextureAspect[
-            HEAPU32[(((descriptor)+(28))>>2)]],
-        };
-      }
-  
-      var texture = WebGPU.mgrTexture.get(textureId);
-      return WebGPU.mgrTextureView.create(texture.createView(desc));
-    }
-
-  function _dawnTextureReference(id) {
-    WebGPU.mgrTexture.reference(id);
-  }
-
-  function _dawnTextureRelease(id) {
-    WebGPU.mgrTexture.release(id);
-  }
-
-  function _dawnTextureViewRelease(id) {
-    WebGPU.mgrTextureView.release(id);
-  }
 
   function _emscripten_get_heap_size() {
       return HEAP8.length;
     }
 
+  function _emscripten_get_sbrk_ptr() {
+      return 5328;
+    }
+
+  function _emscripten_memcpy_big(dest, src, num) {
+      HEAPU8.set(HEAPU8.subarray(src, src+num), dest);
+    }
+
+  
+  function abortOnCannotGrowMemory(requestedSize) {
+      abort('Cannot enlarge memory arrays to size ' + requestedSize + ' bytes (OOM). Either (1) compile with  -s TOTAL_MEMORY=X  with X higher than the current value ' + HEAP8.length + ', (2) compile with  -s ALLOW_MEMORY_GROWTH=1  which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with  -s ABORTING_MALLOC=0 ');
+    }function _emscripten_resize_heap(requestedSize) {
+      abortOnCannotGrowMemory(requestedSize);
+    }
+
   
   
-  var Browser={mainLoop:{scheduler:null,method:"",currentlyRunningMainloop:0,func:null,arg:0,timingMode:0,timingValue:0,currentFrameNumber:0,queue:[],pause:function () {
+  var Browser={mainLoop:{scheduler:null,method:"",currentlyRunningMainloop:0,func:null,arg:0,timingMode:0,timingValue:0,currentFrameNumber:0,queue:[],pause:function() {
           Browser.mainLoop.scheduler = null;
           Browser.mainLoop.currentlyRunningMainloop++; // Incrementing this signals the previous main loop that it's now become old, and it must return.
-        },resume:function () {
+        },resume:function() {
           Browser.mainLoop.currentlyRunningMainloop++;
           var timingMode = Browser.mainLoop.timingMode;
           var timingValue = Browser.mainLoop.timingValue;
@@ -2611,7 +1878,7 @@ function copyTempDouble(ptr) {
           _emscripten_set_main_loop(func, 0, false, Browser.mainLoop.arg, true /* do not set timing and call scheduler, we will do it on the next lines */);
           _emscripten_set_main_loop_timing(timingMode, timingValue);
           Browser.mainLoop.scheduler();
-        },updateStatus:function () {
+        },updateStatus:function() {
           if (Module['setStatus']) {
             var message = Module['statusMessage'] || 'Please wait...';
             var remaining = Browser.mainLoop.remainingBlockers;
@@ -2626,7 +1893,7 @@ function copyTempDouble(ptr) {
               Module['setStatus']('');
             }
           }
-        },runIter:function (func) {
+        },runIter:function(func) {
           if (ABORT) return;
           if (Module['preMainLoop']) {
             var preRet = Module['preMainLoop']();
@@ -2645,7 +1912,7 @@ function copyTempDouble(ptr) {
             }
           }
           if (Module['postMainLoop']) Module['postMainLoop']();
-        }},isFullscreen:false,pointerLock:false,moduleContextCreatedCallbacks:[],workers:[],init:function () {
+        }},isFullscreen:false,pointerLock:false,moduleContextCreatedCallbacks:[],workers:[],init:function() {
         if (!Module["preloadPlugins"]) Module["preloadPlugins"] = []; // needs to exist even in workers
   
         if (Browser.initted) return;
@@ -2826,7 +2093,7 @@ function copyTempDouble(ptr) {
             }, false);
           }
         }
-      },createContext:function (canvas, useWebGL, setInModule, webGLContextAttributes) {
+      },createContext:function(canvas, useWebGL, setInModule, webGLContextAttributes) {
         if (useWebGL && Module.ctx && canvas == Module.canvas) return Module.ctx; // no need to recreate GL context if it's already been created for this canvas.
   
         var ctx;
@@ -2870,7 +2137,7 @@ function copyTempDouble(ptr) {
           Browser.init();
         }
         return ctx;
-      },destroyContext:function (canvas, useWebGL, setInModule) {},fullscreenHandlersInstalled:false,lockPointer:undefined,resizeCanvas:undefined,requestFullscreen:function (lockPointer, resizeCanvas, vrDevice) {
+      },destroyContext:function(canvas, useWebGL, setInModule) {},fullscreenHandlersInstalled:false,lockPointer:undefined,resizeCanvas:undefined,requestFullscreen:function(lockPointer, resizeCanvas, vrDevice) {
         Browser.lockPointer = lockPointer;
         Browser.resizeCanvas = resizeCanvas;
         Browser.vrDevice = vrDevice;
@@ -2933,13 +2200,9 @@ function copyTempDouble(ptr) {
         } else {
           canvasContainer.requestFullscreen();
         }
-      },requestFullScreen:function (lockPointer, resizeCanvas, vrDevice) {
-          err('Browser.requestFullScreen() is deprecated. Please call Browser.requestFullscreen instead.');
-          Browser.requestFullScreen = function(lockPointer, resizeCanvas, vrDevice) {
-            return Browser.requestFullscreen(lockPointer, resizeCanvas, vrDevice);
-          }
-          return Browser.requestFullscreen(lockPointer, resizeCanvas, vrDevice);
-      },exitFullscreen:function () {
+      },requestFullScreen:function() {
+        abort('Module.requestFullScreen has been replaced by Module.requestFullscreen (without a capital S)');
+      },exitFullscreen:function() {
         // This is workaround for chrome. Trying to exit from fullscreen
         // not in fullscreen state will cause "TypeError: Document not active"
         // in chrome. See https://github.com/emscripten-core/emscripten/pull/8236
@@ -2955,7 +2218,7 @@ function copyTempDouble(ptr) {
             (function() {});
         CFS.apply(document, []);
         return true;
-      },nextRAF:0,fakeRequestAnimationFrame:function (func) {
+      },nextRAF:0,fakeRequestAnimationFrame:function(func) {
         // try to keep 60fps between calls to here
         var now = Date.now();
         if (Browser.nextRAF === 0) {
@@ -2967,20 +2230,20 @@ function copyTempDouble(ptr) {
         }
         var delay = Math.max(Browser.nextRAF - now, 0);
         setTimeout(func, delay);
-      },requestAnimationFrame:function (func) {
+      },requestAnimationFrame:function(func) {
         if (typeof requestAnimationFrame === 'function') {
           requestAnimationFrame(func);
           return;
         }
         var RAF = Browser.fakeRequestAnimationFrame;
         RAF(func);
-      },safeCallback:function (func) {
+      },safeCallback:function(func) {
         return function() {
           if (!ABORT) return func.apply(null, arguments);
         };
-      },allowAsyncCallbacks:true,queuedAsyncCallbacks:[],pauseAsyncCallbacks:function () {
+      },allowAsyncCallbacks:true,queuedAsyncCallbacks:[],pauseAsyncCallbacks:function() {
         Browser.allowAsyncCallbacks = false;
-      },resumeAsyncCallbacks:function () { // marks future callbacks as ok to execute, and synchronously runs any remaining ones right now
+      },resumeAsyncCallbacks:function() { // marks future callbacks as ok to execute, and synchronously runs any remaining ones right now
         Browser.allowAsyncCallbacks = true;
         if (Browser.queuedAsyncCallbacks.length > 0) {
           var callbacks = Browser.queuedAsyncCallbacks;
@@ -2989,7 +2252,7 @@ function copyTempDouble(ptr) {
             func();
           });
         }
-      },safeRequestAnimationFrame:function (func) {
+      },safeRequestAnimationFrame:function(func) {
         return Browser.requestAnimationFrame(function() {
           if (ABORT) return;
           if (Browser.allowAsyncCallbacks) {
@@ -2998,8 +2261,8 @@ function copyTempDouble(ptr) {
             Browser.queuedAsyncCallbacks.push(func);
           }
         });
-      },safeSetTimeout:function (func, timeout) {
-        Module['noExitRuntime'] = true;
+      },safeSetTimeout:function(func, timeout) {
+        noExitRuntime = true;
         return setTimeout(function() {
           if (ABORT) return;
           if (Browser.allowAsyncCallbacks) {
@@ -3008,15 +2271,15 @@ function copyTempDouble(ptr) {
             Browser.queuedAsyncCallbacks.push(func);
           }
         }, timeout);
-      },safeSetInterval:function (func, timeout) {
-        Module['noExitRuntime'] = true;
+      },safeSetInterval:function(func, timeout) {
+        noExitRuntime = true;
         return setInterval(function() {
           if (ABORT) return;
           if (Browser.allowAsyncCallbacks) {
             func();
           } // drop it on the floor otherwise, next interval will kick in
         }, timeout);
-      },getMimetype:function (name) {
+      },getMimetype:function(name) {
         return {
           'jpg': 'image/jpeg',
           'jpeg': 'image/jpeg',
@@ -3026,23 +2289,23 @@ function copyTempDouble(ptr) {
           'wav': 'audio/wav',
           'mp3': 'audio/mpeg'
         }[name.substr(name.lastIndexOf('.')+1)];
-      },getUserMedia:function (func) {
+      },getUserMedia:function(func) {
         if(!window.getUserMedia) {
           window.getUserMedia = navigator['getUserMedia'] ||
                                 navigator['mozGetUserMedia'];
         }
         window.getUserMedia(func);
-      },getMovementX:function (event) {
+      },getMovementX:function(event) {
         return event['movementX'] ||
                event['mozMovementX'] ||
                event['webkitMovementX'] ||
                0;
-      },getMovementY:function (event) {
+      },getMovementY:function(event) {
         return event['movementY'] ||
                event['mozMovementY'] ||
                event['webkitMovementY'] ||
                0;
-      },getMouseWheelDelta:function (event) {
+      },getMouseWheelDelta:function(event) {
         var delta = 0;
         switch (event.type) {
           case 'DOMMouseScroll':
@@ -3076,7 +2339,7 @@ function copyTempDouble(ptr) {
             throw 'unrecognized mouse wheel event: ' + event.type;
         }
         return delta;
-      },mouseX:0,mouseY:0,mouseMovementX:0,mouseMovementY:0,touches:{},lastTouches:{},calculateMouseEvent:function (event) { // event should be mousemove, mousedown or mouseup
+      },mouseX:0,mouseY:0,mouseMovementX:0,mouseMovementY:0,touches:{},lastTouches:{},calculateMouseEvent:function(event) { // event should be mousemove, mousedown or mouseup
         if (Browser.pointerLock) {
           // When the pointer is locked, calculate the coordinates
           // based on the movement of the mouse.
@@ -3155,7 +2418,7 @@ function copyTempDouble(ptr) {
           Browser.mouseX = x;
           Browser.mouseY = y;
         }
-      },asyncLoad:function (url, onload, onerror, noRunDep) {
+      },asyncLoad:function(url, onload, onerror, noRunDep) {
         var dep = !noRunDep ? getUniqueRunDependency('al ' + url) : '';
         readAsync(url, function(arrayBuffer) {
           assert(arrayBuffer, 'Loading data file "' + url + '" failed (no arrayBuffer).');
@@ -3169,16 +2432,16 @@ function copyTempDouble(ptr) {
           }
         });
         if (dep) addRunDependency(dep);
-      },resizeListeners:[],updateResizeListeners:function () {
+      },resizeListeners:[],updateResizeListeners:function() {
         var canvas = Module['canvas'];
         Browser.resizeListeners.forEach(function(listener) {
           listener(canvas.width, canvas.height);
         });
-      },setCanvasSize:function (width, height, noUpdates) {
+      },setCanvasSize:function(width, height, noUpdates) {
         var canvas = Module['canvas'];
         Browser.updateCanvasDimensions(canvas, width, height);
         if (!noUpdates) Browser.updateResizeListeners();
-      },windowedWidth:0,windowedHeight:0,setFullscreenCanvasSize:function () {
+      },windowedWidth:0,windowedHeight:0,setFullscreenCanvasSize:function() {
         // check if SDL is available
         if (typeof SDL != "undefined") {
           var flags = HEAPU32[((SDL.screen)>>2)];
@@ -3187,7 +2450,7 @@ function copyTempDouble(ptr) {
         }
         Browser.updateCanvasDimensions(Module['canvas']);
         Browser.updateResizeListeners();
-      },setWindowedCanvasSize:function () {
+      },setWindowedCanvasSize:function() {
         // check if SDL is available
         if (typeof SDL != "undefined") {
           var flags = HEAPU32[((SDL.screen)>>2)];
@@ -3196,7 +2459,7 @@ function copyTempDouble(ptr) {
         }
         Browser.updateCanvasDimensions(Module['canvas']);
         Browser.updateResizeListeners();
-      },updateCanvasDimensions:function (canvas, wNative, hNative) {
+      },updateCanvasDimensions:function(canvas, wNative, hNative) {
         if (wNative && hNative) {
           canvas.widthNative = wNative;
           canvas.heightNative = hNative;
@@ -3240,7 +2503,7 @@ function copyTempDouble(ptr) {
             }
           }
         }
-      },wgetRequests:{},nextWgetRequestHandle:0,getNextWgetRequestHandle:function () {
+      },wgetRequests:{},nextWgetRequestHandle:0,getNextWgetRequestHandle:function() {
         var handle = Browser.nextWgetRequestHandle;
         Browser.nextWgetRequestHandle++;
         return handle;
@@ -3296,7 +2559,7 @@ function copyTempDouble(ptr) {
     }
   
   function _emscripten_get_now() { abort() }function _emscripten_set_main_loop(func, fps, simulateInfiniteLoop, arg, noSetTiming) {
-      Module['noExitRuntime'] = true;
+      noExitRuntime = true;
   
       assert(!Browser.mainLoop.func, 'emscripten_set_main_loop: there can only be one main loop function at once: call emscripten_cancel_main_loop to cancel the previous one before setting a new one with different parameters.');
   
@@ -3362,7 +2625,7 @@ function copyTempDouble(ptr) {
   
   
         if (Browser.mainLoop.method === 'timeout' && Module.ctx) {
-          err('Looks like you are rendering without using requestAnimationFrame for the main loop. You should use 0 for the frame rate in emscripten_set_main_loop in order to use requestAnimationFrame, as that can greatly improve your frame rates!');
+          warnOnce('Looks like you are rendering without using requestAnimationFrame for the main loop. You should use 0 for the frame rate in emscripten_set_main_loop in order to use requestAnimationFrame, as that can greatly improve your frame rates!');
           Browser.mainLoop.method = ''; // just warn once per call to set main loop
         }
   
@@ -3390,18 +2653,124 @@ function copyTempDouble(ptr) {
       }
   
       if (simulateInfiniteLoop) {
-        throw 'SimulateInfiniteLoop';
+        throw 'unwind';
       }
     }
 
   
-  function _emscripten_webgpu_do_get_current_texture() {
+  
+  var WebGPU={initManagers:function() {
+        if (this.mgrDevice) return;
+  
+        function makeManager() {
+          return {
+            objects: [undefined],
+            create: function(object) {
+              var id = this.objects.length;
+              assert(typeof this.objects[id] === 'undefined');
+              this.objects[id] = { refcount: 1, object };
+              return id;
+            },
+            get: function(id) {
+              if (id === 0) return undefined;
+              var o = this.objects[id];
+              assert(typeof o !== "undefined");
+              return o.object;
+            },
+            reference: function(id) {
+              var o = this.objects[id];
+              assert(typeof o !== "undefined");
+              o.refcount++;
+            },
+            release: function(id) {
+              var o = this.objects[id];
+              assert(typeof o !== "undefined");
+              assert(o.refcount > 0);
+              o.refcount--;
+              if (o.refcount <= 0) {
+                delete this.objects[id];
+              }
+            },
+          };
+        }
+  
+        this.mgrDevice = this.mgrDevice || makeManager();
+        this.mgrQueue = this.mgrQueue || makeManager();
+        this.mgrFence = this.mgrFence || makeManager();
+  
+        this.mgrCommandBuffer = this.mgrCommandBuffer || makeManager();
+        this.mgrCommandEncoder = this.mgrCommandEncoder || makeManager();
+        this.mgrRenderPassEncoder = this.mgrRenderPassEncoder || makeManager();
+  
+        this.mgrBindGroup = this.mgrBindGroup || makeManager();
+        this.mgrBuffer = this.mgrBuffer || makeManager();
+        this.mgrSampler = this.mgrSampler || makeManager();
+        this.mgrTexture = this.mgrTexture || makeManager();
+        this.mgrTextureView = this.mgrTextureView || makeManager();
+  
+        this.mgrBindGroupLayout = this.mgrBindGroupLayout || makeManager();
+        this.mgrPipelineLayout = this.mgrPipelineLayout || makeManager();
+        this.mgrRenderPipeline = this.mgrRenderPipeline || makeManager();
+        this.mgrShaderModule = this.mgrShaderModule || makeManager();
+  
+        this.mgrRenderBundleEncoder = this.mgrRenderBundleEncoder || makeManager();
+        this.mgrRenderBundle = this.mgrRenderBundle || makeManager();
+      },trackMapWrite:function(obj, mapped) {
+        var data = _malloc(mapped.byteLength);
+        HEAPU8.fill(0, data, mapped.byteLength);
+        obj.mapWriteSrc = data;
+        obj.mapWriteDst = mapped;
+      },trackUnmap:function(obj) {
+        if (obj.mapWriteSrc) {
+          new Uint8Array(obj.mapWriteDst).set(HEAPU8.subarray(obj.mapWriteSrc, obj.mapWriteSrc + obj.mapWriteDst.byteLength));
+          _free(obj.mapWriteSrc);
+        }
+        obj.mapWriteSrc = undefined;
+        obj.mapWriteDst = undefined;
+      },makeColor:function(ptr) {
+        return {
+          r: HEAPF32[((ptr)>>2)],
+          g: HEAPF32[(((ptr)+(4))>>2)],
+          b: HEAPF32[(((ptr)+(8))>>2)],
+          a: HEAPF32[(((ptr)+(12))>>2)],
+        };
+      },makeExtent3D:function(ptr) {
+        return {
+          width: HEAPU32[((ptr)>>2)],
+          height: HEAPU32[(((ptr)+(4))>>2)],
+          depth: HEAPU32[(((ptr)+(8))>>2)],
+        };
+      },makeOrigin3D:function(ptr) {
+        return {
+          x: HEAPU32[((ptr)>>2)],
+          y: HEAPU32[(((ptr)+(4))>>2)],
+          z: HEAPU32[(((ptr)+(8))>>2)],
+        };
+      },makeTextureCopyView:function(ptr) {
+        assert(ptr);assert(HEAP32[((ptr)>>2)] === 0);
+        return {
+          texture: this.mgrTexture.get(
+            HEAP32[(((ptr)+(4))>>2)]),
+          mipLevel: HEAPU32[(((ptr)+(8))>>2)],
+          arrayLayer: HEAPU32[(((ptr)+(12))>>2)],
+          origin: WebGPU.makeOrigin3D(ptr + 16),
+        };
+      },makeBufferCopyView:function(ptr) {
+        assert(ptr);assert(HEAP32[((ptr)>>2)] === 0);
+        return {
+          buffer: this.mgrBuffer.get(
+            HEAP32[(((ptr)+(4))>>2)]),
+          offset: HEAPU32[((((ptr + 4))+(8))>>2)] * 0x100000000 + HEAPU32[(((ptr)+(8))>>2)],
+          rowPitch: HEAPU32[(((ptr)+(16))>>2)],
+          imageHeight: HEAPU32[(((ptr)+(20))>>2)],
+        };
+      },AddressMode:["repeat","mirror-repeat","clamp-to-edge"],BindingType:["uniform-buffer","storage-buffer","readonly-storage-buffer","sampler","sampled-texture","storage-texture"],BlendFactor:["zero","one","src-color","one-minus-src-color","src-alpha","one-minus-src-alpha","dst-color","one-minus-dst-color","dst-alpha","one-minus-dst-alpha","src-alpha-saturated","blend-color","one-minus-blend-color"],BlendOperation:["add","subtract","reverse-subtract","min","max"],BufferMapAsyncStatus:["success","error","unknown","device-lost"],CompareFunction:["never","less","less-equal","greater","greater-equal","equal","not-equal","always"],CullMode:["none","front","back"],ErrorFilter:["none","validation","out-of-memory"],ErrorType:["no-error","validation","out-of-memory","unknown","device-lost"],FenceCompletionStatus:["success","error","unknown","device-lost"],FilterMode:["nearest","linear"],FrontFace:["ccw","cw"],IndexFormat:["uint16","uint32"],InputStepMode:["vertex","instance"],LoadOp:["clear","load"],PrimitiveTopology:["point-list","line-list","line-strip","triangle-list","triangle-strip"],StencilOperation:["keep","zero","replace","invert","increment-clamp","decrement-clamp","increment-wrap","decrement-wrap"],StoreOp:["store","clear"],TextureAspect:["all","stencil-only","depth-only"],TextureComponentType:["float","sint","uint"],TextureDimension:["1d","2d","3d"],TextureFormat:[,"r8unorm","r8snorm","r8uint","r8sint","r16uint","r16sint","r16float","rg8unorm","rg8snorm","rg8uint","rg8sint","r32float","r32uint","r32sint","rg16uint","rg16sint","rg16float","rgba8unorm","rgba8unorm-srgb","rgba8snorm","rgba8uint","rgba8sint","bgra8unorm","bgra8unorm-srgb","rgb10a2unorm","rg11b10float","rg32float","rg32uint","rg32sint","rgba16uint","rgba16sint","rgba16float","rgba32float","rgba32uint","rgba32sint","depth32float","depth24plus","depth24plus-stencil8","bc1rgbaunorm","bc1rgbaunorm-srgb","bc2rgbaunorm","bc2rgbaunorm-srgb","bc3rgbaunorm","bc3rgbaunorm-srgb","bc4runorm","bc4rsnorm","bc5rgunorm","bc5rgsnorm","bc6hrgbufloat","bc6hrgbsfloat","bc7rgbaunorm","bc7rgbaunorm-srgb"],TextureViewDimension:[,"1d","2d","2darray","cube","cube-array","3d"],VertexFormat:["uchar2","uchar4","char2","char4","uchar2norm","uchar4norm","char2norm","char4norm","ushort2","ushort4","short2","short4","ushort2norm","ushort4norm","short2norm","short4norm","half2","half4","float","float2","float3","float4","uint","uint2","uint3","uint4","int","int2","int3","int4"]};function _emscripten_webgpu_do_get_current_texture() {
       var swapchain = Module['preinitializedWebGPUSwapChain'];
       assert(swapchain);
       WebGPU.initManagers();
       return WebGPU.mgrTexture.create(swapchain.getCurrentTexture());
     }function _emscripten_webgpu_get_current_texture(
-  /*``*/) {
+  ) {
   return _emscripten_webgpu_do_get_current_texture();
   }
 
@@ -3412,40 +2781,876 @@ function copyTempDouble(ptr) {
       WebGPU.initManagers();
       return WebGPU.mgrDevice.create(Module['preinitializedWebGPUDevice']);
     }function _emscripten_webgpu_get_device(
-  /*``*/) {
+  ) {
   return _emscripten_webgpu_do_get_device();
   }
 
-  function _llvm_trap() {
-      abort('trap!');
-    }
-
   
-  function _emscripten_memcpy_big(dest, src, num) {
-      HEAPU8.set(HEAPU8.subarray(src, src+num), dest);
-    }
-  
-   
-
-   
-
-   
-
-  
-  function ___setErrNo(value) {
-      if (Module['___errno_location']) HEAP32[((Module['___errno_location']())>>2)]=value;
-      else err('failed to set errno from JS');
-      return value;
+  function flush_NO_FILESYSTEM() {
+      // flush anything remaining in the buffers during shutdown
+      var fflush = Module["_fflush"];
+      if (fflush) fflush(0);
+      var buffers = SYSCALLS.buffers;
+      if (buffers[1].length) SYSCALLS.printChar(1, 10);
+      if (buffers[2].length) SYSCALLS.printChar(2, 10);
     }
   
   
-  function abortOnCannotGrowMemory(requestedSize) {
-      abort('Cannot enlarge memory arrays to size ' + requestedSize + ' bytes (OOM). Either (1) compile with  -s TOTAL_MEMORY=X  with X higher than the current value ' + HEAP8.length + ', (2) compile with  -s ALLOW_MEMORY_GROWTH=1  which allows increasing the size at runtime, or (3) if you want malloc to return NULL (0) instead of this abort, compile with  -s ABORTING_MALLOC=0 ');
-    }function _emscripten_resize_heap(requestedSize) {
-      abortOnCannotGrowMemory(requestedSize);
-    } 
-Module["requestFullScreen"] = function Module_requestFullScreen(lockPointer, resizeCanvas, vrDevice) { err("Module.requestFullScreen is deprecated. Please call Module.requestFullscreen instead."); Module["requestFullScreen"] = Module["requestFullscreen"]; Browser.requestFullScreen(lockPointer, resizeCanvas, vrDevice) };
-  Module["requestFullscreen"] = function Module_requestFullscreen(lockPointer, resizeCanvas, vrDevice) { Browser.requestFullscreen(lockPointer, resizeCanvas, vrDevice) };
+  var PATH={splitPath:function(filename) {
+        var splitPathRe = /^(\/?|)([\s\S]*?)((?:\.{1,2}|[^\/]+?|)(\.[^.\/]*|))(?:[\/]*)$/;
+        return splitPathRe.exec(filename).slice(1);
+      },normalizeArray:function(parts, allowAboveRoot) {
+        // if the path tries to go above the root, `up` ends up > 0
+        var up = 0;
+        for (var i = parts.length - 1; i >= 0; i--) {
+          var last = parts[i];
+          if (last === '.') {
+            parts.splice(i, 1);
+          } else if (last === '..') {
+            parts.splice(i, 1);
+            up++;
+          } else if (up) {
+            parts.splice(i, 1);
+            up--;
+          }
+        }
+        // if the path is allowed to go above the root, restore leading ..s
+        if (allowAboveRoot) {
+          for (; up; up--) {
+            parts.unshift('..');
+          }
+        }
+        return parts;
+      },normalize:function(path) {
+        var isAbsolute = path.charAt(0) === '/',
+            trailingSlash = path.substr(-1) === '/';
+        // Normalize the path
+        path = PATH.normalizeArray(path.split('/').filter(function(p) {
+          return !!p;
+        }), !isAbsolute).join('/');
+        if (!path && !isAbsolute) {
+          path = '.';
+        }
+        if (path && trailingSlash) {
+          path += '/';
+        }
+        return (isAbsolute ? '/' : '') + path;
+      },dirname:function(path) {
+        var result = PATH.splitPath(path),
+            root = result[0],
+            dir = result[1];
+        if (!root && !dir) {
+          // No dirname whatsoever
+          return '.';
+        }
+        if (dir) {
+          // It has a dirname, strip trailing slash
+          dir = dir.substr(0, dir.length - 1);
+        }
+        return root + dir;
+      },basename:function(path) {
+        // EMSCRIPTEN return '/'' for '/', not an empty string
+        if (path === '/') return '/';
+        var lastSlash = path.lastIndexOf('/');
+        if (lastSlash === -1) return path;
+        return path.substr(lastSlash+1);
+      },extname:function(path) {
+        return PATH.splitPath(path)[3];
+      },join:function() {
+        var paths = Array.prototype.slice.call(arguments, 0);
+        return PATH.normalize(paths.join('/'));
+      },join2:function(l, r) {
+        return PATH.normalize(l + '/' + r);
+      }};var SYSCALLS={buffers:[null,[],[]],printChar:function(stream, curr) {
+        var buffer = SYSCALLS.buffers[stream];
+        assert(buffer);
+        if (curr === 0 || curr === 10) {
+          (stream === 1 ? out : err)(UTF8ArrayToString(buffer, 0));
+          buffer.length = 0;
+        } else {
+          buffer.push(curr);
+        }
+      },varargs:0,get:function(varargs) {
+        SYSCALLS.varargs += 4;
+        var ret = HEAP32[(((SYSCALLS.varargs)-(4))>>2)];
+        return ret;
+      },getStr:function() {
+        var ret = UTF8ToString(SYSCALLS.get());
+        return ret;
+      },get64:function() {
+        var low = SYSCALLS.get(), high = SYSCALLS.get();
+        if (low >= 0) assert(high === 0);
+        else assert(high === -1);
+        return low;
+      },getZero:function() {
+        assert(SYSCALLS.get() === 0);
+      }};function _fd_write(fd, iov, iovcnt, pnum) {try {
+  
+      // hack to support printf in SYSCALLS_REQUIRE_FILESYSTEM=0
+      var num = 0;
+      for (var i = 0; i < iovcnt; i++) {
+        var ptr = HEAP32[(((iov)+(i*8))>>2)];
+        var len = HEAP32[(((iov)+(i*8 + 4))>>2)];
+        for (var j = 0; j < len; j++) {
+          SYSCALLS.printChar(fd, HEAPU8[ptr+j]);
+        }
+        num += len;
+      }
+      HEAP32[((pnum)>>2)]=num
+      return 0;
+    } catch (e) {
+    if (typeof FS === 'undefined' || !(e instanceof FS.ErrnoError)) abort(e);
+    return e.errno;
+  }
+  }
+
+  
+  function _memcpy(dest, src, num) {
+      dest = dest|0; src = src|0; num = num|0;
+      var ret = 0;
+      var aligned_dest_end = 0;
+      var block_aligned_dest_end = 0;
+      var dest_end = 0;
+      // Test against a benchmarked cutoff limit for when HEAPU8.set() becomes faster to use.
+      if ((num|0) >= 8192) {
+        _emscripten_memcpy_big(dest|0, src|0, num|0)|0;
+        return dest|0;
+      }
+  
+      ret = dest|0;
+      dest_end = (dest + num)|0;
+      if ((dest&3) == (src&3)) {
+        // The initial unaligned < 4-byte front.
+        while (dest & 3) {
+          if ((num|0) == 0) return ret|0;
+          HEAP8[((dest)>>0)]=((HEAP8[((src)>>0)])|0);
+          dest = (dest+1)|0;
+          src = (src+1)|0;
+          num = (num-1)|0;
+        }
+        aligned_dest_end = (dest_end & -4)|0;
+        block_aligned_dest_end = (aligned_dest_end - 64)|0;
+        while ((dest|0) <= (block_aligned_dest_end|0) ) {
+          HEAP32[((dest)>>2)]=((HEAP32[((src)>>2)])|0);
+          HEAP32[(((dest)+(4))>>2)]=((HEAP32[(((src)+(4))>>2)])|0);
+          HEAP32[(((dest)+(8))>>2)]=((HEAP32[(((src)+(8))>>2)])|0);
+          HEAP32[(((dest)+(12))>>2)]=((HEAP32[(((src)+(12))>>2)])|0);
+          HEAP32[(((dest)+(16))>>2)]=((HEAP32[(((src)+(16))>>2)])|0);
+          HEAP32[(((dest)+(20))>>2)]=((HEAP32[(((src)+(20))>>2)])|0);
+          HEAP32[(((dest)+(24))>>2)]=((HEAP32[(((src)+(24))>>2)])|0);
+          HEAP32[(((dest)+(28))>>2)]=((HEAP32[(((src)+(28))>>2)])|0);
+          HEAP32[(((dest)+(32))>>2)]=((HEAP32[(((src)+(32))>>2)])|0);
+          HEAP32[(((dest)+(36))>>2)]=((HEAP32[(((src)+(36))>>2)])|0);
+          HEAP32[(((dest)+(40))>>2)]=((HEAP32[(((src)+(40))>>2)])|0);
+          HEAP32[(((dest)+(44))>>2)]=((HEAP32[(((src)+(44))>>2)])|0);
+          HEAP32[(((dest)+(48))>>2)]=((HEAP32[(((src)+(48))>>2)])|0);
+          HEAP32[(((dest)+(52))>>2)]=((HEAP32[(((src)+(52))>>2)])|0);
+          HEAP32[(((dest)+(56))>>2)]=((HEAP32[(((src)+(56))>>2)])|0);
+          HEAP32[(((dest)+(60))>>2)]=((HEAP32[(((src)+(60))>>2)])|0);
+          dest = (dest+64)|0;
+          src = (src+64)|0;
+        }
+        while ((dest|0) < (aligned_dest_end|0) ) {
+          HEAP32[((dest)>>2)]=((HEAP32[((src)>>2)])|0);
+          dest = (dest+4)|0;
+          src = (src+4)|0;
+        }
+      } else {
+        // In the unaligned copy case, unroll a bit as well.
+        aligned_dest_end = (dest_end - 4)|0;
+        while ((dest|0) < (aligned_dest_end|0) ) {
+          HEAP8[((dest)>>0)]=((HEAP8[((src)>>0)])|0);
+          HEAP8[(((dest)+(1))>>0)]=((HEAP8[(((src)+(1))>>0)])|0);
+          HEAP8[(((dest)+(2))>>0)]=((HEAP8[(((src)+(2))>>0)])|0);
+          HEAP8[(((dest)+(3))>>0)]=((HEAP8[(((src)+(3))>>0)])|0);
+          dest = (dest+4)|0;
+          src = (src+4)|0;
+        }
+      }
+      // The remaining unaligned < 4 byte tail.
+      while ((dest|0) < (dest_end|0)) {
+        HEAP8[((dest)>>0)]=((HEAP8[((src)>>0)])|0);
+        dest = (dest+1)|0;
+        src = (src+1)|0;
+      }
+      return ret|0;
+    }
+
+  function _memset(ptr, value, num) {
+      ptr = ptr|0; value = value|0; num = num|0;
+      var end = 0, aligned_end = 0, block_aligned_end = 0, value4 = 0;
+      end = (ptr + num)|0;
+  
+      value = value & 0xff;
+      if ((num|0) >= 67 /* 64 bytes for an unrolled loop + 3 bytes for unaligned head*/) {
+        while ((ptr&3) != 0) {
+          HEAP8[((ptr)>>0)]=value;
+          ptr = (ptr+1)|0;
+        }
+  
+        aligned_end = (end & -4)|0;
+        value4 = value | (value << 8) | (value << 16) | (value << 24);
+  
+        block_aligned_end = (aligned_end - 64)|0;
+  
+        while((ptr|0) <= (block_aligned_end|0)) {
+          HEAP32[((ptr)>>2)]=value4;
+          HEAP32[(((ptr)+(4))>>2)]=value4;
+          HEAP32[(((ptr)+(8))>>2)]=value4;
+          HEAP32[(((ptr)+(12))>>2)]=value4;
+          HEAP32[(((ptr)+(16))>>2)]=value4;
+          HEAP32[(((ptr)+(20))>>2)]=value4;
+          HEAP32[(((ptr)+(24))>>2)]=value4;
+          HEAP32[(((ptr)+(28))>>2)]=value4;
+          HEAP32[(((ptr)+(32))>>2)]=value4;
+          HEAP32[(((ptr)+(36))>>2)]=value4;
+          HEAP32[(((ptr)+(40))>>2)]=value4;
+          HEAP32[(((ptr)+(44))>>2)]=value4;
+          HEAP32[(((ptr)+(48))>>2)]=value4;
+          HEAP32[(((ptr)+(52))>>2)]=value4;
+          HEAP32[(((ptr)+(56))>>2)]=value4;
+          HEAP32[(((ptr)+(60))>>2)]=value4;
+          ptr = (ptr + 64)|0;
+        }
+  
+        while ((ptr|0) < (aligned_end|0) ) {
+          HEAP32[((ptr)>>2)]=value4;
+          ptr = (ptr+4)|0;
+        }
+      }
+      // The remaining bytes.
+      while ((ptr|0) < (end|0)) {
+        HEAP8[((ptr)>>0)]=value;
+        ptr = (ptr+1)|0;
+      }
+      return (end-num)|0;
+    }
+
+  function _setTempRet0($i) {
+      setTempRet0(($i) | 0);
+    }
+
+  function _wgpuBindGroupLayoutReference(id) {
+    WebGPU.mgrBindGroupLayout.reference(id);
+  }
+
+  function _wgpuBindGroupLayoutRelease(id) {
+    WebGPU.mgrBindGroupLayout.release(id);
+  }
+
+  function _wgpuBindGroupRelease(id) {
+    WebGPU.mgrBindGroup.release(id);
+  }
+
+  function _wgpuBufferMapReadAsync(bufferId, callback, userdata) {
+      var bufferEntry = WebGPU.mgrBuffer.objects[bufferId];
+      bufferEntry.mapped = 'write';
+      var buffer = bufferEntry.object;
+  
+      buffer.mapReadAsync().then(function(mapped) {
+        var DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS = 0;
+        var data = _malloc(mapped.byteLength);
+        HEAPU8.set(new Uint8Array(mapped), data);
+        var dataLength_h = (mapped.byteLength / 0x100000000) | 0;
+        var dataLength_l = mapped.byteLength | 0;
+        // WGPUBufferMapAsyncStatus status, const void* data, uint64_t dataLength, void* userdata
+        dynCall('viiji', callback, [DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS, data, dataLength_l, dataLength_h, userdata]);
+      }, function() {
+        // TODO(kainino0x): Figure out how to pick other error status values.
+        var DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR = 1;
+        dynCall('viiji', callback, [DAWN_BUFFER_MAP_ASYNC_STATUS_ERROR, 0, 0, 0, userdata]);
+      });
+    }
+
+  function _wgpuBufferReference(id) {
+    WebGPU.mgrBuffer.reference(id);
+  }
+
+  function _wgpuBufferRelease(id) {
+    WebGPU.mgrBuffer.release(id);
+  }
+
+  function _wgpuBufferUnmap(bufferId) {
+      var bufferObj = WebGPU.mgrBuffer.objects[bufferId];
+      WebGPU.trackUnmap(bufferObj);
+      bufferObj.object.unmap();
+    }
+
+  function _wgpuCommandBufferRelease(id) {
+    WebGPU.mgrCommandBuffer.release(id);
+  }
+
+  function _wgpuCommandEncoderBeginRenderPass(encoderId, descriptor) {
+      assert(descriptor);
+  
+      function makeColorAttachment(caPtr) {
+        let loadValue =  WebGPU.LoadOp[
+            HEAPU32[(((caPtr)+(8))>>2)]];
+        if (loadValue === 'clear') {
+          loadValue = WebGPU.makeColor(caPtr + 16);
+        }
+  
+        return {
+          attachment: WebGPU.mgrTextureView.get(
+            HEAPU32[((caPtr)>>2)]),
+          resolveTarget: WebGPU.mgrTextureView.get(
+            HEAPU32[(((caPtr)+(4))>>2)]),
+          storeOp: WebGPU.StoreOp[
+            HEAPU32[(((caPtr)+(12))>>2)]],
+          loadValue,
+        };
+      }
+  
+      function makeColorAttachments(count, caPtr) {
+        var attachments = [];
+        for (var i = 0; i < count; ++i) {
+          attachments.push(makeColorAttachment(caPtr + 32 * i));
+        }
+        return attachments;
+      }
+  
+      function makeDepthStencilAttachment(dsaPtr) {
+        if (dsaPtr === 0) return undefined;
+  
+        let depthLoadValue = WebGPU.LoadOp[
+            HEAPU32[(((dsaPtr)+(4))>>2)]];
+        if (depthLoadValue === 'clear') {
+          depthLoadValue = HEAPF32[(((dsaPtr)+(12))>>2)];
+        }
+  
+        let stencilLoadValue = WebGPU.LoadOp[
+            HEAPU32[(((dsaPtr)+(16))>>2)]];
+        if (stencilLoadValue === 'clear') {
+          stencilLoadValue = HEAPU32[(((dsaPtr)+(24))>>2)];
+        }
+  
+        return {
+          attachment: WebGPU.mgrTextureView.get(
+            HEAPU32[((dsaPtr)>>2)]),
+          depthStoreOp: WebGPU.StoreOp[
+            HEAPU32[(((dsaPtr)+(8))>>2)]],
+          depthLoadValue,
+          stencilStoreOp: WebGPU.StoreOp[
+            HEAPU32[(((dsaPtr)+(20))>>2)]],
+          stencilLoadValue,
+        };
+      }
+  
+      function makeRenderPassDescriptor(descriptor) {
+        assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+        var desc = {
+          label: undefined,
+          colorAttachments: makeColorAttachments(
+            HEAPU32[(((descriptor)+(8))>>2)],
+            HEAP32[(((descriptor)+(12))>>2)]),
+          depthStencilAttachment: makeDepthStencilAttachment(
+            HEAP32[(((descriptor)+(16))>>2)]),
+        };
+        var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+        if (labelPtr) desc.label = UTF8ToString(labelPtr);
+        return desc;
+      }
+  
+      var desc = makeRenderPassDescriptor(descriptor);
+  
+      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
+      return WebGPU.mgrRenderPassEncoder.create(commandEncoder.beginRenderPass(desc));
+    }
+
+  function _wgpuCommandEncoderCopyTextureToBuffer(encoderId, srcPtr, dstPtr, copySizePtr) {
+      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
+      var copySize = WebGPU.makeExtent3D(copySizePtr);
+      commandEncoder.copyTextureToBuffer(
+        WebGPU.makeTextureCopyView(srcPtr), WebGPU.makeBufferCopyView(dstPtr), copySize);
+    }
+
+  function _wgpuCommandEncoderFinish(encoderId) {
+      var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
+      return WebGPU.mgrCommandBuffer.create(commandEncoder.finish());
+    }
+
+  function _wgpuCommandEncoderRelease(id) {
+    WebGPU.mgrCommandEncoder.release(id);
+  }
+
+  function _wgpuDeviceCreateBindGroup(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+  
+      function makeBinding(bindingPtr) {
+        assert(bindingPtr);
+  
+        var bufferId = HEAPU32[(((bindingPtr)+(4))>>2)];
+        var samplerId = HEAPU32[(((bindingPtr)+(24))>>2)];
+        var textureViewId = HEAPU32[(((bindingPtr)+(28))>>2)];
+        assert((bufferId != 0) + (samplerId != 0) + (textureViewId != 0) == 1);
+  
+        var binding = HEAPU32[((bindingPtr)>>2)];
+  
+        if (bufferId != 0) {
+          var size = undefined;
+  
+          // Handle WGPU_WHOLE_SIZE.
+          var sizePart1 = HEAPU32[(((bindingPtr)+(16))>>2)];
+          var sizePart2 = HEAPU32[(((bindingPtr)+(20))>>2)];
+          if (sizePart1 != 0xFFFFFFFF || sizePart2 != 0xFFFFFFFF) {
+            size = HEAPU32[((((bindingPtr + 4))+(16))>>2)] * 0x100000000 + HEAPU32[(((bindingPtr)+(16))>>2)];
+          }
+  
+          return {
+            binding,
+            resource: {
+              buffer: WebGPU.mgrBuffer.get(bufferId),
+              offset: HEAPU32[((((bindingPtr + 4))+(8))>>2)] * 0x100000000 + HEAPU32[(((bindingPtr)+(8))>>2)],
+              size: size,
+            },
+          };
+        } else if (samplerId != 0) {
+          return {
+            binding,
+            resource: WebGPU.mgrSampler.get(samplerId),
+          };
+        } else {
+          return {
+            binding,
+            resource: WebGPU.mgrTextureView.get(textureViewId),
+          };
+        }
+      }
+  
+      function makeBindings(count, bindingsPtrs) {
+        var bindings = [];
+        for (var i = 0; i < count; ++i) {
+          bindings.push(makeBinding(bindingsPtrs +
+              32 * i));
+        }
+        return bindings;
+      }
+  
+      var desc = {
+        label: undefined,
+        layout: WebGPU.mgrBindGroupLayout.get(
+          HEAP32[(((descriptor)+(8))>>2)]),
+        bindings: makeBindings(
+          HEAPU32[(((descriptor)+(12))>>2)],
+          HEAP32[(((descriptor)+(16))>>2)],
+        ),
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrBindGroup.create(device.createBindGroup(desc));
+    }
+
+  function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+  
+      function makeBinding(bindingPtr) {
+        assert(bindingPtr);
+  
+        return {
+          binding:
+            HEAPU32[((bindingPtr)>>2)],
+          visibility:
+            HEAPU32[(((bindingPtr)+(4))>>2)],
+          type: WebGPU.BindingType[
+            HEAPU32[(((bindingPtr)+(8))>>2)]],
+          textureDimension: WebGPU.TextureViewDimension[
+            HEAPU32[(((bindingPtr)+(16))>>2)]],
+          textureComponentType: WebGPU.TextureComponentType[
+            HEAPU32[(((bindingPtr)+(20))>>2)]],
+          multisampled:
+            (HEAP8[(((bindingPtr)+(13))>>0)] !== 0),
+          hasDynamicOffset:
+            (HEAP8[(((bindingPtr)+(12))>>0)] !== 0),
+        };
+      }
+  
+      function makeBindings(count, bindingsPtrs) {
+        var bindings = [];
+        for (var i = 0; i < count; ++i) {
+          bindings.push(makeBinding(bindingsPtrs +
+              24 * i));
+        }
+        return bindings;
+      }
+  
+      var desc = {
+        bindings: makeBindings(
+          HEAPU32[(((descriptor)+(8))>>2)],
+          HEAP32[(((descriptor)+(12))>>2)],
+        ),
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrBindGroupLayout.create(device.createBindGroupLayout(desc));
+    }
+
+  function _wgpuDeviceCreateBuffer(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+      var desc = {
+        label: undefined,
+        usage: HEAPU32[(((descriptor)+(8))>>2)],
+        size: HEAPU32[((((descriptor + 4))+(16))>>2)] * 0x100000000 + HEAPU32[(((descriptor)+(16))>>2)],
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrBuffer.create(device.createBuffer(desc));
+    }
+
+  function _wgpuDeviceCreateCommandEncoder(deviceId, descriptor) {
+      var desc;
+      if (descriptor) {
+        assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+        desc = { label: undefined };
+        var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+        if (labelPtr) desc.label = UTF8ToString(labelPtr);
+      }
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrCommandEncoder.create(device.createCommandEncoder(desc));
+    }
+
+  function _wgpuDeviceCreatePipelineLayout(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+      var bglCount = HEAPU32[(((descriptor)+(8))>>2)];
+      var bglPtr = HEAP32[(((descriptor)+(12))>>2)];
+      var bgls = [];
+      for (var i = 0; i < bglCount; ++i) {
+        bgls.push(WebGPU.mgrBindGroupLayout.get(
+          HEAP32[(((bglPtr)+(4 * i))>>2)]));
+      }
+      var desc = { label: undefined, bindGroupLayouts: bgls };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrPipelineLayout.create(device.createPipelineLayout(desc));
+    }
+
+  function _wgpuDeviceCreateQueue(deviceId) {
+      assert(WebGPU.mgrQueue.objects.length === 1, 'there is only one queue');
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrQueue.create(device.defaultQueue);
+    }
+
+  function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+  
+      function makeStage(ptr) {
+        if (ptr === 0) return undefined;
+        assert(ptr);assert(HEAP32[((ptr)>>2)] === 0);
+        return {
+          module: WebGPU.mgrShaderModule.get(
+            HEAP32[(((ptr)+(4))>>2)]),
+          entryPoint: UTF8ToString(
+            HEAP32[(((ptr)+(8))>>2)]),
+        };
+      }
+  
+      function makeRasterizationState(rsPtr) {
+        if (rsPtr === 0) return undefined;
+        assert(rsPtr);assert(HEAP32[((rsPtr)>>2)] === 0);
+        return {
+          frontFace: WebGPU.FrontFace[
+            HEAPU32[(((rsPtr)+(4))>>2)]],
+          cullMode: WebGPU.CullMode[
+            HEAPU32[(((rsPtr)+(8))>>2)]],
+        };
+      }
+  
+      function makeBlendDescriptor(bdPtr) {
+        if (bdPtr === 0) return undefined;
+        return {
+          operation: WebGPU.BlendOperation[
+            HEAPU32[((bdPtr)>>2)]],
+          srcFactor: WebGPU.BlendFactor[
+            HEAPU32[(((bdPtr)+(4))>>2)]],
+          dstFactor: WebGPU.BlendFactor[
+            HEAPU32[(((bdPtr)+(8))>>2)]],
+        };
+      }
+  
+      function makeColorState(csPtr) {
+        assert(csPtr);assert(HEAP32[((csPtr)>>2)] === 0);
+        return {
+          format: WebGPU.TextureFormat[
+            HEAPU32[(((csPtr)+(4))>>2)]],
+          alphaBlend: makeBlendDescriptor(csPtr + 8),
+          colorBlend: makeBlendDescriptor(csPtr + 20),
+          writeMask: HEAPU32[(((csPtr)+(32))>>2)],
+        };
+      }
+  
+      function makeColorStates(count, csPtr) {
+        if (count === 0) return undefined;
+  
+        var states = [];
+        for (var i = 0; i < count; ++i) {
+          states.push(makeColorState(csPtr + 36 * i));
+        }
+        return states;
+      }
+  
+      function makeStencilStateFace(ssfPtr) {
+        assert(ssfPtr);
+        return {
+          compare: WebGPU.CompareFunction[
+            HEAPU32[((ssfPtr)>>2)]],
+          failOp: WebGPU.StencilOperation[
+            HEAPU32[(((ssfPtr)+(4))>>2)]],
+          depthFailOp: WebGPU.StencilOperation[
+            HEAPU32[(((ssfPtr)+(8))>>2)]],
+          passOp: WebGPU.StencilOperation[
+            HEAPU32[(((ssfPtr)+(12))>>2)]],
+        };
+      }
+  
+      function makeDepthStencilState(dssPtr) {
+        if (dssPtr === 0) return undefined;
+  
+        assert(dssPtr);
+        return {
+          format: WebGPU.TextureFormat[
+            HEAPU32[(((dssPtr)+(4))>>2)]],
+          depthWriteEnabled: (HEAP8[(((dssPtr)+(8))>>0)] !== 0),
+          depthCompare: WebGPU.CompareFunction[
+            HEAPU32[(((dssPtr)+(12))>>2)]],
+          stencilFront: makeStencilStateFace(dssPtr + 16),
+          stencilBack: makeStencilStateFace(dssPtr + 32),
+          stencilReadMask: HEAPU32[(((dssPtr)+(48))>>2)],
+          stencilWriteMask: HEAPU32[(((dssPtr)+(52))>>2)],
+        };
+      }
+  
+      function makeVertexAttribute(vaPtr) {
+        assert(vaPtr);
+        return {
+          format: WebGPU.VertexFormat[
+            HEAPU32[((vaPtr)>>2)]],
+          offset: HEAPU32[((((vaPtr + 4))+(8))>>2)] * 0x100000000 + HEAPU32[(((vaPtr)+(8))>>2)],
+          shaderLocation: HEAPU32[(((vaPtr)+(16))>>2)],
+        };
+      }
+  
+      function makeVertexAttributes(count, vaArrayPtr) {
+        var vas = [];
+        for (var i = 0; i < count; ++i) {
+          vas.push(makeVertexAttribute(vaArrayPtr + i * 24));
+        }
+        return vas;
+      }
+  
+      function makeVertexBuffer(vbPtr) {
+        if (vbPtr === 0) return undefined;
+  
+        return {
+          arrayStride: HEAPU32[(((vbPtr + 4))>>2)] * 0x100000000 + HEAPU32[((vbPtr)>>2)],
+          stepMode: WebGPU.InputStepMode[
+            HEAPU32[(((vbPtr)+(8))>>2)]],
+          // TODO(kainino0x): Update naming once WGPU matches WebGPU.
+          attributes: makeVertexAttributes(
+            HEAPU32[(((vbPtr)+(12))>>2)],
+            HEAP32[(((vbPtr)+(16))>>2)]),
+        };
+      }
+  
+      function makeVertexBuffers(count, vbArrayPtr) {
+        if (count === 0) return undefined;
+  
+        var vbs = [];
+        for (var i = 0; i < count; ++i) {
+          vbs.push(makeVertexBuffer(vbArrayPtr + i * 24));
+        }
+        return vbs;
+      }
+  
+      function makeVertexState(viPtr) {
+        if (viPtr === 0) return undefined;
+        assert(viPtr);assert(HEAP32[((viPtr)>>2)] === 0);
+        return {
+          indexFormat: WebGPU.IndexFormat[
+            HEAPU32[(((viPtr)+(4))>>2)]],
+          vertexBuffers: makeVertexBuffers(
+            HEAPU32[(((viPtr)+(8))>>2)],
+            HEAP32[(((viPtr)+(12))>>2)]),
+        };
+      }
+  
+      var desc = {
+        label: undefined,
+        layout: WebGPU.mgrPipelineLayout.get(
+          HEAP32[(((descriptor)+(8))>>2)]),
+        vertexStage: makeStage(
+          descriptor + 12),
+        fragmentStage: makeStage(
+          HEAP32[(((descriptor)+(24))>>2)]),
+        primitiveTopology: WebGPU.PrimitiveTopology[
+          HEAPU32[(((descriptor)+(32))>>2)]],
+        rasterizationState: makeRasterizationState(
+          HEAP32[(((descriptor)+(36))>>2)]),
+        colorStates: makeColorStates(
+          HEAPU32[(((descriptor)+(48))>>2)],
+          HEAP32[(((descriptor)+(52))>>2)]),
+        depthStencilState: makeDepthStencilState(
+          HEAP32[(((descriptor)+(44))>>2)]),
+        vertexState: makeVertexState(
+          HEAP32[(((descriptor)+(28))>>2)]),
+        sampleCount: HEAPU32[(((descriptor)+(40))>>2)],
+        sampleMask: HEAPU32[(((descriptor)+(56))>>2)],
+        alphaToCoverageEnabled: (HEAP8[(((descriptor)+(60))>>0)] !== 0),
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrRenderPipeline.create(device.createRenderPipeline(desc));
+    }
+
+  function _wgpuDeviceCreateShaderModule(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+      var count = HEAPU32[(((descriptor)+(8))>>2)];
+      var start = HEAP32[(((descriptor)+(12))>>2)];
+      var desc = {
+        label: undefined,
+        code: HEAPU32.subarray(start >> 2, (start >> 2) + count),
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrShaderModule.create(device.createShaderModule(desc));
+    }
+
+  function _wgpuDeviceCreateTexture(deviceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+  
+      var desc = {
+        label: undefined,
+        size: WebGPU.makeExtent3D(descriptor + 16),
+        arrayLayerCount: HEAPU32[(((descriptor)+(28))>>2)],
+        mipLevelCount: HEAPU32[(((descriptor)+(36))>>2)],
+        sampleCount: HEAPU32[(((descriptor)+(40))>>2)],
+        dimension: WebGPU.TextureDimension[
+          HEAPU32[(((descriptor)+(12))>>2)]],
+        format: WebGPU.TextureFormat[
+          HEAPU32[(((descriptor)+(32))>>2)]],
+        usage: HEAPU32[(((descriptor)+(8))>>2)],
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+  
+      var device = WebGPU.mgrDevice.get(deviceId);
+      return WebGPU.mgrTexture.create(device.createTexture(desc));
+    }
+
+  function _wgpuDeviceRelease(id) {
+    WebGPU.mgrDevice.release(id);
+  }
+
+  function _wgpuDeviceSetUncapturedErrorCallback(deviceId, callback, userdata) {
+      var device = WebGPU.mgrDevice.get(deviceId);
+      device.onuncapturederror = function(ev) {
+        // WGPUErrorType type, const char* message, void* userdata
+        var Validation = 0x00000001;
+        var OutOfMemory = 0x00000002;
+        var type;
+        if (ev.error instanceof GPUValidationError) type = Validation;
+        else if (ev.error instanceof GPUOutOfMemoryError) type = OutOfMemory;
+        var messagePtr = allocateUTF8(ev.error.message);
+        dynCall('viii', callback, [type, messagePtr, userdata]);
+        _free(messagePtr);
+      };
+    }
+
+  function _wgpuPipelineLayoutRelease(id) {
+    WebGPU.mgrPipelineLayout.release(id);
+  }
+
+  function _wgpuQueueRelease(id) {
+    WebGPU.mgrQueue.release(id);
+  }
+
+  function _wgpuQueueSubmit(queueId, commandCount, commands) {
+      assert(commands % 4 === 0);
+      var queue = WebGPU.mgrQueue.get(queueId);
+      var cmds = Array.from(HEAP32.subarray(commands >> 2, (commands >> 2) + commandCount),
+        function(id) { return WebGPU.mgrCommandBuffer.get(id); });
+      queue.submit(cmds);
+    }
+
+  function _wgpuRenderPassEncoderDraw(passId, vertexCount, instanceCount, firstVertex, firstInstance) {
+      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+      pass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
+    }
+
+  function _wgpuRenderPassEncoderEndPass(passId) {
+      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+      pass.endPass();
+    }
+
+  function _wgpuRenderPassEncoderRelease(id) {
+    WebGPU.mgrRenderPassEncoder.release(id);
+  }
+
+  function _wgpuRenderPassEncoderSetPipeline(passId, pipelineId) {
+      var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+      var pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+      pass.setPipeline(pipeline);
+    }
+
+  function _wgpuRenderPipelineRelease(id) {
+    WebGPU.mgrRenderPipeline.release(id);
+  }
+
+  function _wgpuShaderModuleReference(id) {
+    WebGPU.mgrShaderModule.reference(id);
+  }
+
+  function _wgpuShaderModuleRelease(id) {
+    WebGPU.mgrShaderModule.release(id);
+  }
+
+  function _wgpuTextureCreateView(textureId, descriptor) {
+      var desc;
+      if (descriptor) {
+        assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+        desc = {
+          format: WebGPU.TextureFormat[
+            HEAPU32[(((descriptor)+(8))>>2)]],
+          dimension: WebGPU.TextureViewDimension[
+            HEAPU32[(((descriptor)+(12))>>2)]],
+          baseMipLevel: HEAPU32[(((descriptor)+(16))>>2)],
+          mipLevelCount: HEAPU32[(((descriptor)+(20))>>2)],
+          baseArrayLayer: HEAPU32[(((descriptor)+(24))>>2)],
+          arrayLayerCount: HEAPU32[(((descriptor)+(28))>>2)],
+          aspect: WebGPU.TextureAspect[
+            HEAPU32[(((descriptor)+(32))>>2)]],
+        };
+        var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+        if (labelPtr) desc.label = UTF8ToString(labelPtr);
+      }
+  
+      var texture = WebGPU.mgrTexture.get(textureId);
+      return WebGPU.mgrTextureView.create(texture.createView(desc));
+    }
+
+  function _wgpuTextureReference(id) {
+    WebGPU.mgrTexture.reference(id);
+  }
+
+  function _wgpuTextureRelease(id) {
+    WebGPU.mgrTexture.release(id);
+  }
+
+  function _wgpuTextureViewRelease(id) {
+    WebGPU.mgrTextureView.release(id);
+  }
+Module["requestFullscreen"] = function Module_requestFullscreen(lockPointer, resizeCanvas, vrDevice) { Browser.requestFullscreen(lockPointer, resizeCanvas, vrDevice) };
+  Module["requestFullScreen"] = function Module_requestFullScreen() { Browser.requestFullScreen() };
   Module["requestAnimationFrame"] = function Module_requestAnimationFrame(func) { Browser.requestAnimationFrame(func) };
   Module["setCanvasSize"] = function Module_setCanvasSize(width, height, noUpdates) { Browser.setCanvasSize(width, height, noUpdates) };
   Module["pauseMainLoop"] = function Module_pauseMainLoop() { Browser.mainLoop.pause() };
@@ -3459,11 +3664,8 @@ if (ENVIRONMENT_IS_NODE) {
     };
   } else if (typeof dateNow !== 'undefined') {
     _emscripten_get_now = dateNow;
-  } else if (typeof performance === 'object' && performance && typeof performance['now'] === 'function') {
-    _emscripten_get_now = function() { return performance['now'](); };
-  } else {
-    _emscripten_get_now = Date.now;
-  };
+  } else _emscripten_get_now = function() { return performance['now'](); };
+  ;
 var ASSERTIONS = true;
 
 // Copyright 2017 The Emscripten Authors.  All rights reserved.
@@ -3498,188 +3700,222 @@ function intArrayToString(array) {
 
 // ASM_LIBRARY EXTERN PRIMITIVES: Int8Array,Int32Array
 
-function nullFunc_ii(x) { abortFnPtrError(x, 'ii'); }
-function nullFunc_iidiiii(x) { abortFnPtrError(x, 'iidiiii'); }
-function nullFunc_iii(x) { abortFnPtrError(x, 'iii'); }
-function nullFunc_iiii(x) { abortFnPtrError(x, 'iiii'); }
-function nullFunc_jiji(x) { abortFnPtrError(x, 'jiji'); }
-function nullFunc_v(x) { abortFnPtrError(x, 'v'); }
-function nullFunc_vi(x) { abortFnPtrError(x, 'vi'); }
-function nullFunc_vii(x) { abortFnPtrError(x, 'vii'); }
-function nullFunc_viii(x) { abortFnPtrError(x, 'viii'); }
-function nullFunc_viiii(x) { abortFnPtrError(x, 'viiii'); }
-function nullFunc_viiiii(x) { abortFnPtrError(x, 'viiiii'); }
-function nullFunc_viiiiii(x) { abortFnPtrError(x, 'viiiiii'); }
-function nullFunc_viiji(x) { abortFnPtrError(x, 'viiji'); }
-
 var asmGlobalArg = {};
-
-var asmLibraryArg = {
-  "abort": abort,
-  "setTempRet0": setTempRet0,
-  "getTempRet0": getTempRet0,
-  "abortStackOverflow": abortStackOverflow,
-  "nullFunc_ii": nullFunc_ii,
-  "nullFunc_iidiiii": nullFunc_iidiiii,
-  "nullFunc_iii": nullFunc_iii,
-  "nullFunc_iiii": nullFunc_iiii,
-  "nullFunc_jiji": nullFunc_jiji,
-  "nullFunc_v": nullFunc_v,
-  "nullFunc_vi": nullFunc_vi,
-  "nullFunc_vii": nullFunc_vii,
-  "nullFunc_viii": nullFunc_viii,
-  "nullFunc_viiii": nullFunc_viiii,
-  "nullFunc_viiiii": nullFunc_viiiii,
-  "nullFunc_viiiiii": nullFunc_viiiiii,
-  "nullFunc_viiji": nullFunc_viiji,
-  "___assert_fail": ___assert_fail,
-  "___cxa_begin_catch": ___cxa_begin_catch,
-  "___cxa_pure_virtual": ___cxa_pure_virtual,
-  "___cxa_uncaught_exceptions": ___cxa_uncaught_exceptions,
-  "___exception_addRef": ___exception_addRef,
-  "___exception_deAdjust": ___exception_deAdjust,
-  "___gxx_personality_v0": ___gxx_personality_v0,
-  "___lock": ___lock,
-  "___setErrNo": ___setErrNo,
-  "___syscall140": ___syscall140,
-  "___syscall146": ___syscall146,
-  "___syscall54": ___syscall54,
-  "___syscall6": ___syscall6,
-  "___unlock": ___unlock,
-  "_abort": _abort,
-  "_dawnBufferMapReadAsync": _dawnBufferMapReadAsync,
-  "_dawnBufferReference": _dawnBufferReference,
-  "_dawnBufferRelease": _dawnBufferRelease,
-  "_dawnBufferUnmap": _dawnBufferUnmap,
-  "_dawnCommandBufferRelease": _dawnCommandBufferRelease,
-  "_dawnCommandEncoderBeginRenderPass": _dawnCommandEncoderBeginRenderPass,
-  "_dawnCommandEncoderCopyTextureToBuffer": _dawnCommandEncoderCopyTextureToBuffer,
-  "_dawnCommandEncoderFinish": _dawnCommandEncoderFinish,
-  "_dawnCommandEncoderRelease": _dawnCommandEncoderRelease,
-  "_dawnDeviceCreateBuffer": _dawnDeviceCreateBuffer,
-  "_dawnDeviceCreateCommandEncoder": _dawnDeviceCreateCommandEncoder,
-  "_dawnDeviceCreatePipelineLayout": _dawnDeviceCreatePipelineLayout,
-  "_dawnDeviceCreateQueue": _dawnDeviceCreateQueue,
-  "_dawnDeviceCreateRenderPipeline": _dawnDeviceCreateRenderPipeline,
-  "_dawnDeviceCreateShaderModule": _dawnDeviceCreateShaderModule,
-  "_dawnDeviceCreateTexture": _dawnDeviceCreateTexture,
-  "_dawnDeviceRelease": _dawnDeviceRelease,
-  "_dawnDeviceSetUncapturedErrorCallback": _dawnDeviceSetUncapturedErrorCallback,
-  "_dawnPipelineLayoutRelease": _dawnPipelineLayoutRelease,
-  "_dawnQueueRelease": _dawnQueueRelease,
-  "_dawnQueueSubmit": _dawnQueueSubmit,
-  "_dawnRenderPassEncoderDraw": _dawnRenderPassEncoderDraw,
-  "_dawnRenderPassEncoderEndPass": _dawnRenderPassEncoderEndPass,
-  "_dawnRenderPassEncoderRelease": _dawnRenderPassEncoderRelease,
-  "_dawnRenderPassEncoderSetPipeline": _dawnRenderPassEncoderSetPipeline,
-  "_dawnRenderPipelineRelease": _dawnRenderPipelineRelease,
-  "_dawnShaderModuleReference": _dawnShaderModuleReference,
-  "_dawnShaderModuleRelease": _dawnShaderModuleRelease,
-  "_dawnTextureCreateView": _dawnTextureCreateView,
-  "_dawnTextureReference": _dawnTextureReference,
-  "_dawnTextureRelease": _dawnTextureRelease,
-  "_dawnTextureViewRelease": _dawnTextureViewRelease,
-  "_emscripten_get_heap_size": _emscripten_get_heap_size,
-  "_emscripten_get_now": _emscripten_get_now,
-  "_emscripten_memcpy_big": _emscripten_memcpy_big,
-  "_emscripten_resize_heap": _emscripten_resize_heap,
-  "_emscripten_set_main_loop": _emscripten_set_main_loop,
-  "_emscripten_set_main_loop_timing": _emscripten_set_main_loop_timing,
-  "_emscripten_webgpu_do_get_current_texture": _emscripten_webgpu_do_get_current_texture,
-  "_emscripten_webgpu_do_get_device": _emscripten_webgpu_do_get_device,
-  "_emscripten_webgpu_get_current_texture": _emscripten_webgpu_get_current_texture,
-  "_emscripten_webgpu_get_device": _emscripten_webgpu_get_device,
-  "_llvm_trap": _llvm_trap,
-  "abortOnCannotGrowMemory": abortOnCannotGrowMemory,
-  "demangle": demangle,
-  "demangleAll": demangleAll,
-  "flush_NO_FILESYSTEM": flush_NO_FILESYSTEM,
-  "jsStackTrace": jsStackTrace,
-  "stackTrace": stackTrace,
-  "tempDoublePtr": tempDoublePtr,
-  "DYNAMICTOP_PTR": DYNAMICTOP_PTR
+var asmLibraryArg = { "__assert_fail": ___assert_fail, "__cxa_atexit": ___cxa_atexit, "__handle_stack_overflow": ___handle_stack_overflow, "__lock": ___lock, "__unlock": ___unlock, "abort": _abort, "emscripten_get_sbrk_ptr": _emscripten_get_sbrk_ptr, "emscripten_memcpy_big": _emscripten_memcpy_big, "emscripten_resize_heap": _emscripten_resize_heap, "emscripten_set_main_loop": _emscripten_set_main_loop, "emscripten_webgpu_get_current_texture": _emscripten_webgpu_get_current_texture, "emscripten_webgpu_get_device": _emscripten_webgpu_get_device, "fd_write": _fd_write, "memory": wasmMemory, "setTempRet0": _setTempRet0, "table": wasmTable, "wgpuBindGroupLayoutReference": _wgpuBindGroupLayoutReference, "wgpuBindGroupLayoutRelease": _wgpuBindGroupLayoutRelease, "wgpuBindGroupRelease": _wgpuBindGroupRelease, "wgpuBufferMapReadAsync": _wgpuBufferMapReadAsync, "wgpuBufferReference": _wgpuBufferReference, "wgpuBufferRelease": _wgpuBufferRelease, "wgpuBufferUnmap": _wgpuBufferUnmap, "wgpuCommandBufferRelease": _wgpuCommandBufferRelease, "wgpuCommandEncoderBeginRenderPass": _wgpuCommandEncoderBeginRenderPass, "wgpuCommandEncoderCopyTextureToBuffer": _wgpuCommandEncoderCopyTextureToBuffer, "wgpuCommandEncoderFinish": _wgpuCommandEncoderFinish, "wgpuCommandEncoderRelease": _wgpuCommandEncoderRelease, "wgpuDeviceCreateBindGroup": _wgpuDeviceCreateBindGroup, "wgpuDeviceCreateBindGroupLayout": _wgpuDeviceCreateBindGroupLayout, "wgpuDeviceCreateBuffer": _wgpuDeviceCreateBuffer, "wgpuDeviceCreateCommandEncoder": _wgpuDeviceCreateCommandEncoder, "wgpuDeviceCreatePipelineLayout": _wgpuDeviceCreatePipelineLayout, "wgpuDeviceCreateQueue": _wgpuDeviceCreateQueue, "wgpuDeviceCreateRenderPipeline": _wgpuDeviceCreateRenderPipeline, "wgpuDeviceCreateShaderModule": _wgpuDeviceCreateShaderModule, "wgpuDeviceCreateTexture": _wgpuDeviceCreateTexture, "wgpuDeviceRelease": _wgpuDeviceRelease, "wgpuDeviceSetUncapturedErrorCallback": _wgpuDeviceSetUncapturedErrorCallback, "wgpuPipelineLayoutRelease": _wgpuPipelineLayoutRelease, "wgpuQueueRelease": _wgpuQueueRelease, "wgpuQueueSubmit": _wgpuQueueSubmit, "wgpuRenderPassEncoderDraw": _wgpuRenderPassEncoderDraw, "wgpuRenderPassEncoderEndPass": _wgpuRenderPassEncoderEndPass, "wgpuRenderPassEncoderRelease": _wgpuRenderPassEncoderRelease, "wgpuRenderPassEncoderSetPipeline": _wgpuRenderPassEncoderSetPipeline, "wgpuRenderPipelineRelease": _wgpuRenderPipelineRelease, "wgpuShaderModuleReference": _wgpuShaderModuleReference, "wgpuShaderModuleRelease": _wgpuShaderModuleRelease, "wgpuTextureCreateView": _wgpuTextureCreateView, "wgpuTextureReference": _wgpuTextureReference, "wgpuTextureRelease": _wgpuTextureRelease, "wgpuTextureViewRelease": _wgpuTextureViewRelease };
+var asm = createWasm();
+var real____wasm_call_ctors = asm["__wasm_call_ctors"];
+asm["__wasm_call_ctors"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real____wasm_call_ctors.apply(null, arguments);
 };
-// EMSCRIPTEN_START_ASM
-var asm =Module["asm"]// EMSCRIPTEN_END_ASM
-(asmGlobalArg, asmLibraryArg, buffer);
+
+var real__main = asm["main"];
+asm["main"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real__main.apply(null, arguments);
+};
+
+var real____errno_location = asm["__errno_location"];
+asm["__errno_location"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real____errno_location.apply(null, arguments);
+};
+
+var real__fflush = asm["fflush"];
+asm["fflush"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real__fflush.apply(null, arguments);
+};
+
+var real__setThrew = asm["setThrew"];
+asm["setThrew"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real__setThrew.apply(null, arguments);
+};
+
+var real___ZSt18uncaught_exceptionv = asm["_ZSt18uncaught_exceptionv"];
+asm["_ZSt18uncaught_exceptionv"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real___ZSt18uncaught_exceptionv.apply(null, arguments);
+};
+
+var real__malloc = asm["malloc"];
+asm["malloc"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real__malloc.apply(null, arguments);
+};
+
+var real__free = asm["free"];
+asm["free"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real__free.apply(null, arguments);
+};
+
+var real____set_stack_limit = asm["__set_stack_limit"];
+asm["__set_stack_limit"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real____set_stack_limit.apply(null, arguments);
+};
+
+var real_stackSave = asm["stackSave"];
+asm["stackSave"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_stackSave.apply(null, arguments);
+};
+
+var real_stackAlloc = asm["stackAlloc"];
+asm["stackAlloc"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_stackAlloc.apply(null, arguments);
+};
+
+var real_stackRestore = asm["stackRestore"];
+asm["stackRestore"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_stackRestore.apply(null, arguments);
+};
+
+var real___growWasmMemory = asm["__growWasmMemory"];
+asm["__growWasmMemory"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real___growWasmMemory.apply(null, arguments);
+};
+
+var real_dynCall_vi = asm["dynCall_vi"];
+asm["dynCall_vi"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_vi.apply(null, arguments);
+};
+
+var real_dynCall_viii = asm["dynCall_viii"];
+asm["dynCall_viii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_viii.apply(null, arguments);
+};
+
+var real_dynCall_viiji = asm["dynCall_viiji"];
+asm["dynCall_viiji"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_viiji.apply(null, arguments);
+};
+
+var real_dynCall_v = asm["dynCall_v"];
+asm["dynCall_v"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_v.apply(null, arguments);
+};
+
+var real_dynCall_ii = asm["dynCall_ii"];
+asm["dynCall_ii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_ii.apply(null, arguments);
+};
+
+var real_dynCall_iiii = asm["dynCall_iiii"];
+asm["dynCall_iiii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_iiii.apply(null, arguments);
+};
+
+var real_dynCall_jiji = asm["dynCall_jiji"];
+asm["dynCall_jiji"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_jiji.apply(null, arguments);
+};
+
+var real_dynCall_iidiiii = asm["dynCall_iidiiii"];
+asm["dynCall_iidiiii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_iidiiii.apply(null, arguments);
+};
+
+var real_dynCall_vii = asm["dynCall_vii"];
+asm["dynCall_vii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return real_dynCall_vii.apply(null, arguments);
+};
 
 Module["asm"] = asm;
-var __ZSt18uncaught_exceptionv = Module["__ZSt18uncaught_exceptionv"] = function() {
+var ___wasm_call_ctors = Module["___wasm_call_ctors"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["__ZSt18uncaught_exceptionv"].apply(null, arguments)
-};
-
-var ___cxa_can_catch = Module["___cxa_can_catch"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["___cxa_can_catch"].apply(null, arguments)
-};
-
-var ___cxa_is_pointer_type = Module["___cxa_is_pointer_type"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["___cxa_is_pointer_type"].apply(null, arguments)
-};
-
-var ___errno_location = Module["___errno_location"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["___errno_location"].apply(null, arguments)
-};
-
-var _fflush = Module["_fflush"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_fflush"].apply(null, arguments)
-};
-
-var _free = Module["_free"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_free"].apply(null, arguments)
+  return Module["asm"]["__wasm_call_ctors"].apply(null, arguments)
 };
 
 var _main = Module["_main"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_main"].apply(null, arguments)
+  return Module["asm"]["main"].apply(null, arguments)
+};
+
+var ___errno_location = Module["___errno_location"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["__errno_location"].apply(null, arguments)
+};
+
+var _fflush = Module["_fflush"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["fflush"].apply(null, arguments)
+};
+
+var _setThrew = Module["_setThrew"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["setThrew"].apply(null, arguments)
+};
+
+var __ZSt18uncaught_exceptionv = Module["__ZSt18uncaught_exceptionv"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["_ZSt18uncaught_exceptionv"].apply(null, arguments)
 };
 
 var _malloc = Module["_malloc"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_malloc"].apply(null, arguments)
+  return Module["asm"]["malloc"].apply(null, arguments)
 };
 
-var _memcpy = Module["_memcpy"] = function() {
+var _free = Module["_free"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_memcpy"].apply(null, arguments)
+  return Module["asm"]["free"].apply(null, arguments)
 };
 
-var _memmove = Module["_memmove"] = function() {
+var ___set_stack_limit = Module["___set_stack_limit"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_memmove"].apply(null, arguments)
+  return Module["asm"]["__set_stack_limit"].apply(null, arguments)
 };
 
-var _memset = Module["_memset"] = function() {
+var stackSave = Module["stackSave"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_memset"].apply(null, arguments)
-};
-
-var _sbrk = Module["_sbrk"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["_sbrk"].apply(null, arguments)
-};
-
-var establishStackSpace = Module["establishStackSpace"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["establishStackSpace"].apply(null, arguments)
+  return Module["asm"]["stackSave"].apply(null, arguments)
 };
 
 var stackAlloc = Module["stackAlloc"] = function() {
@@ -3694,28 +3930,40 @@ var stackRestore = Module["stackRestore"] = function() {
   return Module["asm"]["stackRestore"].apply(null, arguments)
 };
 
-var stackSave = Module["stackSave"] = function() {
+var __growWasmMemory = Module["__growWasmMemory"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["stackSave"].apply(null, arguments)
+  return Module["asm"]["__growWasmMemory"].apply(null, arguments)
+};
+
+var dynCall_vi = Module["dynCall_vi"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["dynCall_vi"].apply(null, arguments)
+};
+
+var dynCall_viii = Module["dynCall_viii"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["dynCall_viii"].apply(null, arguments)
+};
+
+var dynCall_viiji = Module["dynCall_viiji"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["dynCall_viiji"].apply(null, arguments)
+};
+
+var dynCall_v = Module["dynCall_v"] = function() {
+  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
+  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
+  return Module["asm"]["dynCall_v"].apply(null, arguments)
 };
 
 var dynCall_ii = Module["dynCall_ii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
   return Module["asm"]["dynCall_ii"].apply(null, arguments)
-};
-
-var dynCall_iidiiii = Module["dynCall_iidiiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_iidiiii"].apply(null, arguments)
-};
-
-var dynCall_iii = Module["dynCall_iii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_iii"].apply(null, arguments)
 };
 
 var dynCall_iiii = Module["dynCall_iiii"] = function() {
@@ -3730,16 +3978,10 @@ var dynCall_jiji = Module["dynCall_jiji"] = function() {
   return Module["asm"]["dynCall_jiji"].apply(null, arguments)
 };
 
-var dynCall_v = Module["dynCall_v"] = function() {
+var dynCall_iidiiii = Module["dynCall_iidiiii"] = function() {
   assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
   assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_v"].apply(null, arguments)
-};
-
-var dynCall_vi = Module["dynCall_vi"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_vi"].apply(null, arguments)
+  return Module["asm"]["dynCall_iidiiii"].apply(null, arguments)
 };
 
 var dynCall_vii = Module["dynCall_vii"] = function() {
@@ -3748,36 +3990,6 @@ var dynCall_vii = Module["dynCall_vii"] = function() {
   return Module["asm"]["dynCall_vii"].apply(null, arguments)
 };
 
-var dynCall_viii = Module["dynCall_viii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viii"].apply(null, arguments)
-};
-
-var dynCall_viiii = Module["dynCall_viiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiii"].apply(null, arguments)
-};
-
-var dynCall_viiiii = Module["dynCall_viiiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiiii"].apply(null, arguments)
-};
-
-var dynCall_viiiiii = Module["dynCall_viiiiii"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiiiii"].apply(null, arguments)
-};
-
-var dynCall_viiji = Module["dynCall_viiji"] = function() {
-  assert(runtimeInitialized, 'you need to wait for the runtime to be ready (e.g. wait for main() to be called)');
-  assert(!runtimeExited, 'the runtime was exited (use NO_EXIT_RUNTIME to keep it alive after main() exits)');
-  return Module["asm"]["dynCall_viiji"].apply(null, arguments)
-};
-;
 
 
 
@@ -3843,21 +4055,23 @@ if (!Object.getOwnPropertyDescriptor(Module, "prettyPrint")) Module["prettyPrint
 if (!Object.getOwnPropertyDescriptor(Module, "makeBigInt")) Module["makeBigInt"] = function() { abort("'makeBigInt' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "dynCall")) Module["dynCall"] = function() { abort("'dynCall' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "getCompilerSetting")) Module["getCompilerSetting"] = function() { abort("'getCompilerSetting' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "stackSave")) Module["stackSave"] = function() { abort("'stackSave' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "stackRestore")) Module["stackRestore"] = function() { abort("'stackRestore' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "stackAlloc")) Module["stackAlloc"] = function() { abort("'stackAlloc' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "establishStackSpace")) Module["establishStackSpace"] = function() { abort("'establishStackSpace' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "print")) Module["print"] = function() { abort("'print' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "printErr")) Module["printErr"] = function() { abort("'printErr' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "getTempRet0")) Module["getTempRet0"] = function() { abort("'getTempRet0' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "setTempRet0")) Module["setTempRet0"] = function() { abort("'setTempRet0' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
 if (!Object.getOwnPropertyDescriptor(Module, "callMain")) Module["callMain"] = function() { abort("'callMain' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "Pointer_stringify")) Module["Pointer_stringify"] = function() { abort("'Pointer_stringify' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
-if (!Object.getOwnPropertyDescriptor(Module, "warnOnce")) Module["warnOnce"] = function() { abort("'warnOnce' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_NORMAL")) Object.defineProperty(Module, "ALLOC_NORMAL", { get: function() { abort("'ALLOC_NORMAL' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
-if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_STACK")) Object.defineProperty(Module, "ALLOC_STACK", { get: function() { abort("'ALLOC_STACK' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
-if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_DYNAMIC")) Object.defineProperty(Module, "ALLOC_DYNAMIC", { get: function() { abort("'ALLOC_DYNAMIC' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
-if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_NONE")) Object.defineProperty(Module, "ALLOC_NONE", { get: function() { abort("'ALLOC_NONE' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
-if (!Object.getOwnPropertyDescriptor(Module, "calledRun")) Object.defineProperty(Module, "calledRun", { get: function() { abort("'calledRun' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ). Alternatively, forcing filesystem support (-s FORCE_FILESYSTEM=1) can export this for you") } });
+if (!Object.getOwnPropertyDescriptor(Module, "abort")) Module["abort"] = function() { abort("'abort' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+if (!Object.getOwnPropertyDescriptor(Module, "warnOnce")) Module["warnOnce"] = function() { abort("'warnOnce' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+if (!Object.getOwnPropertyDescriptor(Module, "stackSave")) Module["stackSave"] = function() { abort("'stackSave' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+if (!Object.getOwnPropertyDescriptor(Module, "stackRestore")) Module["stackRestore"] = function() { abort("'stackRestore' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+if (!Object.getOwnPropertyDescriptor(Module, "stackAlloc")) Module["stackAlloc"] = function() { abort("'stackAlloc' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") };
+Module["writeStackCookie"] = writeStackCookie;
+Module["checkStackCookie"] = checkStackCookie;
+Module["abortStackOverflow"] = abortStackOverflow;if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_NORMAL")) Object.defineProperty(Module, "ALLOC_NORMAL", { configurable: true, get: function() { abort("'ALLOC_NORMAL' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
+if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_STACK")) Object.defineProperty(Module, "ALLOC_STACK", { configurable: true, get: function() { abort("'ALLOC_STACK' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
+if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_DYNAMIC")) Object.defineProperty(Module, "ALLOC_DYNAMIC", { configurable: true, get: function() { abort("'ALLOC_DYNAMIC' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
+if (!Object.getOwnPropertyDescriptor(Module, "ALLOC_NONE")) Object.defineProperty(Module, "ALLOC_NONE", { configurable: true, get: function() { abort("'ALLOC_NONE' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ)") } });
+if (!Object.getOwnPropertyDescriptor(Module, "calledRun")) Object.defineProperty(Module, "calledRun", { configurable: true, get: function() { abort("'calledRun' was not exported. add it to EXTRA_EXPORTED_RUNTIME_METHODS (see the FAQ). Alternatively, forcing filesystem support (-s FORCE_FILESYSTEM=1) can export this for you") } });
 
 
 
@@ -3876,6 +4090,7 @@ function ExitStatus(status) {
 
 var calledMain = false;
 
+
 dependenciesFulfilled = function runCaller() {
   // If run has never been called, and we should call run (INVOKE_RUN is true, and Module.noInitialRun is not false)
   if (!calledRun) run();
@@ -3885,6 +4100,8 @@ dependenciesFulfilled = function runCaller() {
 function callMain(args) {
   assert(runDependencies == 0, 'cannot call main when async dependencies remain! (listen on Module["onRuntimeInitialized"])');
   assert(__ATPRERUN__.length == 0, 'cannot call main when preRun functions remain to be called');
+
+  var entryFunction = Module['_main'];
 
 
   args = args || [];
@@ -3900,10 +4117,13 @@ function callMain(args) {
 
   try {
 
+    Module['___set_stack_limit'](STACK_MAX);
 
-    var ret = Module['_main'](argc, argv);
+    var ret = entryFunction(argc, argv);
 
 
+    // In PROXY_TO_PTHREAD builds, we should never exit the runtime below, as execution is asynchronously handed
+    // off to a pthread.
     // if we're not running an evented main loop, it's time to exit
       exit(ret, /* implicit = */ true);
   }
@@ -3912,9 +4132,9 @@ function callMain(args) {
       // exit() throws this once it's done to make sure execution
       // has been stopped completely
       return;
-    } else if (e == 'SimulateInfiniteLoop') {
+    } else if (e == 'unwind') {
       // running an evented main loop, don't immediately exit
-      Module['noExitRuntime'] = true;
+      noExitRuntime = true;
       return;
     } else {
       var toLog = e;
@@ -4018,14 +4238,14 @@ function exit(status, implicit) {
   // don't need to do anything here and can just leave. if the status is
   // non-zero, though, then we need to report it.
   // (we may have warned about this earlier, if a situation justifies doing so)
-  if (implicit && Module['noExitRuntime'] && status === 0) {
+  if (implicit && noExitRuntime && status === 0) {
     return;
   }
 
-  if (Module['noExitRuntime']) {
+  if (noExitRuntime) {
     // if exit() was called, we may warn the user if the runtime isn't actually being shut down
     if (!implicit) {
-      err('exit(' + status + ') called, but EXIT_RUNTIME is not set, so halting execution but not exiting the runtime or preventing further async execution (build with EXIT_RUNTIME=1, if you want a true shutdown)');
+      err('program exited (with status: ' + status + '), but EXIT_RUNTIME is not set, so halting execution but not exiting the runtime or preventing further async execution (build with EXIT_RUNTIME=1, if you want a true shutdown)');
     }
   } else {
 
@@ -4040,31 +4260,6 @@ function exit(status, implicit) {
   quit_(status, new ExitStatus(status));
 }
 
-var abortDecorators = [];
-
-function abort(what) {
-  if (Module['onAbort']) {
-    Module['onAbort'](what);
-  }
-
-  what += '';
-  out(what);
-  err(what);
-
-  ABORT = true;
-  EXITSTATUS = 1;
-
-  var extra = '';
-  var output = 'abort(' + what + ') at ' + stackTrace() + extra;
-  if (abortDecorators) {
-    abortDecorators.forEach(function(decorator) {
-      output = decorator(output, what);
-    });
-  }
-  throw output;
-}
-Module['abort'] = abort;
-
 if (Module['preInit']) {
   if (typeof Module['preInit'] == 'function') Module['preInit'] = [Module['preInit']];
   while (Module['preInit'].length > 0) {
@@ -4078,7 +4273,7 @@ var shouldRunNow = true;
 if (Module['noInitialRun']) shouldRunNow = false;
 
 
-  Module["noExitRuntime"] = true;
+  noExitRuntime = true;
 
 run();
 

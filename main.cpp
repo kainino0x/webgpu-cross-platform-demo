@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <dawn/dawncpp.h>
+#include <webgpu/webgpu_cpp.h>
 
 #undef NDEBUG
 #include <cassert>
@@ -23,16 +23,17 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-dawn::Device CreateCppDawnDevice() {
-    return dawn::Device::Acquire(emscripten_webgpu_get_device());
+wgpu::Device CreateCppWGPUDevice() {
+    return wgpu::Device::Acquire(emscripten_webgpu_get_device());
 }
 #else
+#include <dawn/dawn_proc.h>
 #include <dawn_native/DawnNative.h>
 #include <memory>
 
 static std::unique_ptr<dawn_native::Instance> instance;
 
-dawn::Device CreateCppDawnDevice() {
+wgpu::Device CreateCppWGPUDevice() {
     instance = std::make_unique<dawn_native::Instance>();
     instance->DiscoverDefaultAdapters();
 
@@ -40,10 +41,10 @@ dawn::Device CreateCppDawnDevice() {
     dawn_native::Adapter backendAdapter = instance->GetAdapters()[0];
     assert(backendAdapter.GetBackendType() == dawn_native::BackendType::Metal);
 
-    dawn::Device device = dawn::Device::Acquire(backendAdapter.CreateDevice());
+    wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
     DawnProcTable procs = dawn_native::GetProcs();
 
-    dawnSetProcs(&procs);
+    dawnProcSetProcs(&procs);
     return device;
 }
 #endif
@@ -56,14 +57,14 @@ static const uint32_t fsCode[] = {
 };
 static const uint32_t expectData = 0xff0080ff;
 
-static dawn::Device device;
-static dawn::Queue queue;
-static dawn::Buffer readbackBuffer;
-static dawn::RenderPipeline pipeline;
+static wgpu::Device device;
+static wgpu::Queue queue;
+static wgpu::Buffer readbackBuffer;
+static wgpu::RenderPipeline pipeline;
 static bool done = false;
 
-void readCallback(DawnBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
-    assert(status == DAWN_BUFFER_MAP_ASYNC_STATUS_SUCCESS);
+void readCallback(WGPUBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
+    assert(status == WGPUBufferMapAsyncStatus_Success);
     printf("mapped read %p\n", ptr);
     uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
     readbackBuffer.Unmap();
@@ -78,74 +79,84 @@ void readCallback(DawnBufferMapAsyncStatus status, const void* ptr, uint64_t siz
     done = true;
 };
 
-void printDeviceError(DawnErrorType errorType, const char* message, void*) {
+void printDeviceError(WGPUErrorType errorType, const char* message, void*) {
     printf("%d: %s\n", errorType, message);
 }
 
 void init() {
     {
-        device = CreateCppDawnDevice();
+        device = CreateCppWGPUDevice();
         device.SetUncapturedErrorCallback(printDeviceError, nullptr);
     }
 
     queue = device.CreateQueue();
 
-    dawn::ShaderModule vsModule = {};
+    wgpu::ShaderModule vsModule = {};
     {
-        dawn::ShaderModuleDescriptor descriptor = {};
+        wgpu::ShaderModuleDescriptor descriptor = {};
         descriptor.codeSize = sizeof(vsCode) / sizeof(uint32_t);
         descriptor.code = vsCode;
         vsModule = device.CreateShaderModule(&descriptor);
     }
 
-    dawn::ShaderModule fsModule = {};
+    wgpu::ShaderModule fsModule = {};
     {
-        dawn::ShaderModuleDescriptor descriptor = {};
+        wgpu::ShaderModuleDescriptor descriptor = {};
         descriptor.codeSize = sizeof(fsCode) / sizeof(uint32_t);
         descriptor.code = fsCode;
         fsModule = device.CreateShaderModule(&descriptor);
     }
 
     {
-        dawn::PipelineStageDescriptor fragmentStage = {};
+        wgpu::BindGroupLayoutDescriptor d = {};
+        auto bgl = device.CreateBindGroupLayout(&d);
+        wgpu::BindGroupDescriptor desc = {};
+        desc.layout = bgl;
+        desc.bindingCount = 0;
+        desc.bindings = nullptr;
+        device.CreateBindGroup(&desc);
+    }
+
+    {
+        wgpu::ProgrammableStageDescriptor fragmentStage = {};
         fragmentStage.module = fsModule;
         fragmentStage.entryPoint = "main";
 
-        dawn::ColorStateDescriptor colorStateDescriptor = {};
-        colorStateDescriptor.format = dawn::TextureFormat::BGRA8Unorm;
+        wgpu::ColorStateDescriptor colorStateDescriptor = {};
+        colorStateDescriptor.format = wgpu::TextureFormat::BGRA8Unorm;
 
-        dawn::PipelineLayoutDescriptor pl = {};
+        wgpu::PipelineLayoutDescriptor pl = {};
         pl.bindGroupLayoutCount = 0;
         pl.bindGroupLayouts = nullptr;
 
-        dawn::RenderPipelineDescriptor descriptor = {};
+        wgpu::RenderPipelineDescriptor descriptor = {};
         descriptor.layout = device.CreatePipelineLayout(&pl);
         descriptor.vertexStage.module = vsModule;
         descriptor.vertexStage.entryPoint = "main";
         descriptor.fragmentStage = &fragmentStage;
         descriptor.colorStateCount = 1;
         descriptor.colorStates = &colorStateDescriptor;
-        descriptor.primitiveTopology = dawn::PrimitiveTopology::TriangleList;
+        descriptor.primitiveTopology = wgpu::PrimitiveTopology::TriangleList;
         pipeline = device.CreateRenderPipeline(&descriptor);
     }
 }
 
-void render(dawn::Texture texture) {
-    dawn::RenderPassColorAttachmentDescriptor attachment = {};
+void render(wgpu::Texture texture) {
+    wgpu::RenderPassColorAttachmentDescriptor attachment = {};
     attachment.attachment = texture.CreateView();
-    attachment.loadOp = dawn::LoadOp::Clear;
-    attachment.storeOp = dawn::StoreOp::Store;
+    attachment.loadOp = wgpu::LoadOp::Clear;
+    attachment.storeOp = wgpu::StoreOp::Store;
     attachment.clearColor = {0, 0, 0, 1};
 
-    dawn::RenderPassDescriptor renderpass = {};
+    wgpu::RenderPassDescriptor renderpass = {};
     renderpass.colorAttachmentCount = 1;
     renderpass.colorAttachments = &attachment;
 
-    dawn::CommandBuffer commands;
+    wgpu::CommandBuffer commands;
     {
-        dawn::CommandEncoder encoder = device.CreateCommandEncoder();
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
         {
-            dawn::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
+            wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
             pass.SetPipeline(pipeline);
             pass.Draw(3, 1, 0, 0);
             pass.EndPass();
@@ -157,35 +168,35 @@ void render(dawn::Texture texture) {
 }
 
 void doTest() {
-    dawn::Texture readbackTexture;
+    wgpu::Texture readbackTexture;
     {
-        dawn::TextureDescriptor descriptor = {};
-        descriptor.usage = dawn::TextureUsage::OutputAttachment | dawn::TextureUsage::CopySrc;
+        wgpu::TextureDescriptor descriptor = {};
+        descriptor.usage = wgpu::TextureUsage::OutputAttachment | wgpu::TextureUsage::CopySrc;
         descriptor.size = {1, 1, 1};
-        descriptor.format = dawn::TextureFormat::BGRA8Unorm;
+        descriptor.format = wgpu::TextureFormat::BGRA8Unorm;
         readbackTexture = device.CreateTexture(&descriptor);
     }
     render(readbackTexture);
 
     {
-        dawn::BufferDescriptor descriptor = {};
+        wgpu::BufferDescriptor descriptor = {};
         descriptor.size = 4;
-        descriptor.usage = dawn::BufferUsage::CopyDst | dawn::BufferUsage::MapRead;
+        descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
 
         readbackBuffer = device.CreateBuffer(&descriptor);
     }
 
-    dawn::CommandBuffer commands;
+    wgpu::CommandBuffer commands;
     {
-        dawn::CommandEncoder encoder = device.CreateCommandEncoder();
-        dawn::TextureCopyView tcv = {};
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+        wgpu::TextureCopyView tcv = {};
         tcv.texture = readbackTexture;
         tcv.origin = {0, 0, 0};
-        dawn::BufferCopyView bcv = {};
+        wgpu::BufferCopyView bcv = {};
         bcv.buffer = readbackBuffer;
         bcv.rowPitch = 256;
         bcv.imageHeight = 256;
-        dawn::Extent3D extent = {1, 1, 1};
+        wgpu::Extent3D extent = {1, 1, 1};
         encoder.CopyTextureToBuffer(&tcv, &bcv, &extent);
         commands = encoder.Finish();
     }
@@ -195,7 +206,7 @@ void doTest() {
 
 #ifdef __EMSCRIPTEN__
 void frame() {
-    dawn::Texture backbuffer = emscripten_webgpu_get_current_texture();
+    wgpu::Texture backbuffer = emscripten_webgpu_get_current_texture();
     render(backbuffer);
 }
 #endif
