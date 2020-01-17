@@ -18,15 +18,14 @@ if(NOT EMSCRIPTEN)
     add_definitions(-DDAWN_ENABLE_BACKEND_METAL)
 endif()
 
-set(HELLO_SOURCES
+add_executable(hello
     "${PROJECT_SOURCE_DIR}/main.cpp"
+    "${PROJECT_SOURCE_DIR}/third_party/webgpu_cpp/webgpu/webgpu_cpp.cpp"
     )
-if(NOT EMSCRIPTEN)
-    set(HELLO_SOURCES ${HELLO_SOURCES}
-        "${DAWN_BUILD_DIR}/gen/src/dawn/webgpu_cpp.cpp"
-        )
-endif()
-add_executable(hello ${HELLO_SOURCES})
+
+target_include_directories(hello
+    PRIVATE "${PROJECT_SOURCE_DIR}/third_party/webgpu_cpp"
+    )
 
 if(EMSCRIPTEN)
     target_link_options(hello
@@ -39,7 +38,6 @@ if(EMSCRIPTEN)
         )
 else()
     target_include_directories(hello
-        PRIVATE "${PROJECT_SOURCE_DIR}/emscripten/system/include"
         PRIVATE "${DAWN_SOURCE_DIR}/src/include"
         PRIVATE "${DAWN_BUILD_DIR}/gen/src/include"
         )

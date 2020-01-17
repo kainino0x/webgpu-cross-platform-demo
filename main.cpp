@@ -63,54 +63,37 @@ static wgpu::Buffer readbackBuffer;
 static wgpu::RenderPipeline pipeline;
 static bool done = false;
 
-void readCallback(WGPUBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
-    assert(status == WGPUBufferMapAsyncStatus_Success);
-    printf("mapped read %p\n", ptr);
-    uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
-    readbackBuffer.Unmap();
-    printf("unmapped\n");
-
-    printf("Got %08x, expected %08x\n", readback, expectData);
-    assert(readback == expectData);
-    if (readback != expectData) {
-        abort();
-    }
-
-    done = true;
-};
-
-void printDeviceError(WGPUErrorType errorType, const char* message, void*) {
-    printf("%d: %s\n", errorType, message);
-}
-
 void init() {
     {
         device = CreateCppWGPUDevice();
-        device.SetUncapturedErrorCallback(printDeviceError, nullptr);
+        device.SetUncapturedErrorCallback(
+            [](WGPUErrorType errorType, const char* message, void*) {
+                printf("%d: %s\n", errorType, message);
+            }, nullptr);
     }
 
     queue = device.CreateQueue();
 
-    wgpu::ShaderModule vsModule = {};
+    wgpu::ShaderModule vsModule{};
     {
-        wgpu::ShaderModuleDescriptor descriptor = {};
+        wgpu::ShaderModuleDescriptor descriptor{};
         descriptor.codeSize = sizeof(vsCode) / sizeof(uint32_t);
         descriptor.code = vsCode;
         vsModule = device.CreateShaderModule(&descriptor);
     }
 
-    wgpu::ShaderModule fsModule = {};
+    wgpu::ShaderModule fsModule{};
     {
-        wgpu::ShaderModuleDescriptor descriptor = {};
+        wgpu::ShaderModuleDescriptor descriptor{};
         descriptor.codeSize = sizeof(fsCode) / sizeof(uint32_t);
         descriptor.code = fsCode;
         fsModule = device.CreateShaderModule(&descriptor);
     }
 
     {
-        wgpu::BindGroupLayoutDescriptor d = {};
-        auto bgl = device.CreateBindGroupLayout(&d);
-        wgpu::BindGroupDescriptor desc = {};
+        wgpu::BindGroupLayoutDescriptor bglDesc{};
+        auto bgl = device.CreateBindGroupLayout(&bglDesc);
+        wgpu::BindGroupDescriptor desc{};
         desc.layout = bgl;
         desc.bindingCount = 0;
         desc.bindings = nullptr;
@@ -118,18 +101,18 @@ void init() {
     }
 
     {
-        wgpu::ProgrammableStageDescriptor fragmentStage = {};
+        wgpu::ProgrammableStageDescriptor fragmentStage{};
         fragmentStage.module = fsModule;
         fragmentStage.entryPoint = "main";
 
-        wgpu::ColorStateDescriptor colorStateDescriptor = {};
+        wgpu::ColorStateDescriptor colorStateDescriptor{};
         colorStateDescriptor.format = wgpu::TextureFormat::BGRA8Unorm;
 
-        wgpu::PipelineLayoutDescriptor pl = {};
+        wgpu::PipelineLayoutDescriptor pl{};
         pl.bindGroupLayoutCount = 0;
         pl.bindGroupLayouts = nullptr;
 
-        wgpu::RenderPipelineDescriptor descriptor = {};
+        wgpu::RenderPipelineDescriptor descriptor{};
         descriptor.layout = device.CreatePipelineLayout(&pl);
         descriptor.vertexStage.module = vsModule;
         descriptor.vertexStage.entryPoint = "main";
@@ -141,14 +124,14 @@ void init() {
     }
 }
 
-void render(wgpu::Texture texture) {
-    wgpu::RenderPassColorAttachmentDescriptor attachment = {};
-    attachment.attachment = texture.CreateView();
+void render(wgpu::TextureView view) {
+    wgpu::RenderPassColorAttachmentDescriptor attachment{};
+    attachment.attachment = view;
     attachment.loadOp = wgpu::LoadOp::Clear;
     attachment.storeOp = wgpu::StoreOp::Store;
     attachment.clearColor = {0, 0, 0, 1};
 
-    wgpu::RenderPassDescriptor renderpass = {};
+    wgpu::RenderPassDescriptor renderpass{};
     renderpass.colorAttachmentCount = 1;
     renderpass.colorAttachments = &attachment;
 
@@ -170,16 +153,16 @@ void render(wgpu::Texture texture) {
 void doTest() {
     wgpu::Texture readbackTexture;
     {
-        wgpu::TextureDescriptor descriptor = {};
+        wgpu::TextureDescriptor descriptor{};
         descriptor.usage = wgpu::TextureUsage::OutputAttachment | wgpu::TextureUsage::CopySrc;
         descriptor.size = {1, 1, 1};
         descriptor.format = wgpu::TextureFormat::BGRA8Unorm;
         readbackTexture = device.CreateTexture(&descriptor);
     }
-    render(readbackTexture);
+    render(readbackTexture.CreateView());
 
     {
-        wgpu::BufferDescriptor descriptor = {};
+        wgpu::BufferDescriptor descriptor{};
         descriptor.size = 4;
         descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
 
@@ -189,10 +172,10 @@ void doTest() {
     wgpu::CommandBuffer commands;
     {
         wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
-        wgpu::TextureCopyView tcv = {};
+        wgpu::TextureCopyView tcv{};
         tcv.texture = readbackTexture;
         tcv.origin = {0, 0, 0};
-        wgpu::BufferCopyView bcv = {};
+        wgpu::BufferCopyView bcv{};
         bcv.buffer = readbackBuffer;
         bcv.rowPitch = 256;
         bcv.imageHeight = 256;
@@ -201,12 +184,29 @@ void doTest() {
         commands = encoder.Finish();
     }
     queue.Submit(1, &commands);
-    readbackBuffer.MapReadAsync(readCallback, nullptr);
+    readbackBuffer.MapReadAsync(
+        [](WGPUBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
+            assert(status == WGPUBufferMapAsyncStatus_Success);
+            printf("mapped read %p\n", ptr);
+            uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
+            readbackBuffer.Unmap();
+            printf("unmapped\n");
+
+            printf("Got %08x, expected %08x\n", readback, expectData);
+            assert(readback == expectData);
+            if (readback != expectData) {
+                abort();
+            }
+
+            done = true;
+        }, nullptr);
 }
 
 #ifdef __EMSCRIPTEN__
+wgpu::SwapChain swapChain;
+
 void frame() {
-    wgpu::Texture backbuffer = emscripten_webgpu_get_current_texture();
+    wgpu::TextureView backbuffer = swapChain.GetCurrentTextureView();
     render(backbuffer);
 }
 #endif
@@ -216,6 +216,21 @@ int main() {
     doTest();
 
 #ifdef __EMSCRIPTEN__
+    {
+        wgpu::SurfaceDescriptorFromHTMLCanvas canvasDesc{};
+        canvasDesc.target = "#canvas";
+
+        wgpu::SurfaceDescriptor surfDesc{};
+        surfDesc.nextInChain = &canvasDesc;
+        wgpu::Instance instance{};  // null instance
+        wgpu::Surface surface = instance.CreateSurface(&surfDesc);
+
+        wgpu::SwapChainDescriptor scDesc{};
+        scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
+        scDesc.width = 200;
+        scDesc.height = 300;
+        swapChain = device.CreateSwapChain(surface, &scDesc);
+    }
     emscripten_set_main_loop(frame, 0, false);
 #else
     while (!done) {

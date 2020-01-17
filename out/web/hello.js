@@ -525,8 +525,7 @@ function makeBigInt(low, high, unsigned) {
 
 function dynCall(sig, ptr, args) {
   if (args && args.length) {
-    // j (64-bit integer) must be passed in as two numbers [low 32, high 32].
-    assert(args.length === sig.substring(1).replace(/j/g, '--').length);
+    assert(args.length == sig.length-1);
     assert(('dynCall_' + sig) in Module, 'bad function pointer type - no table for sig \'' + sig + '\'');
     return Module['dynCall_' + sig].apply(null, [ptr].concat(args));
   } else {
@@ -634,8 +633,8 @@ var wasmMemory;
 // In the wasm backend, we polyfill the WebAssembly object,
 // so this creates a (non-native-wasm) table for us.
 var wasmTable = new WebAssembly.Table({
-  'initial': 13,
-  'maximum': 13 + 0,
+  'initial': 14,
+  'maximum': 14 + 0,
   'element': 'anyfunc'
 });
 
@@ -2658,7 +2657,6 @@ var ASM_CONSTS = {
     }
 
   
-  
   var WebGPU={initManagers:function() {
         if (this.mgrDevice) return;
   
@@ -2668,7 +2666,7 @@ var ASM_CONSTS = {
             create: function(object) {
               var id = this.objects.length;
               assert(typeof this.objects[id] === 'undefined');
-              this.objects[id] = { refcount: 1, object };
+              this.objects[id] = { refcount: 1, object: object };
               return id;
             },
             get: function(id) {
@@ -2693,6 +2691,9 @@ var ASM_CONSTS = {
             },
           };
         }
+  
+        this.mgrSurface = this.mgrSurface || makeManager();
+        this.mgrSwapChain = this.mgrSwapChain || makeManager();
   
         this.mgrDevice = this.mgrDevice || makeManager();
         this.mgrQueue = this.mgrQueue || makeManager();
@@ -2764,26 +2765,10 @@ var ASM_CONSTS = {
           rowPitch: HEAPU32[(((ptr)+(16))>>2)],
           imageHeight: HEAPU32[(((ptr)+(20))>>2)],
         };
-      },AddressMode:["repeat","mirror-repeat","clamp-to-edge"],BindingType:["uniform-buffer","storage-buffer","readonly-storage-buffer","sampler","sampled-texture","storage-texture"],BlendFactor:["zero","one","src-color","one-minus-src-color","src-alpha","one-minus-src-alpha","dst-color","one-minus-dst-color","dst-alpha","one-minus-dst-alpha","src-alpha-saturated","blend-color","one-minus-blend-color"],BlendOperation:["add","subtract","reverse-subtract","min","max"],BufferMapAsyncStatus:["success","error","unknown","device-lost"],CompareFunction:["never","less","less-equal","greater","greater-equal","equal","not-equal","always"],CullMode:["none","front","back"],ErrorFilter:["none","validation","out-of-memory"],ErrorType:["no-error","validation","out-of-memory","unknown","device-lost"],FenceCompletionStatus:["success","error","unknown","device-lost"],FilterMode:["nearest","linear"],FrontFace:["ccw","cw"],IndexFormat:["uint16","uint32"],InputStepMode:["vertex","instance"],LoadOp:["clear","load"],PrimitiveTopology:["point-list","line-list","line-strip","triangle-list","triangle-strip"],StencilOperation:["keep","zero","replace","invert","increment-clamp","decrement-clamp","increment-wrap","decrement-wrap"],StoreOp:["store","clear"],TextureAspect:["all","stencil-only","depth-only"],TextureComponentType:["float","sint","uint"],TextureDimension:["1d","2d","3d"],TextureFormat:[,"r8unorm","r8snorm","r8uint","r8sint","r16uint","r16sint","r16float","rg8unorm","rg8snorm","rg8uint","rg8sint","r32float","r32uint","r32sint","rg16uint","rg16sint","rg16float","rgba8unorm","rgba8unorm-srgb","rgba8snorm","rgba8uint","rgba8sint","bgra8unorm","bgra8unorm-srgb","rgb10a2unorm","rg11b10float","rg32float","rg32uint","rg32sint","rgba16uint","rgba16sint","rgba16float","rgba32float","rgba32uint","rgba32sint","depth32float","depth24plus","depth24plus-stencil8","bc1rgbaunorm","bc1rgbaunorm-srgb","bc2rgbaunorm","bc2rgbaunorm-srgb","bc3rgbaunorm","bc3rgbaunorm-srgb","bc4runorm","bc4rsnorm","bc5rgunorm","bc5rgsnorm","bc6hrgbufloat","bc6hrgbsfloat","bc7rgbaunorm","bc7rgbaunorm-srgb"],TextureViewDimension:[,"1d","2d","2darray","cube","cube-array","3d"],VertexFormat:["uchar2","uchar4","char2","char4","uchar2norm","uchar4norm","char2norm","char4norm","ushort2","ushort4","short2","short4","ushort2norm","ushort4norm","short2norm","short4norm","half2","half4","float","float2","float3","float4","uint","uint2","uint3","uint4","int","int2","int3","int4"]};function _emscripten_webgpu_do_get_current_texture() {
-      var swapchain = Module['preinitializedWebGPUSwapChain'];
-      assert(swapchain);
-      WebGPU.initManagers();
-      return WebGPU.mgrTexture.create(swapchain.getCurrentTexture());
-    }function _emscripten_webgpu_get_current_texture(
-  ) {
-  return _emscripten_webgpu_do_get_current_texture();
-  }
-
-  
-  function _emscripten_webgpu_do_get_device() {
-      // TODO(kainino0x): make it possible to actually create devices
+      },AddressMode:["repeat","mirror-repeat","clamp-to-edge"],BindingType:["uniform-buffer","storage-buffer","readonly-storage-buffer","sampler","sampled-texture","storage-texture"],BlendFactor:["zero","one","src-color","one-minus-src-color","src-alpha","one-minus-src-alpha","dst-color","one-minus-dst-color","dst-alpha","one-minus-dst-alpha","src-alpha-saturated","blend-color","one-minus-blend-color"],BlendOperation:["add","subtract","reverse-subtract","min","max"],BufferMapAsyncStatus:["success","error","unknown","device-lost"],CompareFunction:["never","less","less-equal","greater","greater-equal","equal","not-equal","always"],CullMode:["none","front","back"],ErrorFilter:["none","validation","out-of-memory"],ErrorType:["no-error","validation","out-of-memory","unknown","device-lost"],FenceCompletionStatus:["success","error","unknown","device-lost"],FilterMode:["nearest","linear"],FrontFace:["ccw","cw"],IndexFormat:["uint16","uint32"],InputStepMode:["vertex","instance"],LoadOp:["clear","load"],PrimitiveTopology:["point-list","line-list","line-strip","triangle-list","triangle-strip"],StencilOperation:["keep","zero","replace","invert","increment-clamp","decrement-clamp","increment-wrap","decrement-wrap"],StoreOp:["store","clear"],TextureAspect:["all","stencil-only","depth-only"],TextureComponentType:["float","sint","uint"],TextureDimension:["1d","2d","3d"],TextureFormat:[,"r8unorm","r8snorm","r8uint","r8sint","r16uint","r16sint","r16float","rg8unorm","rg8snorm","rg8uint","rg8sint","r32float","r32uint","r32sint","rg16uint","rg16sint","rg16float","rgba8unorm","rgba8unorm-srgb","rgba8snorm","rgba8uint","rgba8sint","bgra8unorm","bgra8unorm-srgb","rgb10a2unorm","rg11b10float","rg32float","rg32uint","rg32sint","rgba16uint","rgba16sint","rgba16float","rgba32float","rgba32uint","rgba32sint","depth32float","depth24plus","depth24plus-stencil8","bc1rgbaunorm","bc1rgbaunorm-srgb","bc2rgbaunorm","bc2rgbaunorm-srgb","bc3rgbaunorm","bc3rgbaunorm-srgb","bc4runorm","bc4rsnorm","bc5rgunorm","bc5rgsnorm","bc6hrgbufloat","bc6hrgbsfloat","bc7rgbaunorm","bc7rgbaunorm-srgb"],TextureViewDimension:[,"1d","2d","2darray","cube","cube-array","3d"],VertexFormat:["uchar2","uchar4","char2","char4","uchar2norm","uchar4norm","char2norm","char4norm","ushort2","ushort4","short2","short4","ushort2norm","ushort4norm","short2norm","short4norm","half2","half4","float","float2","float3","float4","uint","uint2","uint3","uint4","int","int2","int3","int4"]};function _emscripten_webgpu_get_device() {
       assert(Module['preinitializedWebGPUDevice']);
-      WebGPU.initManagers();
       return WebGPU.mgrDevice.create(Module['preinitializedWebGPUDevice']);
-    }function _emscripten_webgpu_get_device(
-  ) {
-  return _emscripten_webgpu_do_get_device();
-  }
+    }
 
   
   function flush_NO_FILESYSTEM() {
@@ -3084,7 +3069,7 @@ var ASM_CONSTS = {
       assert(descriptor);
   
       function makeColorAttachment(caPtr) {
-        let loadValue =  WebGPU.LoadOp[
+        var loadValue = WebGPU.LoadOp[
             HEAPU32[(((caPtr)+(8))>>2)]];
         if (loadValue === 'clear') {
           loadValue = WebGPU.makeColor(caPtr + 16);
@@ -3097,7 +3082,7 @@ var ASM_CONSTS = {
             HEAPU32[(((caPtr)+(4))>>2)]),
           storeOp: WebGPU.StoreOp[
             HEAPU32[(((caPtr)+(12))>>2)]],
-          loadValue,
+          loadValue: loadValue,
         };
       }
   
@@ -3112,13 +3097,13 @@ var ASM_CONSTS = {
       function makeDepthStencilAttachment(dsaPtr) {
         if (dsaPtr === 0) return undefined;
   
-        let depthLoadValue = WebGPU.LoadOp[
+        var depthLoadValue = WebGPU.LoadOp[
             HEAPU32[(((dsaPtr)+(4))>>2)]];
         if (depthLoadValue === 'clear') {
           depthLoadValue = HEAPF32[(((dsaPtr)+(12))>>2)];
         }
   
-        let stencilLoadValue = WebGPU.LoadOp[
+        var stencilLoadValue = WebGPU.LoadOp[
             HEAPU32[(((dsaPtr)+(16))>>2)]];
         if (stencilLoadValue === 'clear') {
           stencilLoadValue = HEAPU32[(((dsaPtr)+(24))>>2)];
@@ -3129,10 +3114,10 @@ var ASM_CONSTS = {
             HEAPU32[((dsaPtr)>>2)]),
           depthStoreOp: WebGPU.StoreOp[
             HEAPU32[(((dsaPtr)+(8))>>2)]],
-          depthLoadValue,
+          depthLoadValue: depthLoadValue,
           stencilStoreOp: WebGPU.StoreOp[
             HEAPU32[(((dsaPtr)+(20))>>2)]],
-          stencilLoadValue,
+          stencilLoadValue: stencilLoadValue,
         };
       }
   
@@ -3197,7 +3182,7 @@ var ASM_CONSTS = {
           }
   
           return {
-            binding,
+            binding: binding,
             resource: {
               buffer: WebGPU.mgrBuffer.get(bufferId),
               offset: HEAPU32[((((bindingPtr + 4))+(8))>>2)] * 0x100000000 + HEAPU32[(((bindingPtr)+(8))>>2)],
@@ -3206,12 +3191,12 @@ var ASM_CONSTS = {
           };
         } else if (samplerId != 0) {
           return {
-            binding,
+            binding: binding,
             resource: WebGPU.mgrSampler.get(samplerId),
           };
         } else {
           return {
-            binding,
+            binding: binding,
             resource: WebGPU.mgrTextureView.get(textureViewId),
           };
         }
@@ -3232,7 +3217,7 @@ var ASM_CONSTS = {
           HEAP32[(((descriptor)+(8))>>2)]),
         bindings: makeBindings(
           HEAPU32[(((descriptor)+(12))>>2)],
-          HEAP32[(((descriptor)+(16))>>2)],
+          HEAP32[(((descriptor)+(16))>>2)]
         ),
       };
       var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
@@ -3278,7 +3263,7 @@ var ASM_CONSTS = {
       var desc = {
         bindings: makeBindings(
           HEAPU32[(((descriptor)+(8))>>2)],
-          HEAP32[(((descriptor)+(12))>>2)],
+          HEAP32[(((descriptor)+(12))>>2)]
         ),
       };
       var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
@@ -3525,6 +3510,32 @@ var ASM_CONSTS = {
       return WebGPU.mgrShaderModule.create(device.createShaderModule(desc));
     }
 
+  function _wgpuDeviceCreateSwapChain(deviceId, surfaceId, descriptor) {
+      assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
+      var device = WebGPU.mgrDevice.get(deviceId);
+      var canvas = WebGPU.mgrSurface.get(surfaceId);
+  
+      canvas.width = HEAPU32[(((descriptor)+(16))>>2)];
+      canvas.height = HEAPU32[(((descriptor)+(20))>>2)];
+  
+      var ctx = canvas.getContext('gpupresent');
+      assert(/* WGPUPresentMode_VSync */ 1 ===
+        HEAPU32[(((descriptor)+(24))>>2)]);
+  
+      var desc = {
+        label: undefined,
+        device: device,
+        format: WebGPU.TextureFormat[
+          HEAPU32[(((descriptor)+(12))>>2)]],
+        usage: HEAPU32[(((descriptor)+(8))>>2)],
+      };
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) desc.label = UTF8ToString(labelPtr);
+      var swapChain = ctx.configureSwapChain(desc);
+  
+      return WebGPU.mgrSwapChain.create(swapChain);
+    }
+
   function _wgpuDeviceCreateTexture(deviceId, descriptor) {
       assert(descriptor);assert(HEAP32[((descriptor)>>2)] === 0);
   
@@ -3564,6 +3575,41 @@ var ASM_CONSTS = {
         dynCall('viii', callback, [type, messagePtr, userdata]);
         _free(messagePtr);
       };
+    }
+
+  
+  
+  
+  function __maybeCStringToJsString(cString) {
+      return cString === cString + 0 ? UTF8ToString(cString) : cString;
+    }
+  
+  var __specialEventTargets=[0, typeof document !== 'undefined' ? document : 0, typeof window !== 'undefined' ? window : 0];function __findEventTarget(target) {
+      var domElement = __specialEventTargets[target] || (typeof document !== 'undefined' ? document.querySelector(__maybeCStringToJsString(target)) : undefined);
+      return domElement;
+    }function __findCanvasEventTarget(target) { return __findEventTarget(target); }function _wgpuInstanceCreateSurface(instanceId, descriptor) {
+      assert(instanceId === 0, "WGPUInstance is ignored");
+      assert(descriptor !== 0);
+      var nextInChainPtr = HEAP32[((descriptor)>>2)];
+      assert(nextInChainPtr !== 0);
+      assert(/* WGPUSType_SurfaceDescriptorFromHTMLCanvas */ 4 ===
+        HEAPU32[(((nextInChainPtr)+(4))>>2)]);
+      var descriptorFromHTMLCanvas = nextInChainPtr;
+  
+      assert(descriptorFromHTMLCanvas);assert(HEAP32[((descriptorFromHTMLCanvas)>>2)] === 0);
+      var targetPtr = HEAP32[(((descriptorFromHTMLCanvas)+(8))>>2)];
+      assert(targetPtr !== 0);
+      var target = UTF8ToString(targetPtr);
+      var canvas = __findCanvasEventTarget(target);
+  
+      var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
+      if (labelPtr) canvas.surfaceLabelWebGPU = UTF8ToString(labelPtr);
+  
+      return WebGPU.mgrSurface.create(canvas);
+    }
+
+  function _wgpuInstanceRelease() {
+      assert(false, 'No WGPUInstance object should exist.');
     }
 
   function _wgpuPipelineLayoutRelease(id) {
@@ -3614,6 +3660,23 @@ var ASM_CONSTS = {
     WebGPU.mgrShaderModule.release(id);
   }
 
+  function _wgpuSurfaceReference(id) {
+    WebGPU.mgrSurface.reference(id);
+  }
+
+  function _wgpuSurfaceRelease(id) {
+    WebGPU.mgrSurface.release(id);
+  }
+
+  function _wgpuSwapChainGetCurrentTextureView(swapChainId) {
+      var swapChain = WebGPU.mgrSwapChain.get(swapChainId);
+      return WebGPU.mgrTextureView.create(swapChain.getCurrentTexture().createView());
+    }
+
+  function _wgpuSwapChainRelease(id) {
+    WebGPU.mgrSwapChain.release(id);
+  }
+
   function _wgpuTextureCreateView(textureId, descriptor) {
       var desc;
       if (descriptor) {
@@ -3646,6 +3709,10 @@ var ASM_CONSTS = {
     WebGPU.mgrTexture.release(id);
   }
 
+  function _wgpuTextureViewReference(id) {
+    WebGPU.mgrTextureView.reference(id);
+  }
+
   function _wgpuTextureViewRelease(id) {
     WebGPU.mgrTextureView.release(id);
   }
@@ -3666,6 +3733,7 @@ if (ENVIRONMENT_IS_NODE) {
     _emscripten_get_now = dateNow;
   } else _emscripten_get_now = function() { return performance['now'](); };
   ;
+WebGPU.initManagers();;
 var ASSERTIONS = true;
 
 // Copyright 2017 The Emscripten Authors.  All rights reserved.
@@ -3701,7 +3769,7 @@ function intArrayToString(array) {
 // ASM_LIBRARY EXTERN PRIMITIVES: Int8Array,Int32Array
 
 var asmGlobalArg = {};
-var asmLibraryArg = { "__assert_fail": ___assert_fail, "__cxa_atexit": ___cxa_atexit, "__handle_stack_overflow": ___handle_stack_overflow, "__lock": ___lock, "__unlock": ___unlock, "abort": _abort, "emscripten_get_sbrk_ptr": _emscripten_get_sbrk_ptr, "emscripten_memcpy_big": _emscripten_memcpy_big, "emscripten_resize_heap": _emscripten_resize_heap, "emscripten_set_main_loop": _emscripten_set_main_loop, "emscripten_webgpu_get_current_texture": _emscripten_webgpu_get_current_texture, "emscripten_webgpu_get_device": _emscripten_webgpu_get_device, "fd_write": _fd_write, "memory": wasmMemory, "setTempRet0": _setTempRet0, "table": wasmTable, "wgpuBindGroupLayoutReference": _wgpuBindGroupLayoutReference, "wgpuBindGroupLayoutRelease": _wgpuBindGroupLayoutRelease, "wgpuBindGroupRelease": _wgpuBindGroupRelease, "wgpuBufferMapReadAsync": _wgpuBufferMapReadAsync, "wgpuBufferReference": _wgpuBufferReference, "wgpuBufferRelease": _wgpuBufferRelease, "wgpuBufferUnmap": _wgpuBufferUnmap, "wgpuCommandBufferRelease": _wgpuCommandBufferRelease, "wgpuCommandEncoderBeginRenderPass": _wgpuCommandEncoderBeginRenderPass, "wgpuCommandEncoderCopyTextureToBuffer": _wgpuCommandEncoderCopyTextureToBuffer, "wgpuCommandEncoderFinish": _wgpuCommandEncoderFinish, "wgpuCommandEncoderRelease": _wgpuCommandEncoderRelease, "wgpuDeviceCreateBindGroup": _wgpuDeviceCreateBindGroup, "wgpuDeviceCreateBindGroupLayout": _wgpuDeviceCreateBindGroupLayout, "wgpuDeviceCreateBuffer": _wgpuDeviceCreateBuffer, "wgpuDeviceCreateCommandEncoder": _wgpuDeviceCreateCommandEncoder, "wgpuDeviceCreatePipelineLayout": _wgpuDeviceCreatePipelineLayout, "wgpuDeviceCreateQueue": _wgpuDeviceCreateQueue, "wgpuDeviceCreateRenderPipeline": _wgpuDeviceCreateRenderPipeline, "wgpuDeviceCreateShaderModule": _wgpuDeviceCreateShaderModule, "wgpuDeviceCreateTexture": _wgpuDeviceCreateTexture, "wgpuDeviceRelease": _wgpuDeviceRelease, "wgpuDeviceSetUncapturedErrorCallback": _wgpuDeviceSetUncapturedErrorCallback, "wgpuPipelineLayoutRelease": _wgpuPipelineLayoutRelease, "wgpuQueueRelease": _wgpuQueueRelease, "wgpuQueueSubmit": _wgpuQueueSubmit, "wgpuRenderPassEncoderDraw": _wgpuRenderPassEncoderDraw, "wgpuRenderPassEncoderEndPass": _wgpuRenderPassEncoderEndPass, "wgpuRenderPassEncoderRelease": _wgpuRenderPassEncoderRelease, "wgpuRenderPassEncoderSetPipeline": _wgpuRenderPassEncoderSetPipeline, "wgpuRenderPipelineRelease": _wgpuRenderPipelineRelease, "wgpuShaderModuleReference": _wgpuShaderModuleReference, "wgpuShaderModuleRelease": _wgpuShaderModuleRelease, "wgpuTextureCreateView": _wgpuTextureCreateView, "wgpuTextureReference": _wgpuTextureReference, "wgpuTextureRelease": _wgpuTextureRelease, "wgpuTextureViewRelease": _wgpuTextureViewRelease };
+var asmLibraryArg = { "__assert_fail": ___assert_fail, "__cxa_atexit": ___cxa_atexit, "__handle_stack_overflow": ___handle_stack_overflow, "__lock": ___lock, "__unlock": ___unlock, "abort": _abort, "emscripten_get_sbrk_ptr": _emscripten_get_sbrk_ptr, "emscripten_memcpy_big": _emscripten_memcpy_big, "emscripten_resize_heap": _emscripten_resize_heap, "emscripten_set_main_loop": _emscripten_set_main_loop, "emscripten_webgpu_get_device": _emscripten_webgpu_get_device, "fd_write": _fd_write, "memory": wasmMemory, "setTempRet0": _setTempRet0, "table": wasmTable, "wgpuBindGroupLayoutReference": _wgpuBindGroupLayoutReference, "wgpuBindGroupLayoutRelease": _wgpuBindGroupLayoutRelease, "wgpuBindGroupRelease": _wgpuBindGroupRelease, "wgpuBufferMapReadAsync": _wgpuBufferMapReadAsync, "wgpuBufferReference": _wgpuBufferReference, "wgpuBufferRelease": _wgpuBufferRelease, "wgpuBufferUnmap": _wgpuBufferUnmap, "wgpuCommandBufferRelease": _wgpuCommandBufferRelease, "wgpuCommandEncoderBeginRenderPass": _wgpuCommandEncoderBeginRenderPass, "wgpuCommandEncoderCopyTextureToBuffer": _wgpuCommandEncoderCopyTextureToBuffer, "wgpuCommandEncoderFinish": _wgpuCommandEncoderFinish, "wgpuCommandEncoderRelease": _wgpuCommandEncoderRelease, "wgpuDeviceCreateBindGroup": _wgpuDeviceCreateBindGroup, "wgpuDeviceCreateBindGroupLayout": _wgpuDeviceCreateBindGroupLayout, "wgpuDeviceCreateBuffer": _wgpuDeviceCreateBuffer, "wgpuDeviceCreateCommandEncoder": _wgpuDeviceCreateCommandEncoder, "wgpuDeviceCreatePipelineLayout": _wgpuDeviceCreatePipelineLayout, "wgpuDeviceCreateQueue": _wgpuDeviceCreateQueue, "wgpuDeviceCreateRenderPipeline": _wgpuDeviceCreateRenderPipeline, "wgpuDeviceCreateShaderModule": _wgpuDeviceCreateShaderModule, "wgpuDeviceCreateSwapChain": _wgpuDeviceCreateSwapChain, "wgpuDeviceCreateTexture": _wgpuDeviceCreateTexture, "wgpuDeviceRelease": _wgpuDeviceRelease, "wgpuDeviceSetUncapturedErrorCallback": _wgpuDeviceSetUncapturedErrorCallback, "wgpuInstanceCreateSurface": _wgpuInstanceCreateSurface, "wgpuInstanceRelease": _wgpuInstanceRelease, "wgpuPipelineLayoutRelease": _wgpuPipelineLayoutRelease, "wgpuQueueRelease": _wgpuQueueRelease, "wgpuQueueSubmit": _wgpuQueueSubmit, "wgpuRenderPassEncoderDraw": _wgpuRenderPassEncoderDraw, "wgpuRenderPassEncoderEndPass": _wgpuRenderPassEncoderEndPass, "wgpuRenderPassEncoderRelease": _wgpuRenderPassEncoderRelease, "wgpuRenderPassEncoderSetPipeline": _wgpuRenderPassEncoderSetPipeline, "wgpuRenderPipelineRelease": _wgpuRenderPipelineRelease, "wgpuShaderModuleReference": _wgpuShaderModuleReference, "wgpuShaderModuleRelease": _wgpuShaderModuleRelease, "wgpuSurfaceReference": _wgpuSurfaceReference, "wgpuSurfaceRelease": _wgpuSurfaceRelease, "wgpuSwapChainGetCurrentTextureView": _wgpuSwapChainGetCurrentTextureView, "wgpuSwapChainRelease": _wgpuSwapChainRelease, "wgpuTextureCreateView": _wgpuTextureCreateView, "wgpuTextureReference": _wgpuTextureReference, "wgpuTextureRelease": _wgpuTextureRelease, "wgpuTextureViewReference": _wgpuTextureViewReference, "wgpuTextureViewRelease": _wgpuTextureViewRelease };
 var asm = createWasm();
 var real____wasm_call_ctors = asm["__wasm_call_ctors"];
 asm["__wasm_call_ctors"] = function() {
