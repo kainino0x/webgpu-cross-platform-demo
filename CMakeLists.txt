@@ -7,12 +7,12 @@ set(CMAKE_CXX_STANDARD 14)
 if(NOT EMSCRIPTEN)
     set(DAWN_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/dawn")
     if(NOT EXISTS "${DAWN_SOURCE_DIR}")
-        message(FATAL_ERROR "Dawn not found in third_party/dawn")
+        message(FATAL_ERROR "Dawn not found in third_party/dawn. Have you run git submodule update --init?")
     endif()
 
     set(DAWN_BUILD_DIR "${PROJECT_SOURCE_DIR}/third_party/dawn/out/Release")
     if(NOT EXISTS "${DAWN_BUILD_DIR}")
-        message(FATAL_ERROR "No build found in ${DAWN_BUILD_DIR}. Create it and be sure to build with dawn_complete_static_libs = true")
+        message(FATAL_ERROR "No build found in ${DAWN_BUILD_DIR}. Have you run ./setup.sh?")
     endif()
 
     add_definitions(-DDAWN_ENABLE_BACKEND_METAL)
@@ -32,8 +32,7 @@ if(EMSCRIPTEN)
         PRIVATE "SHELL:-g1"
         PRIVATE "SHELL:-s USE_WEBGPU=1"
         PRIVATE "SHELL:-s ASSERTIONS=1"
-        #PRIVATE "SHELL:-s ERROR_ON_UNDEFINED_SYMBOLS=0"
-        #PRIVATE "SHELL:--closure 1"
+        #PRIVATE "SHELL:--closure 1"  # Broken!
         #PRIVATE "SHELL:-s VERBOSE=1"
         )
 else()
@@ -53,5 +52,6 @@ else()
         "-framework IOKit"
         "-framework IOSurface"
         "-framework Metal"
+        "-framework QuartzCore"
         )
 endif()

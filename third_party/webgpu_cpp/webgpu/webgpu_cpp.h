@@ -1,7 +1,12 @@
 #ifndef WEBGPU_CPP_H_
 #define WEBGPU_CPP_H_
 
+#if __has_include("webgpu/webgpu.h")
 #include "webgpu/webgpu.h"
+#else
+#include "dawn/webgpu.h"
+#endif
+
 #include "webgpu/EnumClassBitmasks.h"
 
 namespace wgpu {
@@ -22,13 +27,13 @@ namespace wgpu {
     };
 
     enum class BackendType : uint32_t {
-        D3D11 = 0x00000000,
-        D3D12 = 0x00000001,
-        Metal = 0x00000002,
-        Vulkan = 0x00000003,
-        OpenGL = 0x00000004,
-        OpenGLES = 0x00000005,
-        Null = 0x00000006,
+        Null = 0x00000000,
+        D3D11 = 0x00000001,
+        D3D12 = 0x00000002,
+        Metal = 0x00000003,
+        Vulkan = 0x00000004,
+        OpenGL = 0x00000005,
+        OpenGLES = 0x00000006,
     };
 
     enum class BindingType : uint32_t {
@@ -152,7 +157,7 @@ namespace wgpu {
         SurfaceDescriptorFromMetalLayer = 0x00000001,
         SurfaceDescriptorFromWindowsHWND = 0x00000002,
         SurfaceDescriptorFromXlib = 0x00000003,
-        SurfaceDescriptorFromHTMLCanvas = 0x00000004,
+        SurfaceDescriptorFromHTMLCanvasId = 0x00000004,
     };
 
     enum class StencilOperation : uint32_t {
@@ -407,7 +412,7 @@ namespace wgpu {
     struct ShaderModuleDescriptor;
     struct StencilStateFaceDescriptor;
     struct SurfaceDescriptor;
-    struct SurfaceDescriptorFromHTMLCanvas;
+    struct SurfaceDescriptorFromHTMLCanvasId;
     struct SurfaceDescriptorFromMetalLayer;
     struct SurfaceDescriptorFromWindowsHWND;
     struct SurfaceDescriptorFromXlib;
@@ -630,7 +635,6 @@ namespace wgpu {
         RenderPipeline CreateRenderPipeline(RenderPipelineDescriptor const * descriptor) const;
         Sampler CreateSampler(SamplerDescriptor const * descriptor) const;
         ShaderModule CreateShaderModule(ShaderModuleDescriptor const * descriptor) const;
-        SwapChain CreateSwapChain(Surface surface, SwapChainDescriptor const * descriptor) const;
         Texture CreateTexture(TextureDescriptor const * descriptor) const;
         void InjectError(ErrorType type, char const * message) const;
         void LoseForTesting() const;
@@ -1044,9 +1048,9 @@ namespace wgpu {
         char const * label = nullptr;
     };
 
-    struct SurfaceDescriptorFromHTMLCanvas : ChainedStruct {
-        SurfaceDescriptorFromHTMLCanvas() {
-            sType = SType::SurfaceDescriptorFromHTMLCanvas;
+    struct SurfaceDescriptorFromHTMLCanvasId : ChainedStruct {
+        SurfaceDescriptorFromHTMLCanvasId() {
+            sType = SType::SurfaceDescriptorFromHTMLCanvasId;
         }
         char const * target;
     };

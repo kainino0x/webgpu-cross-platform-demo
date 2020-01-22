@@ -23,13 +23,13 @@ namespace wgpu {
     static_assert(sizeof(BackendType) == sizeof(WGPUBackendType), "sizeof mismatch for BackendType");
     static_assert(alignof(BackendType) == alignof(WGPUBackendType), "alignof mismatch for BackendType");
 
+    static_assert(static_cast<uint32_t>(BackendType::Null) == WGPUBackendType_Null, "value mismatch for BackendType::Null");
     static_assert(static_cast<uint32_t>(BackendType::D3D11) == WGPUBackendType_D3D11, "value mismatch for BackendType::D3D11");
     static_assert(static_cast<uint32_t>(BackendType::D3D12) == WGPUBackendType_D3D12, "value mismatch for BackendType::D3D12");
     static_assert(static_cast<uint32_t>(BackendType::Metal) == WGPUBackendType_Metal, "value mismatch for BackendType::Metal");
     static_assert(static_cast<uint32_t>(BackendType::Vulkan) == WGPUBackendType_Vulkan, "value mismatch for BackendType::Vulkan");
     static_assert(static_cast<uint32_t>(BackendType::OpenGL) == WGPUBackendType_OpenGL, "value mismatch for BackendType::OpenGL");
     static_assert(static_cast<uint32_t>(BackendType::OpenGLES) == WGPUBackendType_OpenGLES, "value mismatch for BackendType::OpenGLES");
-    static_assert(static_cast<uint32_t>(BackendType::Null) == WGPUBackendType_Null, "value mismatch for BackendType::Null");
 
 
     static_assert(sizeof(BindingType) == sizeof(WGPUBindingType), "sizeof mismatch for BindingType");
@@ -187,7 +187,7 @@ namespace wgpu {
     static_assert(static_cast<uint32_t>(SType::SurfaceDescriptorFromMetalLayer) == WGPUSType_SurfaceDescriptorFromMetalLayer, "value mismatch for SType::SurfaceDescriptorFromMetalLayer");
     static_assert(static_cast<uint32_t>(SType::SurfaceDescriptorFromWindowsHWND) == WGPUSType_SurfaceDescriptorFromWindowsHWND, "value mismatch for SType::SurfaceDescriptorFromWindowsHWND");
     static_assert(static_cast<uint32_t>(SType::SurfaceDescriptorFromXlib) == WGPUSType_SurfaceDescriptorFromXlib, "value mismatch for SType::SurfaceDescriptorFromXlib");
-    static_assert(static_cast<uint32_t>(SType::SurfaceDescriptorFromHTMLCanvas) == WGPUSType_SurfaceDescriptorFromHTMLCanvas, "value mismatch for SType::SurfaceDescriptorFromHTMLCanvas");
+    static_assert(static_cast<uint32_t>(SType::SurfaceDescriptorFromHTMLCanvasId) == WGPUSType_SurfaceDescriptorFromHTMLCanvasId, "value mismatch for SType::SurfaceDescriptorFromHTMLCanvasId");
 
 
     static_assert(sizeof(StencilOperation) == sizeof(WGPUStencilOperation), "sizeof mismatch for StencilOperation");
@@ -735,11 +735,11 @@ namespace wgpu {
             "offsetof mismatch for SurfaceDescriptor::label");
 
 
-    static_assert(sizeof(SurfaceDescriptorFromHTMLCanvas) == sizeof(WGPUSurfaceDescriptorFromHTMLCanvas), "sizeof mismatch for SurfaceDescriptorFromHTMLCanvas");
-    static_assert(alignof(SurfaceDescriptorFromHTMLCanvas) == alignof(WGPUSurfaceDescriptorFromHTMLCanvas), "alignof mismatch for SurfaceDescriptorFromHTMLCanvas");
+    static_assert(sizeof(SurfaceDescriptorFromHTMLCanvasId) == sizeof(WGPUSurfaceDescriptorFromHTMLCanvasId), "sizeof mismatch for SurfaceDescriptorFromHTMLCanvasId");
+    static_assert(alignof(SurfaceDescriptorFromHTMLCanvasId) == alignof(WGPUSurfaceDescriptorFromHTMLCanvasId), "alignof mismatch for SurfaceDescriptorFromHTMLCanvasId");
 
-    static_assert(offsetof(SurfaceDescriptorFromHTMLCanvas, target) == offsetof(WGPUSurfaceDescriptorFromHTMLCanvas, target),
-            "offsetof mismatch for SurfaceDescriptorFromHTMLCanvas::target");
+    static_assert(offsetof(SurfaceDescriptorFromHTMLCanvasId, target) == offsetof(WGPUSurfaceDescriptorFromHTMLCanvasId, target),
+            "offsetof mismatch for SurfaceDescriptorFromHTMLCanvasId::target");
 
 
     static_assert(sizeof(SurfaceDescriptorFromMetalLayer) == sizeof(WGPUSurfaceDescriptorFromMetalLayer), "sizeof mismatch for SurfaceDescriptorFromMetalLayer");
@@ -767,23 +767,23 @@ namespace wgpu {
             "offsetof mismatch for SurfaceDescriptorFromXlib::window");
 
 
-    static_assert(sizeof(SwapChainDescriptor) == sizeof(WGPUSwapChainDescriptor), "sizeof mismatch for SwapChainDescriptor");
+    //static_assert(sizeof(SwapChainDescriptor) == sizeof(WGPUSwapChainDescriptor), "sizeof mismatch for SwapChainDescriptor");
     static_assert(alignof(SwapChainDescriptor) == alignof(WGPUSwapChainDescriptor), "alignof mismatch for SwapChainDescriptor");
 
     static_assert(offsetof(SwapChainDescriptor, nextInChain) == offsetof(WGPUSwapChainDescriptor, nextInChain),
             "offsetof mismatch for SwapChainDescriptor::nextInChain");
     static_assert(offsetof(SwapChainDescriptor, label) == offsetof(WGPUSwapChainDescriptor, label),
             "offsetof mismatch for SwapChainDescriptor::label");
-    static_assert(offsetof(SwapChainDescriptor, usage) == offsetof(WGPUSwapChainDescriptor, usage),
-            "offsetof mismatch for SwapChainDescriptor::usage");
-    static_assert(offsetof(SwapChainDescriptor, format) == offsetof(WGPUSwapChainDescriptor, format),
-            "offsetof mismatch for SwapChainDescriptor::format");
-    static_assert(offsetof(SwapChainDescriptor, width) == offsetof(WGPUSwapChainDescriptor, width),
-            "offsetof mismatch for SwapChainDescriptor::width");
-    static_assert(offsetof(SwapChainDescriptor, height) == offsetof(WGPUSwapChainDescriptor, height),
-            "offsetof mismatch for SwapChainDescriptor::height");
-    static_assert(offsetof(SwapChainDescriptor, presentMode) == offsetof(WGPUSwapChainDescriptor, presentMode),
-            "offsetof mismatch for SwapChainDescriptor::presentMode");
+    //static_assert(offsetof(SwapChainDescriptor, usage) == offsetof(WGPUSwapChainDescriptor, usage),
+    //        "offsetof mismatch for SwapChainDescriptor::usage");
+    //static_assert(offsetof(SwapChainDescriptor, format) == offsetof(WGPUSwapChainDescriptor, format),
+    //        "offsetof mismatch for SwapChainDescriptor::format");
+    //static_assert(offsetof(SwapChainDescriptor, width) == offsetof(WGPUSwapChainDescriptor, width),
+    //        "offsetof mismatch for SwapChainDescriptor::width");
+    //static_assert(offsetof(SwapChainDescriptor, height) == offsetof(WGPUSwapChainDescriptor, height),
+    //        "offsetof mismatch for SwapChainDescriptor::height");
+    //static_assert(offsetof(SwapChainDescriptor, presentMode) == offsetof(WGPUSwapChainDescriptor, presentMode),
+    //        "offsetof mismatch for SwapChainDescriptor::presentMode");
 
 
     static_assert(sizeof(TextureViewDescriptor) == sizeof(WGPUTextureViewDescriptor), "sizeof mismatch for TextureViewDescriptor");
@@ -1279,10 +1279,6 @@ namespace wgpu {
         ShaderModule Device::CreateShaderModule(ShaderModuleDescriptor const * descriptor) const {
         auto result = wgpuDeviceCreateShaderModule(Get(), reinterpret_cast<WGPUShaderModuleDescriptor const * >(descriptor));
         return ShaderModule::Acquire(result);
-    }
-        SwapChain Device::CreateSwapChain(Surface surface, SwapChainDescriptor const * descriptor) const {
-        auto result = wgpuDeviceCreateSwapChain(Get(), surface.Get(), reinterpret_cast<WGPUSwapChainDescriptor const * >(descriptor));
-        return SwapChain::Acquire(result);
     }
         Texture Device::CreateTexture(TextureDescriptor const * descriptor) const {
         auto result = wgpuDeviceCreateTexture(Get(), reinterpret_cast<WGPUTextureDescriptor const * >(descriptor));

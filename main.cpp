@@ -217,8 +217,8 @@ int main() {
 
 #ifdef __EMSCRIPTEN__
     {
-        wgpu::SurfaceDescriptorFromHTMLCanvas canvasDesc{};
-        canvasDesc.target = "#canvas";
+        wgpu::SurfaceDescriptorFromHTMLCanvasId canvasDesc{};
+        canvasDesc.target = "canvas";
 
         wgpu::SurfaceDescriptor surfDesc{};
         surfDesc.nextInChain = &canvasDesc;
@@ -229,7 +229,8 @@ int main() {
         scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
         scDesc.width = 200;
         scDesc.height = 300;
-        swapChain = device.CreateSwapChain(surface, &scDesc);
+        swapChain = wgpu::SwapChain::Acquire(wgpuDeviceCreateSwapChain(
+                device.Get(), surface.Get(), reinterpret_cast<const WGPUSwapChainDescriptor*>(&scDesc)));
     }
     emscripten_set_main_loop(frame, 0, false);
 #else
