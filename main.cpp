@@ -226,11 +226,12 @@ int main() {
         wgpu::Surface surface = instance.CreateSurface(&surfDesc);
 
         wgpu::SwapChainDescriptor scDesc{};
+        scDesc.usage = wgpu::TextureUsage::OutputAttachment;
         scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
         scDesc.width = 200;
         scDesc.height = 300;
-        swapChain = wgpu::SwapChain::Acquire(wgpuDeviceCreateSwapChain(
-                device.Get(), surface.Get(), reinterpret_cast<const WGPUSwapChainDescriptor*>(&scDesc)));
+        scDesc.presentMode = wgpu::PresentMode::VSync;
+        swapChain = device.CreateSwapChain(surface, &scDesc);
     }
     emscripten_set_main_loop(frame, 0, false);
 #else

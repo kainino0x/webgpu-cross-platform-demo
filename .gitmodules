@@ -1,3 +1,6 @@
 [submodule "emscripten"]
 	path = emscripten
 	url = https://github.com/kainino0x/emscripten
+[submodule "third_party/dawn"]
+	path = third_party/dawn
+	url = https://dawn.googlesource.com/dawn

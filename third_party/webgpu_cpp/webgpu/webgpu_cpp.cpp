@@ -767,23 +767,25 @@ namespace wgpu {
             "offsetof mismatch for SurfaceDescriptorFromXlib::window");
 
 
-    //static_assert(sizeof(SwapChainDescriptor) == sizeof(WGPUSwapChainDescriptor), "sizeof mismatch for SwapChainDescriptor");
+    static_assert(sizeof(SwapChainDescriptor) == sizeof(WGPUSwapChainDescriptor), "sizeof mismatch for SwapChainDescriptor");
     static_assert(alignof(SwapChainDescriptor) == alignof(WGPUSwapChainDescriptor), "alignof mismatch for SwapChainDescriptor");
 
     static_assert(offsetof(SwapChainDescriptor, nextInChain) == offsetof(WGPUSwapChainDescriptor, nextInChain),
             "offsetof mismatch for SwapChainDescriptor::nextInChain");
     static_assert(offsetof(SwapChainDescriptor, label) == offsetof(WGPUSwapChainDescriptor, label),
             "offsetof mismatch for SwapChainDescriptor::label");
-    //static_assert(offsetof(SwapChainDescriptor, usage) == offsetof(WGPUSwapChainDescriptor, usage),
-    //        "offsetof mismatch for SwapChainDescriptor::usage");
-    //static_assert(offsetof(SwapChainDescriptor, format) == offsetof(WGPUSwapChainDescriptor, format),
-    //        "offsetof mismatch for SwapChainDescriptor::format");
-    //static_assert(offsetof(SwapChainDescriptor, width) == offsetof(WGPUSwapChainDescriptor, width),
-    //        "offsetof mismatch for SwapChainDescriptor::width");
-    //static_assert(offsetof(SwapChainDescriptor, height) == offsetof(WGPUSwapChainDescriptor, height),
-    //        "offsetof mismatch for SwapChainDescriptor::height");
-    //static_assert(offsetof(SwapChainDescriptor, presentMode) == offsetof(WGPUSwapChainDescriptor, presentMode),
-    //        "offsetof mismatch for SwapChainDescriptor::presentMode");
+    static_assert(offsetof(SwapChainDescriptor, usage) == offsetof(WGPUSwapChainDescriptor, usage),
+            "offsetof mismatch for SwapChainDescriptor::usage");
+    static_assert(offsetof(SwapChainDescriptor, format) == offsetof(WGPUSwapChainDescriptor, format),
+            "offsetof mismatch for SwapChainDescriptor::format");
+    static_assert(offsetof(SwapChainDescriptor, width) == offsetof(WGPUSwapChainDescriptor, width),
+            "offsetof mismatch for SwapChainDescriptor::width");
+    static_assert(offsetof(SwapChainDescriptor, height) == offsetof(WGPUSwapChainDescriptor, height),
+            "offsetof mismatch for SwapChainDescriptor::height");
+    static_assert(offsetof(SwapChainDescriptor, presentMode) == offsetof(WGPUSwapChainDescriptor, presentMode),
+            "offsetof mismatch for SwapChainDescriptor::presentMode");
+    static_assert(offsetof(SwapChainDescriptor, implementation) == offsetof(WGPUSwapChainDescriptor, implementation),
+            "offsetof mismatch for SwapChainDescriptor::implementation");
 
 
     static_assert(sizeof(TextureViewDescriptor) == sizeof(WGPUTextureViewDescriptor), "sizeof mismatch for TextureViewDescriptor");
@@ -1280,6 +1282,10 @@ namespace wgpu {
         auto result = wgpuDeviceCreateShaderModule(Get(), reinterpret_cast<WGPUShaderModuleDescriptor const * >(descriptor));
         return ShaderModule::Acquire(result);
     }
+        SwapChain Device::CreateSwapChain(Surface const& surface, SwapChainDescriptor const * descriptor) const {
+        auto result = wgpuDeviceCreateSwapChain(Get(), surface.Get(), reinterpret_cast<WGPUSwapChainDescriptor const * >(descriptor));
+        return SwapChain::Acquire(result);
+    }
         Texture Device::CreateTexture(TextureDescriptor const * descriptor) const {
         auto result = wgpuDeviceCreateTexture(Get(), reinterpret_cast<WGPUTextureDescriptor const * >(descriptor));
         return Texture::Acquire(result);
@@ -1626,6 +1632,9 @@ namespace wgpu {
         TextureView SwapChain::GetCurrentTextureView() const {
         auto result = wgpuSwapChainGetCurrentTextureView(Get());
         return TextureView::Acquire(result);
+    }
+        void SwapChain::Present() const {
+        wgpuSwapChainPresent(Get());
     }
     void SwapChain::WGPUReference(WGPUSwapChain handle) {
         if (handle != nullptr) {

@@ -635,6 +635,7 @@ namespace wgpu {
         RenderPipeline CreateRenderPipeline(RenderPipelineDescriptor const * descriptor) const;
         Sampler CreateSampler(SamplerDescriptor const * descriptor) const;
         ShaderModule CreateShaderModule(ShaderModuleDescriptor const * descriptor) const;
+        SwapChain CreateSwapChain(Surface const& surface, SwapChainDescriptor const * descriptor) const;
         Texture CreateTexture(TextureDescriptor const * descriptor) const;
         void InjectError(ErrorType type, char const * message) const;
         void LoseForTesting() const;
@@ -824,6 +825,7 @@ namespace wgpu {
         using ObjectBase::operator=;
 
         TextureView GetCurrentTextureView() const;
+        void Present() const;
 
       private:
         friend ObjectBase<SwapChain, WGPUSwapChain>;
@@ -1081,11 +1083,12 @@ namespace wgpu {
     struct SwapChainDescriptor {
         ChainedStruct const * nextInChain = nullptr;
         char const * label = nullptr;
-        TextureUsage usage = TextureUsage::OutputAttachment;
+        TextureUsage usage;
         TextureFormat format;
         uint32_t width;
         uint32_t height;
-        PresentMode presentMode = PresentMode::VSync;
+        PresentMode presentMode;
+        uint64_t implementation = 0;
     };
 
     struct TextureViewDescriptor {
