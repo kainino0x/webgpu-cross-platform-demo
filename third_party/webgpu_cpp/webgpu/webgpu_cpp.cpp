@@ -738,8 +738,8 @@ namespace wgpu {
     static_assert(sizeof(SurfaceDescriptorFromHTMLCanvasId) == sizeof(WGPUSurfaceDescriptorFromHTMLCanvasId), "sizeof mismatch for SurfaceDescriptorFromHTMLCanvasId");
     static_assert(alignof(SurfaceDescriptorFromHTMLCanvasId) == alignof(WGPUSurfaceDescriptorFromHTMLCanvasId), "alignof mismatch for SurfaceDescriptorFromHTMLCanvasId");
 
-    static_assert(offsetof(SurfaceDescriptorFromHTMLCanvasId, target) == offsetof(WGPUSurfaceDescriptorFromHTMLCanvasId, target),
-            "offsetof mismatch for SurfaceDescriptorFromHTMLCanvasId::target");
+    static_assert(offsetof(SurfaceDescriptorFromHTMLCanvasId, id) == offsetof(WGPUSurfaceDescriptorFromHTMLCanvasId, id),
+            "offsetof mismatch for SurfaceDescriptorFromHTMLCanvasId::id");
 
 
     static_assert(sizeof(SurfaceDescriptorFromMetalLayer) == sizeof(WGPUSurfaceDescriptorFromMetalLayer), "sizeof mismatch for SurfaceDescriptorFromMetalLayer");

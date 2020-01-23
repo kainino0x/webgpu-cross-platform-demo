@@ -218,7 +218,7 @@ int main() {
 #ifdef __EMSCRIPTEN__
     {
         wgpu::SurfaceDescriptorFromHTMLCanvasId canvasDesc{};
-        canvasDesc.target = "canvas";
+        canvasDesc.id = "canvas";
 
         wgpu::SurfaceDescriptor surfDesc{};
         surfDesc.nextInChain = &canvasDesc;

@@ -1052,7 +1052,7 @@ namespace wgpu {
         SurfaceDescriptorFromHTMLCanvasId() {
             sType = SType::SurfaceDescriptorFromHTMLCanvasId;
         }
-        char const * target;
+        char const * id;
     };
 
     struct SurfaceDescriptorFromMetalLayer : ChainedStruct {
