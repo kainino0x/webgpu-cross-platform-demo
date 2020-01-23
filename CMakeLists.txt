@@ -32,7 +32,7 @@ if(EMSCRIPTEN)
         PRIVATE "SHELL:-g1"
         PRIVATE "SHELL:-s USE_WEBGPU=1"
         PRIVATE "SHELL:-s ASSERTIONS=1"
-        #PRIVATE "SHELL:--closure 1"  # Broken!
+        #PRIVATE "SHELL:--closure 1"
         #PRIVATE "SHELL:-s VERBOSE=1"
         )
 else()
