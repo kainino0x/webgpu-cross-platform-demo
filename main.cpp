@@ -22,6 +22,7 @@
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/html5_webgpu.h>
 
 wgpu::Device CreateCppWGPUDevice() {
     return wgpu::Device::Acquire(emscripten_webgpu_get_device());
@@ -72,21 +73,27 @@ void init() {
             }, nullptr);
     }
 
-    queue = device.CreateQueue();
+    queue = device.GetDefaultQueue();
 
     wgpu::ShaderModule vsModule{};
     {
+        wgpu::ShaderModuleSPIRVDescriptor spirvDesc{};
+        spirvDesc.codeSize = sizeof(vsCode) / sizeof(uint32_t);
+        spirvDesc.code = vsCode;
+
         wgpu::ShaderModuleDescriptor descriptor{};
-        descriptor.codeSize = sizeof(vsCode) / sizeof(uint32_t);
-        descriptor.code = vsCode;
+        descriptor.nextInChain = &spirvDesc;
         vsModule = device.CreateShaderModule(&descriptor);
     }
 
     wgpu::ShaderModule fsModule{};
     {
+        wgpu::ShaderModuleSPIRVDescriptor spirvDesc{};
+        spirvDesc.codeSize = sizeof(fsCode) / sizeof(uint32_t);
+        spirvDesc.code = fsCode;
+
         wgpu::ShaderModuleDescriptor descriptor{};
-        descriptor.codeSize = sizeof(fsCode) / sizeof(uint32_t);
-        descriptor.code = fsCode;
+        descriptor.nextInChain = &spirvDesc;
         fsModule = device.CreateShaderModule(&descriptor);
     }
 
@@ -95,8 +102,8 @@ void init() {
         auto bgl = device.CreateBindGroupLayout(&bglDesc);
         wgpu::BindGroupDescriptor desc{};
         desc.layout = bgl;
-        desc.bindingCount = 0;
-        desc.bindings = nullptr;
+        desc.entryCount = 0;
+        desc.entries = nullptr;
         device.CreateBindGroup(&desc);
     }
 
@@ -161,9 +168,10 @@ void doTest() {
     }
     render(readbackTexture.CreateView());
 
+    constexpr size_t kBufferSize = 4;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = 4;
+        descriptor.size = kBufferSize;
         descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
 
         readbackBuffer = device.CreateBuffer(&descriptor);
@@ -177,16 +185,18 @@ void doTest() {
         tcv.origin = {0, 0, 0};
         wgpu::BufferCopyView bcv{};
         bcv.buffer = readbackBuffer;
-        bcv.rowPitch = 256;
-        bcv.imageHeight = 256;
+        bcv.layout.bytesPerRow = 256;
         wgpu::Extent3D extent = {1, 1, 1};
         encoder.CopyTextureToBuffer(&tcv, &bcv, &extent);
         commands = encoder.Finish();
     }
     queue.Submit(1, &commands);
-    readbackBuffer.MapReadAsync(
-        [](WGPUBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
+    readbackBuffer.MapAsync(
+        wgpu::MapMode::Read, 0, kBufferSize,
+        [](WGPUBufferMapAsyncStatus status, void*) {
             assert(status == WGPUBufferMapAsyncStatus_Success);
+            const void* ptr = readbackBuffer.GetConstMappedRange();
+
             printf("mapped read %p\n", ptr);
             uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
             readbackBuffer.Unmap();
@@ -217,8 +227,8 @@ int main() {
 
 #ifdef __EMSCRIPTEN__
     {
-        wgpu::SurfaceDescriptorFromHTMLCanvasId canvasDesc{};
-        canvasDesc.id = "canvas";
+        wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
+        canvasDesc.selector = "#canvas";
 
         wgpu::SurfaceDescriptor surfDesc{};
         surfDesc.nextInChain = &canvasDesc;
@@ -230,7 +240,7 @@ int main() {
         scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
         scDesc.width = 200;
         scDesc.height = 300;
-        scDesc.presentMode = wgpu::PresentMode::VSync;
+        scDesc.presentMode = wgpu::PresentMode::Fifo;
         swapChain = device.CreateSwapChain(surface, &scDesc);
     }
     emscripten_set_main_loop(frame, 0, false);
