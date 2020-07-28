@@ -18,6 +18,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -30,7 +31,6 @@ wgpu::Device CreateCppWGPUDevice() {
 #else
 #include <dawn/dawn_proc.h>
 #include <dawn_native/DawnNative.h>
-#include <memory>
 
 static std::unique_ptr<dawn_native::Instance> instance;
 
@@ -56,7 +56,6 @@ static const uint32_t vsCode[] = {
 static const uint32_t fsCode[] = {
     119734787, 65536, 851975, 14, 0, 131089, 1, 393227, 1, 1280527431, 1685353262, 808793134, 0, 196622, 0, 1, 393231, 4, 4, 1852399981, 0, 9, 196624, 4, 7, 196611, 1, 310, 655364, 1197427783, 1279741775, 1885560645, 1953718128, 1600482425, 1701734764, 1919509599, 1769235301, 25974, 524292, 1197427783, 1279741775, 1852399429, 1685417059, 1768185701, 1952671090, 6649449, 262149, 4, 1852399981, 0, 327685, 9, 1734439526, 1869377347, 114, 196679, 9, 0, 262215, 9, 30, 0, 131091, 2, 196641, 3, 2, 196630, 6, 32, 262167, 7, 6, 4, 262176, 8, 3, 7, 262203, 8, 9, 3, 262187, 6, 10, 0, 262187, 6, 11, 1056964608, 262187, 6, 12, 1065353216, 458796, 7, 13, 10, 11, 12, 12, 327734, 2, 4, 0, 3, 131320, 5, 196670, 9, 13, 65789, 65592
 };
-static const uint32_t expectData = 0xff0080ff;
 
 static wgpu::Device device;
 static wgpu::Queue queue;
@@ -157,7 +156,126 @@ void render(wgpu::TextureView view) {
     queue.Submit(1, &commands);
 }
 
-void doTest() {
+void issueContentsCheck(const char* functionName,
+        wgpu::Buffer readbackBuffer, uint32_t expectData) {
+    struct UserData {
+        const char* functionName;
+        wgpu::Buffer readbackBuffer;
+        uint32_t expectData;
+    };
+
+    UserData* userdata = new UserData;
+    userdata->functionName = functionName;
+    userdata->readbackBuffer = readbackBuffer;
+    userdata->expectData = expectData;
+
+    readbackBuffer.MapAsync(
+        wgpu::MapMode::Read, 0, 4,
+        [](WGPUBufferMapAsyncStatus status, void* vp_userdata) {
+            assert(status == WGPUBufferMapAsyncStatus_Success);
+            std::unique_ptr<UserData> userdata(reinterpret_cast<UserData*>(vp_userdata));
+
+            const void* ptr = userdata->readbackBuffer.GetConstMappedRange();
+
+            printf("%s:\n", userdata->functionName);
+            printf("  mapped read %p...", ptr);
+            uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
+            userdata->readbackBuffer.Unmap();
+            printf(" unmapped\n");
+
+            printf("  got %08x, expected %08x\n",
+                readback, userdata->expectData);
+            assert(readback == userdata->expectData);
+            if (readback != userdata->expectData) {
+                abort();
+            }
+
+            done = true;
+        }, userdata);
+}
+
+void doCopyTestMappedAtCreation() {
+    static constexpr uint32_t kValue = 0x05060708;
+    wgpu::Buffer src;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = 4;
+        descriptor.usage = wgpu::BufferUsage::CopySrc;
+        descriptor.mappedAtCreation = true;
+        src = device.CreateBuffer(&descriptor);
+    }
+    uint32_t* ptr = static_cast<uint32_t*>(src.GetMappedRange());
+    *ptr = kValue;
+    src.Unmap();
+
+    wgpu::Buffer dst;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = 4;
+        descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+        dst = device.CreateBuffer(&descriptor);
+    }
+
+    wgpu::CommandBuffer commands;
+    {
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+        encoder.CopyBufferToBuffer(src, 0, dst, 0, 4);
+        commands = encoder.Finish();
+    }
+    queue.Submit(1, &commands);
+
+    issueContentsCheck(__FUNCTION__, dst, kValue);
+}
+
+void doCopyTestMapAsync() {
+    static constexpr uint32_t kValue = 0x01020304;
+    wgpu::Buffer src;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = 4;
+        descriptor.usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc;
+        src = device.CreateBuffer(&descriptor);
+    }
+
+    struct UserData {
+        const char* functionName;
+        wgpu::Buffer src;
+    };
+
+    UserData* userdata = new UserData;
+    userdata->functionName = __FUNCTION__;
+    userdata->src = src;
+
+    src.MapAsync(wgpu::MapMode::Write, 0, 4,
+        [](WGPUBufferMapAsyncStatus status, void* vp_userdata) {
+            assert(status == WGPUBufferMapAsyncStatus_Success);
+            std::unique_ptr<UserData> userdata(reinterpret_cast<UserData*>(vp_userdata));
+
+            uint32_t* ptr = static_cast<uint32_t*>(userdata->src.GetMappedRange());
+            *ptr = kValue;
+            userdata->src.Unmap();
+
+            wgpu::Buffer dst;
+            {
+                wgpu::BufferDescriptor descriptor{};
+                descriptor.size = 4;
+                descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+                dst = device.CreateBuffer(&descriptor);
+            }
+
+            wgpu::CommandBuffer commands;
+            {
+                wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+                encoder.CopyBufferToBuffer(userdata->src, 0, dst, 0, 4);
+                commands = encoder.Finish();
+            }
+            queue.Submit(1, &commands);
+
+            issueContentsCheck(userdata->functionName, dst, kValue);
+        }, userdata);
+}
+
+void doRenderTest() {
     wgpu::Texture readbackTexture;
     {
         wgpu::TextureDescriptor descriptor{};
@@ -168,10 +286,9 @@ void doTest() {
     }
     render(readbackTexture.CreateView());
 
-    constexpr size_t kBufferSize = 4;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = kBufferSize;
+        descriptor.size = 4;
         descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
 
         readbackBuffer = device.CreateBuffer(&descriptor);
@@ -191,25 +308,10 @@ void doTest() {
         commands = encoder.Finish();
     }
     queue.Submit(1, &commands);
-    readbackBuffer.MapAsync(
-        wgpu::MapMode::Read, 0, kBufferSize,
-        [](WGPUBufferMapAsyncStatus status, void*) {
-            assert(status == WGPUBufferMapAsyncStatus_Success);
-            const void* ptr = readbackBuffer.GetConstMappedRange();
 
-            printf("mapped read %p\n", ptr);
-            uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
-            readbackBuffer.Unmap();
-            printf("unmapped\n");
-
-            printf("Got %08x, expected %08x\n", readback, expectData);
-            assert(readback == expectData);
-            if (readback != expectData) {
-                abort();
-            }
-
-            done = true;
-        }, nullptr);
+    // Check the color value encoded in the shader makes it out correctly.
+    static const uint32_t expectData = 0xff0080ff;
+    issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -223,7 +325,9 @@ void frame() {
 
 int main() {
     init();
-    doTest();
+    doCopyTestMappedAtCreation();
+    doCopyTestMapAsync();
+    doRenderTest();
 
 #ifdef __EMSCRIPTEN__
     {

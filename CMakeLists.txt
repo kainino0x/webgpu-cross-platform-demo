@@ -29,7 +29,7 @@ target_include_directories(hello
 
 if(EMSCRIPTEN)
     target_link_options(hello
-        PRIVATE "SHELL:-g1"
+        PRIVATE "SHELL:-g3"
         PRIVATE "SHELL:-s USE_WEBGPU=1"
         PRIVATE "SHELL:-s ASSERTIONS=1"
         #PRIVATE "SHELL:--closure 1"
