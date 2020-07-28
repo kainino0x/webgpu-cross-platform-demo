@@ -13,9 +13,6 @@ add_executable(hello
     )
 
 if(EMSCRIPTEN)
-    target_link_libraries(hello
-        webgpu_cpp
-        )
     target_link_options(hello
         PRIVATE "SHELL:-g3"
         PRIVATE "SHELL:-s USE_WEBGPU=1"

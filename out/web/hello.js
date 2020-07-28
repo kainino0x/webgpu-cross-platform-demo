@@ -1289,11 +1289,11 @@ function updateGlobalBufferAndViews(buf) {
 }
 
 var STATIC_BASE = 1024,
-    STACK_BASE = 5248448,
+    STACK_BASE = 5248400,
     STACKTOP = STACK_BASE,
-    STACK_MAX = 5568,
-    DYNAMIC_BASE = 5248448,
-    DYNAMICTOP_PTR = 5408;
+    STACK_MAX = 5520,
+    DYNAMIC_BASE = 5248400,
+    DYNAMICTOP_PTR = 5360;
 
 assert(STACK_BASE % 16 === 0, 'stack must start aligned');
 assert(DYNAMIC_BASE % 16 === 0, 'heap must start aligned');
@@ -1878,7 +1878,7 @@ var ASM_CONSTS = {
 
 
 
-// STATICTOP = STATIC_BASE + 4544;
+// STATICTOP = STATIC_BASE + 4496;
 /* global initializers */  __ATINIT__.push({ func: function() { ___wasm_call_ctors() } });
 
 
@@ -1952,7 +1952,7 @@ var ASM_CONSTS = {
     }
 
   function _emscripten_get_sbrk_ptr() {
-      return 5408;
+      return 5360;
     }
 
   function _emscripten_memcpy_big(dest, src, num) {
@@ -2860,7 +2860,7 @@ var ASM_CONSTS = {
           "texture": this.mgrTexture.get(
             HEAP32[(((ptr)+(4))>>2)]),
           "mipLevel": HEAPU32[(((ptr)+(8))>>2)],
-          "origin": WebGPU.makeOrigin3D(ptr + 16),
+          "origin": WebGPU.makeOrigin3D(ptr + 12),
         };
       },makeTextureDataLayout:function(ptr) {
         assert(ptr);assert(HEAP32[((ptr)>>2)] === 0);
@@ -3620,12 +3620,12 @@ var ASM_CONSTS = {
       var desc = {
         "label": undefined,
         "size": WebGPU.makeExtent3D(descriptor + 16),
-        "mipLevelCount": HEAPU32[(((descriptor)+(36))>>2)],
-        "sampleCount": HEAPU32[(((descriptor)+(40))>>2)],
+        "mipLevelCount": HEAPU32[(((descriptor)+(32))>>2)],
+        "sampleCount": HEAPU32[(((descriptor)+(36))>>2)],
         "dimension": WebGPU.TextureDimension[
           HEAPU32[(((descriptor)+(12))>>2)]],
         "format": WebGPU.TextureFormat[
-          HEAPU32[(((descriptor)+(32))>>2)]],
+          HEAPU32[(((descriptor)+(28))>>2)]],
         "usage": HEAPU32[(((descriptor)+(8))>>2)],
       };
       var labelPtr = HEAP32[(((descriptor)+(4))>>2)];
