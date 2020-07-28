@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef __EMSCRIPTEN__
 #include <webgpu/webgpu_cpp.h>
+#else
+#include <dawn/webgpu_cpp.h>
+#endif
 
 #undef NDEBUG
 #include <cassert>
@@ -61,7 +65,7 @@ static wgpu::Device device;
 static wgpu::Queue queue;
 static wgpu::Buffer readbackBuffer;
 static wgpu::RenderPipeline pipeline;
-static bool done = false;
+static int testsCompleted = 0;
 
 void init() {
     {
@@ -190,7 +194,7 @@ void issueContentsCheck(const char* functionName,
                 abort();
             }
 
-            done = true;
+            testsCompleted++;
         }, userdata);
 }
 
@@ -349,7 +353,7 @@ int main() {
     }
     emscripten_set_main_loop(frame, 0, false);
 #else
-    while (!done) {
+    while (testsCompleted < 3) {
         device.Tick();
     }
 #endif
