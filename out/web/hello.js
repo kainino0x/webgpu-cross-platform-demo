@@ -3068,15 +3068,13 @@ var ASM_CONSTS = {
       bufferWrapper.onUnmap = [];
       var buffer = bufferWrapper.object;
   
-      var WGPUBufferMapAsyncStatus_Success = 0;
-      var WGPUBufferMapAsyncStatus_Error = 1;
       // `callback` takes (WGPUBufferMapAsyncStatus status, void * userdata)
   
       buffer["mapAsync"](mode, offset, size).then(function() {
-        dynCall('vii', callback, [WGPUBufferMapAsyncStatus_Success, userdata]);
+        dynCall('vii', callback, [0 /* WGPUBufferMapAsyncStatus_Success */, userdata]);
       }, function() {
         // TODO(kainino0x): Figure out how to pick other error status values.
-        dynCall('vii', callback, [WGPUBufferMapAsyncStatus_Error, userdata]);
+        dynCall('vii', callback, [1 /* WGPUBufferMapAsyncStatus_Error */, userdata]);
       });
     }
 

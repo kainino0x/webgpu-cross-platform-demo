@@ -198,17 +198,20 @@ void issueContentsCheck(const char* functionName,
         }, userdata);
 }
 
-void doCopyTestMappedAtCreation() {
+void doCopyTestMappedAtCreation(bool useRange) {
     static constexpr uint32_t kValue = 0x05060708;
     wgpu::Buffer src;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = 4;
+        descriptor.size = 8;
         descriptor.usage = wgpu::BufferUsage::CopySrc;
         descriptor.mappedAtCreation = true;
         src = device.CreateBuffer(&descriptor);
     }
-    uint32_t* ptr = static_cast<uint32_t*>(src.GetMappedRange());
+    size_t offset = useRange ? 4 : 0;
+    uint32_t* ptr = static_cast<uint32_t*>(useRange ?
+            src.GetMappedRange(offset, 4) :
+            src.GetMappedRange());
     *ptr = kValue;
     src.Unmap();
 
@@ -223,7 +226,7 @@ void doCopyTestMappedAtCreation() {
     wgpu::CommandBuffer commands;
     {
         wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
-        encoder.CopyBufferToBuffer(src, 0, dst, 0, 4);
+        encoder.CopyBufferToBuffer(src, offset, dst, 0, 4);
         commands = encoder.Finish();
     }
     queue.Submit(1, &commands);
@@ -231,31 +234,38 @@ void doCopyTestMappedAtCreation() {
     issueContentsCheck(__FUNCTION__, dst, kValue);
 }
 
-void doCopyTestMapAsync() {
+void doCopyTestMapAsync(bool useRange) {
     static constexpr uint32_t kValue = 0x01020304;
     wgpu::Buffer src;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = 4;
+        descriptor.size = 8;
         descriptor.usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc;
         src = device.CreateBuffer(&descriptor);
     }
+    size_t offset = useRange ? 4 : 0;
 
     struct UserData {
         const char* functionName;
+        bool useRange;
+        size_t offset;
         wgpu::Buffer src;
     };
 
     UserData* userdata = new UserData;
     userdata->functionName = __FUNCTION__;
+    userdata->useRange = useRange;
+    userdata->offset = offset;
     userdata->src = src;
 
-    src.MapAsync(wgpu::MapMode::Write, 0, 4,
+    src.MapAsync(wgpu::MapMode::Write, offset, 4,
         [](WGPUBufferMapAsyncStatus status, void* vp_userdata) {
             assert(status == WGPUBufferMapAsyncStatus_Success);
             std::unique_ptr<UserData> userdata(reinterpret_cast<UserData*>(vp_userdata));
 
-            uint32_t* ptr = static_cast<uint32_t*>(userdata->src.GetMappedRange());
+            uint32_t* ptr = static_cast<uint32_t*>(userdata->useRange ?
+                    userdata->src.GetMappedRange(userdata->offset, 4) :
+                    userdata->src.GetMappedRange());
             *ptr = kValue;
             userdata->src.Unmap();
 
@@ -270,7 +280,7 @@ void doCopyTestMapAsync() {
             wgpu::CommandBuffer commands;
             {
                 wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
-                encoder.CopyBufferToBuffer(userdata->src, 0, dst, 0, 4);
+                encoder.CopyBufferToBuffer(userdata->src, userdata->offset, dst, 0, 4);
                 commands = encoder.Finish();
             }
             queue.Submit(1, &commands);
@@ -329,8 +339,12 @@ void frame() {
 
 int main() {
     init();
-    doCopyTestMappedAtCreation();
-    doCopyTestMapAsync();
+
+    static constexpr int kNumTests = 5;
+    doCopyTestMappedAtCreation(false);
+    doCopyTestMappedAtCreation(true);
+    doCopyTestMapAsync(false);
+    doCopyTestMapAsync(true);
     doRenderTest();
 
 #ifdef __EMSCRIPTEN__
@@ -353,7 +367,7 @@ int main() {
     }
     emscripten_set_main_loop(frame, 0, false);
 #else
-    while (testsCompleted < 3) {
+    while (testsCompleted < kNumTests) {
         device.Tick();
     }
 #endif
