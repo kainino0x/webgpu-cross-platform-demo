@@ -3017,12 +3017,12 @@ var ASM_CONSTS = {
     WebGPU.mgrBindGroup.release(id);
   }
 
-  function _wgpuBufferGetConstMappedRange(bufferId) {
+  function _wgpuBufferGetConstMappedRange(bufferId, offset, size) {
       var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
   
       var mapped;
       try {
-        mapped = bufferWrapper.object["getMappedRange"]();
+        mapped = bufferWrapper.object["getMappedRange"](offset, size);
       } catch (ex) {
         // TODO(kainino0x): Somehow inject a validation error?
         return 0;
@@ -3036,7 +3036,7 @@ var ASM_CONSTS = {
       return data;
     }
 
-  function _wgpuBufferGetMappedRange(bufferId) {
+  function _wgpuBufferGetMappedRange(bufferId, offset, size) {
       var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
   
       if (bufferWrapper.mapMode !== 2 /* WGPUMapMode_Write */) {
@@ -3047,7 +3047,7 @@ var ASM_CONSTS = {
   
       var mapped;
       try {
-        mapped = bufferWrapper.object["getMappedRange"]();
+        mapped = bufferWrapper.object["getMappedRange"](offset, size);
       } catch (ex) {
         // TODO(kainino0x): Somehow inject a validation error?
         return 0;
@@ -3574,7 +3574,12 @@ var ASM_CONSTS = {
       if (sType === 5) {
         var count = HEAPU32[(((nextInChainPtr)+(8))>>2)];
         var start = HEAP32[(((nextInChainPtr)+(12))>>2)];
-        desc["code"] = HEAPU32.subarray(start >> 2, (start >> 2) + count);
+        if (HEAPU8["buffer"] instanceof SharedArrayBuffer) {
+          // Chrome can't currently handle a SharedArrayBuffer view here.
+          desc["code"] = HEAPU32.slice(start >> 2, (start >> 2) + count);
+        } else {
+          desc["code"] = HEAPU32.subarray(start >> 2, (start >> 2) + count);
+        }
       } else if (sType === 6) {
         var sourcePtr = HEAP32[(((nextInChainPtr)+(8))>>2)];
         if (sourcePtr) {
