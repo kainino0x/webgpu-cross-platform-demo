@@ -8,15 +8,21 @@ if(NOT EMSCRIPTEN)
     add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
 endif()
 
+if(EMSCRIPTEN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+endif()
+
 add_executable(hello
     "main.cpp"
     )
 
 if(EMSCRIPTEN)
     target_link_options(hello
-        PRIVATE "SHELL:-g3"
+        PRIVATE "SHELL:-g4"
+        PRIVATE "SHELL:--source-map-base https://kai.graphics/webgpu-cross-platform-demo/out/web/"
         PRIVATE "SHELL:-s USE_WEBGPU=1"
         PRIVATE "SHELL:-s ASSERTIONS=1"
+        PRIVATE "SHELL:-s SAFE_HEAP=1"
         #PRIVATE "SHELL:--closure 1"
         #PRIVATE "SHELL:-s VERBOSE=1"
         )

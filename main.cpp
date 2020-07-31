@@ -181,18 +181,14 @@ void issueContentsCheck(const char* functionName,
 
             const void* ptr = userdata->readbackBuffer.GetConstMappedRange();
 
-            printf("%s:\n", userdata->functionName);
-            printf("  mapped read %p...", ptr);
+            printf("%s: readback -> %p%s\n", userdata->functionName,
+                    ptr, ptr ? "" : " <------- FAILED");
+            assert(ptr != nullptr);
             uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
             userdata->readbackBuffer.Unmap();
-            printf(" unmapped\n");
-
-            printf("  got %08x, expected %08x\n",
-                readback, userdata->expectData);
-            assert(readback == userdata->expectData);
-            if (readback != userdata->expectData) {
-                abort();
-            }
+            printf("  got %08x, expected %08x%s\n",
+                readback, userdata->expectData,
+                readback == userdata->expectData ? "" : " <------- FAILED");
 
             testsCompleted++;
         }, userdata);
@@ -200,18 +196,22 @@ void issueContentsCheck(const char* functionName,
 
 void doCopyTestMappedAtCreation(bool useRange) {
     static constexpr uint32_t kValue = 0x05060708;
+    size_t size = useRange ? 12 : 4;
     wgpu::Buffer src;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = 8;
+        descriptor.size = size;
         descriptor.usage = wgpu::BufferUsage::CopySrc;
         descriptor.mappedAtCreation = true;
         src = device.CreateBuffer(&descriptor);
     }
-    size_t offset = useRange ? 4 : 0;
+    size_t offset = useRange ? 8 : 0;
     uint32_t* ptr = static_cast<uint32_t*>(useRange ?
             src.GetMappedRange(offset, 4) :
             src.GetMappedRange());
+    printf("%s: getMappedRange -> %p%s\n", __FUNCTION__,
+            ptr, ptr ? "" : " <------- FAILED");
+    assert(ptr != nullptr);
     *ptr = kValue;
     src.Unmap();
 
@@ -236,14 +236,15 @@ void doCopyTestMappedAtCreation(bool useRange) {
 
 void doCopyTestMapAsync(bool useRange) {
     static constexpr uint32_t kValue = 0x01020304;
+    size_t size = useRange ? 12 : 4;
     wgpu::Buffer src;
     {
         wgpu::BufferDescriptor descriptor{};
-        descriptor.size = 8;
+        descriptor.size = size;
         descriptor.usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc;
         src = device.CreateBuffer(&descriptor);
     }
-    size_t offset = useRange ? 4 : 0;
+    size_t offset = useRange ? 8 : 0;
 
     struct UserData {
         const char* functionName;
@@ -266,6 +267,9 @@ void doCopyTestMapAsync(bool useRange) {
             uint32_t* ptr = static_cast<uint32_t*>(userdata->useRange ?
                     userdata->src.GetMappedRange(userdata->offset, 4) :
                     userdata->src.GetMappedRange());
+            printf("%s: getMappedRange -> %p%s\n", userdata->functionName,
+                    ptr, ptr ? "" : " <------- FAILED");
+            assert(ptr != nullptr);
             *ptr = kValue;
             userdata->src.Unmap();
 
