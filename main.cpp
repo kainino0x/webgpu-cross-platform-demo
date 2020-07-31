@@ -12,16 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#ifdef __EMSCRIPTEN__
 #include <webgpu/webgpu_cpp.h>
+#else
+#include <dawn/webgpu_cpp.h>
+#endif
 
 #undef NDEBUG
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
+#include <emscripten/html5_webgpu.h>
 
 wgpu::Device CreateCppWGPUDevice() {
     return wgpu::Device::Acquire(emscripten_webgpu_get_device());
@@ -29,7 +35,6 @@ wgpu::Device CreateCppWGPUDevice() {
 #else
 #include <dawn/dawn_proc.h>
 #include <dawn_native/DawnNative.h>
-#include <memory>
 
 static std::unique_ptr<dawn_native::Instance> instance;
 
@@ -55,13 +60,12 @@ static const uint32_t vsCode[] = {
 static const uint32_t fsCode[] = {
     119734787, 65536, 851975, 14, 0, 131089, 1, 393227, 1, 1280527431, 1685353262, 808793134, 0, 196622, 0, 1, 393231, 4, 4, 1852399981, 0, 9, 196624, 4, 7, 196611, 1, 310, 655364, 1197427783, 1279741775, 1885560645, 1953718128, 1600482425, 1701734764, 1919509599, 1769235301, 25974, 524292, 1197427783, 1279741775, 1852399429, 1685417059, 1768185701, 1952671090, 6649449, 262149, 4, 1852399981, 0, 327685, 9, 1734439526, 1869377347, 114, 196679, 9, 0, 262215, 9, 30, 0, 131091, 2, 196641, 3, 2, 196630, 6, 32, 262167, 7, 6, 4, 262176, 8, 3, 7, 262203, 8, 9, 3, 262187, 6, 10, 0, 262187, 6, 11, 1056964608, 262187, 6, 12, 1065353216, 458796, 7, 13, 10, 11, 12, 12, 327734, 2, 4, 0, 3, 131320, 5, 196670, 9, 13, 65789, 65592
 };
-static const uint32_t expectData = 0xff0080ff;
 
 static wgpu::Device device;
 static wgpu::Queue queue;
 static wgpu::Buffer readbackBuffer;
 static wgpu::RenderPipeline pipeline;
-static bool done = false;
+static int testsCompleted = 0;
 
 void init() {
     {
@@ -72,21 +76,27 @@ void init() {
             }, nullptr);
     }
 
-    queue = device.CreateQueue();
+    queue = device.GetDefaultQueue();
 
     wgpu::ShaderModule vsModule{};
     {
+        wgpu::ShaderModuleSPIRVDescriptor spirvDesc{};
+        spirvDesc.codeSize = sizeof(vsCode) / sizeof(uint32_t);
+        spirvDesc.code = vsCode;
+
         wgpu::ShaderModuleDescriptor descriptor{};
-        descriptor.codeSize = sizeof(vsCode) / sizeof(uint32_t);
-        descriptor.code = vsCode;
+        descriptor.nextInChain = &spirvDesc;
         vsModule = device.CreateShaderModule(&descriptor);
     }
 
     wgpu::ShaderModule fsModule{};
     {
+        wgpu::ShaderModuleSPIRVDescriptor spirvDesc{};
+        spirvDesc.codeSize = sizeof(fsCode) / sizeof(uint32_t);
+        spirvDesc.code = fsCode;
+
         wgpu::ShaderModuleDescriptor descriptor{};
-        descriptor.codeSize = sizeof(fsCode) / sizeof(uint32_t);
-        descriptor.code = fsCode;
+        descriptor.nextInChain = &spirvDesc;
         fsModule = device.CreateShaderModule(&descriptor);
     }
 
@@ -95,8 +105,8 @@ void init() {
         auto bgl = device.CreateBindGroupLayout(&bglDesc);
         wgpu::BindGroupDescriptor desc{};
         desc.layout = bgl;
-        desc.bindingCount = 0;
-        desc.bindings = nullptr;
+        desc.entryCount = 0;
+        desc.entries = nullptr;
         device.CreateBindGroup(&desc);
     }
 
@@ -150,7 +160,140 @@ void render(wgpu::TextureView view) {
     queue.Submit(1, &commands);
 }
 
-void doTest() {
+void issueContentsCheck(const char* functionName,
+        wgpu::Buffer readbackBuffer, uint32_t expectData) {
+    struct UserData {
+        const char* functionName;
+        wgpu::Buffer readbackBuffer;
+        uint32_t expectData;
+    };
+
+    UserData* userdata = new UserData;
+    userdata->functionName = functionName;
+    userdata->readbackBuffer = readbackBuffer;
+    userdata->expectData = expectData;
+
+    readbackBuffer.MapAsync(
+        wgpu::MapMode::Read, 0, 4,
+        [](WGPUBufferMapAsyncStatus status, void* vp_userdata) {
+            assert(status == WGPUBufferMapAsyncStatus_Success);
+            std::unique_ptr<UserData> userdata(reinterpret_cast<UserData*>(vp_userdata));
+
+            const void* ptr = userdata->readbackBuffer.GetConstMappedRange();
+
+            printf("%s: readback -> %p%s\n", userdata->functionName,
+                    ptr, ptr ? "" : " <------- FAILED");
+            assert(ptr != nullptr);
+            uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
+            userdata->readbackBuffer.Unmap();
+            printf("  got %08x, expected %08x%s\n",
+                readback, userdata->expectData,
+                readback == userdata->expectData ? "" : " <------- FAILED");
+
+            testsCompleted++;
+        }, userdata);
+}
+
+void doCopyTestMappedAtCreation(bool useRange) {
+    static constexpr uint32_t kValue = 0x05060708;
+    size_t size = useRange ? 12 : 4;
+    wgpu::Buffer src;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = size;
+        descriptor.usage = wgpu::BufferUsage::CopySrc;
+        descriptor.mappedAtCreation = true;
+        src = device.CreateBuffer(&descriptor);
+    }
+    size_t offset = useRange ? 8 : 0;
+    uint32_t* ptr = static_cast<uint32_t*>(useRange ?
+            src.GetMappedRange(offset, 4) :
+            src.GetMappedRange());
+    printf("%s: getMappedRange -> %p%s\n", __FUNCTION__,
+            ptr, ptr ? "" : " <------- FAILED");
+    assert(ptr != nullptr);
+    *ptr = kValue;
+    src.Unmap();
+
+    wgpu::Buffer dst;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = 4;
+        descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+        dst = device.CreateBuffer(&descriptor);
+    }
+
+    wgpu::CommandBuffer commands;
+    {
+        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+        encoder.CopyBufferToBuffer(src, offset, dst, 0, 4);
+        commands = encoder.Finish();
+    }
+    queue.Submit(1, &commands);
+
+    issueContentsCheck(__FUNCTION__, dst, kValue);
+}
+
+void doCopyTestMapAsync(bool useRange) {
+    static constexpr uint32_t kValue = 0x01020304;
+    size_t size = useRange ? 12 : 4;
+    wgpu::Buffer src;
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.size = size;
+        descriptor.usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc;
+        src = device.CreateBuffer(&descriptor);
+    }
+    size_t offset = useRange ? 8 : 0;
+
+    struct UserData {
+        const char* functionName;
+        bool useRange;
+        size_t offset;
+        wgpu::Buffer src;
+    };
+
+    UserData* userdata = new UserData;
+    userdata->functionName = __FUNCTION__;
+    userdata->useRange = useRange;
+    userdata->offset = offset;
+    userdata->src = src;
+
+    src.MapAsync(wgpu::MapMode::Write, offset, 4,
+        [](WGPUBufferMapAsyncStatus status, void* vp_userdata) {
+            assert(status == WGPUBufferMapAsyncStatus_Success);
+            std::unique_ptr<UserData> userdata(reinterpret_cast<UserData*>(vp_userdata));
+
+            uint32_t* ptr = static_cast<uint32_t*>(userdata->useRange ?
+                    userdata->src.GetMappedRange(userdata->offset, 4) :
+                    userdata->src.GetMappedRange());
+            printf("%s: getMappedRange -> %p%s\n", userdata->functionName,
+                    ptr, ptr ? "" : " <------- FAILED");
+            assert(ptr != nullptr);
+            *ptr = kValue;
+            userdata->src.Unmap();
+
+            wgpu::Buffer dst;
+            {
+                wgpu::BufferDescriptor descriptor{};
+                descriptor.size = 4;
+                descriptor.usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::MapRead;
+                dst = device.CreateBuffer(&descriptor);
+            }
+
+            wgpu::CommandBuffer commands;
+            {
+                wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+                encoder.CopyBufferToBuffer(userdata->src, userdata->offset, dst, 0, 4);
+                commands = encoder.Finish();
+            }
+            queue.Submit(1, &commands);
+
+            issueContentsCheck(userdata->functionName, dst, kValue);
+        }, userdata);
+}
+
+void doRenderTest() {
     wgpu::Texture readbackTexture;
     {
         wgpu::TextureDescriptor descriptor{};
@@ -177,29 +320,16 @@ void doTest() {
         tcv.origin = {0, 0, 0};
         wgpu::BufferCopyView bcv{};
         bcv.buffer = readbackBuffer;
-        bcv.rowPitch = 256;
-        bcv.imageHeight = 256;
+        bcv.layout.bytesPerRow = 256;
         wgpu::Extent3D extent = {1, 1, 1};
         encoder.CopyTextureToBuffer(&tcv, &bcv, &extent);
         commands = encoder.Finish();
     }
     queue.Submit(1, &commands);
-    readbackBuffer.MapReadAsync(
-        [](WGPUBufferMapAsyncStatus status, const void* ptr, uint64_t size, void*) {
-            assert(status == WGPUBufferMapAsyncStatus_Success);
-            printf("mapped read %p\n", ptr);
-            uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
-            readbackBuffer.Unmap();
-            printf("unmapped\n");
 
-            printf("Got %08x, expected %08x\n", readback, expectData);
-            assert(readback == expectData);
-            if (readback != expectData) {
-                abort();
-            }
-
-            done = true;
-        }, nullptr);
+    // Check the color value encoded in the shader makes it out correctly.
+    static const uint32_t expectData = 0xff0080ff;
+    issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
 #ifdef __EMSCRIPTEN__
@@ -213,12 +343,18 @@ void frame() {
 
 int main() {
     init();
-    doTest();
+
+    static constexpr int kNumTests = 5;
+    doCopyTestMappedAtCreation(false);
+    doCopyTestMappedAtCreation(true);
+    doCopyTestMapAsync(false);
+    doCopyTestMapAsync(true);
+    doRenderTest();
 
 #ifdef __EMSCRIPTEN__
     {
-        wgpu::SurfaceDescriptorFromHTMLCanvasId canvasDesc{};
-        canvasDesc.id = "canvas";
+        wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
+        canvasDesc.selector = "#canvas";
 
         wgpu::SurfaceDescriptor surfDesc{};
         surfDesc.nextInChain = &canvasDesc;
@@ -230,12 +366,12 @@ int main() {
         scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
         scDesc.width = 200;
         scDesc.height = 300;
-        scDesc.presentMode = wgpu::PresentMode::VSync;
+        scDesc.presentMode = wgpu::PresentMode::Fifo;
         swapChain = device.CreateSwapChain(surface, &scDesc);
     }
     emscripten_set_main_loop(frame, 0, false);
 #else
-    while (!done) {
+    while (testsCompleted < kNumTests) {
         device.Tick();
     }
 #endif
