@@ -1,5 +1,7 @@
-This is a small test app that uses WebGPU's `webgpu.h` header as a platform-agnostic
-hardware abstraction layer. It uses a C++ layer over `webgpu.h`: `webgpu_cpp.h`.
+This is a small test app that uses WebGPU's unofficial
+[`webgpu.h` header](https://github.com/webgpu-native/webgpu-headers/blob/main/webgpu.h)
+as a platform-agnostic hardware abstraction layer.
+It uses a C++ layer over `webgpu.h`, called `webgpu_cpp.h`.
 On native platforms, this project can be built against
 [Dawn](https://dawn.googlesource.com/dawn/), Chromium's native WebGPU implementation.
 On the Web, this project can be built against Emscripten, which implements `webgpu.h`
@@ -29,10 +31,11 @@ make clean all
 
 ### Web build
 
-This has been mainly tested with Chrome Canary on Mac.
-Requires `chrome://flags/#enable-unsafe-webgpu`.
+This has been mainly tested with Chrome Canary on Mac, but should work on
+Chrome/Edge/Firefox on any platform with support.
+Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
 
-**Note:** The active Emscripten version must be at least 2.0.0.
+**Note:** To build, the active Emscripten version must be at least 2.0.0.
 
 ```sh
 # Make sure Emscripten tools are in the path.
