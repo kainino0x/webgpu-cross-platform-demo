@@ -1,4 +1,23 @@
-## Native build:
+This is a small test app that uses WebGPU's `webgpu.h` header as a platform-agnostic
+hardware abstraction layer. It uses a C++ layer over `webgpu.h`: `webgpu_cpp.h`.
+On native platforms, this project can be built against
+[Dawn](https://dawn.googlesource.com/dawn/), Chromium's native WebGPU implementation.
+On the Web, this project can be built against Emscripten, which implements `webgpu.h`
+on top of the browser's own WebGPU JavaScript API (if
+[enabled](https://github.com/gpuweb/gpuweb/wiki/Implementation-Status)).
+It currently hasn't been set up to build against
+[wgpu-native](https://github.com/gfx-rs/wgpu-native)'s `webgpu.h` implementation,
+but that is a goal.
+
+**Check the [issues](https://github.com/kainino0x/webgpu-cross-platform-demo/issues) tab for known issues.**
+
+## Building
+
+Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
+
+### Native build
+
+Build has only been tested on Linux/Mac.
 
 ```sh
 ./setup.sh
@@ -8,17 +27,19 @@ cmake ../..
 make clean all
 ```
 
-## Web build:
+### Web build
 
-**Note:** The active emsdk must include commit #11737, #11779, and #11782!
-If it doesn't, you can delete its copy of Emscripten and git clone the correct
-one. Right now these patches haven't all landed, so you can use:
-https://github.com/kainino0x/emscripten/tree/with_11779_and_11782
+This has been mainly tested with Chrome Canary on Mac.
+Requires `chrome://flags/#enable-unsafe-webgpu`.
+
+**Note:** The active Emscripten version must be at least 2.0.0.
 
 ```sh
+# Make sure Emscripten tools are in the path.
 pushd path/to/emsdk
 source emsdk_env.sh
 popd
+
 mkdir -p out/web
 cd out/web
 emcmake cmake ../..
