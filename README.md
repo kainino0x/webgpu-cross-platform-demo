@@ -22,7 +22,7 @@ Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 Build has only been tested on Linux/Mac.
 
 ```sh
-./setup.sh
+./setup_native_build.sh
 mkdir -p out/native
 cd out/native
 cmake ../..
