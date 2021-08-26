@@ -2277,6 +2277,61 @@ function _emscripten_set_main_loop(func, fps, simulateInfiniteLoop) {
  setMainLoop(browserIterationFunc, fps, simulateInfiniteLoop);
 }
 
+function flush_NO_FILESYSTEM() {
+ if (typeof _fflush !== "undefined") _fflush(0);
+ var buffers = SYSCALLS.buffers;
+ if (buffers[1].length) SYSCALLS.printChar(1, 10);
+ if (buffers[2].length) SYSCALLS.printChar(2, 10);
+}
+
+var SYSCALLS = {
+ mappings: {},
+ buffers: [ null, [], [] ],
+ printChar: function(stream, curr) {
+  var buffer = SYSCALLS.buffers[stream];
+  assert(buffer);
+  if (curr === 0 || curr === 10) {
+   (stream === 1 ? out : err)(UTF8ArrayToString(buffer, 0));
+   buffer.length = 0;
+  } else {
+   buffer.push(curr);
+  }
+ },
+ varargs: undefined,
+ get: function() {
+  assert(SYSCALLS.varargs != undefined);
+  SYSCALLS.varargs += 4;
+  var ret = SAFE_HEAP_LOAD(SYSCALLS.varargs - 4 | 0, 4, 0) | 0;
+  return ret;
+ },
+ getStr: function(ptr) {
+  var ret = UTF8ToString(ptr);
+  return ret;
+ },
+ get64: function(low, high) {
+  if (low >= 0) assert(high === 0); else assert(high === -1);
+  return low;
+ }
+};
+
+function _fd_write(fd, iov, iovcnt, pnum) {
+ var num = 0;
+ for (var i = 0; i < iovcnt; i++) {
+  var ptr = SAFE_HEAP_LOAD(iov + i * 8 | 0, 4, 0) | 0;
+  var len = SAFE_HEAP_LOAD(iov + (i * 8 + 4) | 0, 4, 0) | 0;
+  for (var j = 0; j < len; j++) {
+   SYSCALLS.printChar(fd, SAFE_HEAP_LOAD(ptr + j, 1, 1));
+  }
+  num += len;
+ }
+ SAFE_HEAP_STORE(pnum | 0, num | 0, 4);
+ return 0;
+}
+
+function _setTempRet0(val) {
+ setTempRet0(val);
+}
+
 var WebGPU = {
  initManagers: function() {
   if (this["mgrDevice"]) return;
@@ -2440,64 +2495,20 @@ var WebGPU = {
  VertexStepMode: [ "vertex", "instance" ]
 };
 
-function _emscripten_webgpu_get_device() {
- assert(Module["preinitializedWebGPUDevice"]);
- return WebGPU["mgrDevice"].create(Module["preinitializedWebGPUDevice"]);
-}
-
-function flush_NO_FILESYSTEM() {
- if (typeof _fflush !== "undefined") _fflush(0);
- var buffers = SYSCALLS.buffers;
- if (buffers[1].length) SYSCALLS.printChar(1, 10);
- if (buffers[2].length) SYSCALLS.printChar(2, 10);
-}
-
-var SYSCALLS = {
- mappings: {},
- buffers: [ null, [], [] ],
- printChar: function(stream, curr) {
-  var buffer = SYSCALLS.buffers[stream];
-  assert(buffer);
-  if (curr === 0 || curr === 10) {
-   (stream === 1 ? out : err)(UTF8ArrayToString(buffer, 0));
-   buffer.length = 0;
-  } else {
-   buffer.push(curr);
-  }
- },
- varargs: undefined,
- get: function() {
-  assert(SYSCALLS.varargs != undefined);
-  SYSCALLS.varargs += 4;
-  var ret = SAFE_HEAP_LOAD(SYSCALLS.varargs - 4 | 0, 4, 0) | 0;
-  return ret;
- },
- getStr: function(ptr) {
-  var ret = UTF8ToString(ptr);
-  return ret;
- },
- get64: function(low, high) {
-  if (low >= 0) assert(high === 0); else assert(high === -1);
-  return low;
+function _wgpuAdapterRequestDevice(adapterId, descriptor, callback, userdata) {
+ var adapter = WebGPU.mgrAdapter.get(adapterId);
+ var desc = {};
+ if (descriptor) {
+  assert(descriptor);
+  assert((SAFE_HEAP_LOAD(descriptor | 0, 4, 0) | 0) === 0);
  }
-};
-
-function _fd_write(fd, iov, iovcnt, pnum) {
- var num = 0;
- for (var i = 0; i < iovcnt; i++) {
-  var ptr = SAFE_HEAP_LOAD(iov + i * 8 | 0, 4, 0) | 0;
-  var len = SAFE_HEAP_LOAD(iov + (i * 8 + 4) | 0, 4, 0) | 0;
-  for (var j = 0; j < len; j++) {
-   SYSCALLS.printChar(fd, SAFE_HEAP_LOAD(ptr + j, 1, 1));
-  }
-  num += len;
- }
- SAFE_HEAP_STORE(pnum | 0, num | 0, 4);
- return 0;
-}
-
-function _setTempRet0(val) {
- setTempRet0(val);
+ adapter["requestDevice"](desc).then(function(device) {
+  var result = WebGPU.mgrDevice.create(device);
+  console.log("requestdevice result:", result);
+  wasmTable.get(callback)(0, result, userdata);
+ }, function() {
+  wasmTable.get(callback)(1, 0, userdata);
+ });
 }
 
 function _wgpuBindGroupLayoutReference(id) {
@@ -3076,6 +3087,10 @@ function _wgpuDeviceGetQueue(deviceId) {
  return queueId;
 }
 
+function _wgpuDeviceReference(id) {
+ WebGPU.mgrDevice.reference(id);
+}
+
 function _wgpuDeviceRelease(id) {
  WebGPU.mgrDevice.release(id);
 }
@@ -3134,6 +3149,24 @@ function _wgpuInstanceCreateSurface(instanceId, descriptor) {
 
 function _wgpuInstanceRelease() {
  abort("No WGPUInstance object should exist (TODO).");
+}
+
+function _wgpuInstanceRequestAdapter(instanceId, options, callback, userdata) {
+ assert(instanceId === 0, "WGPUInstance is ignored");
+ var opts = {};
+ if (options) {
+  assert(options);
+  assert((SAFE_HEAP_LOAD(options | 0, 4, 0) | 0) === 0);
+ }
+ navigator["gpu"]["requestAdapter"](opts).then(function(adapter) {
+  if (adapter) {
+   wasmTable.get(callback)(0, WebGPU.mgrAdapter.create(adapter), userdata);
+  } else {
+   wasmTable.get(callback)(1, 0, userdata);
+  }
+ }, function() {
+  wasmTable.get(callback)(2, 0, userdata);
+ });
 }
 
 function _wgpuPipelineLayoutRelease(id) {
@@ -3306,10 +3339,10 @@ var asmLibraryArg = {
  "emscripten_memcpy_big": _emscripten_memcpy_big,
  "emscripten_resize_heap": _emscripten_resize_heap,
  "emscripten_set_main_loop": _emscripten_set_main_loop,
- "emscripten_webgpu_get_device": _emscripten_webgpu_get_device,
  "fd_write": _fd_write,
  "segfault": segfault,
  "setTempRet0": _setTempRet0,
+ "wgpuAdapterRequestDevice": _wgpuAdapterRequestDevice,
  "wgpuBindGroupLayoutReference": _wgpuBindGroupLayoutReference,
  "wgpuBindGroupLayoutRelease": _wgpuBindGroupLayoutRelease,
  "wgpuBindGroupRelease": _wgpuBindGroupRelease,
@@ -3335,10 +3368,12 @@ var asmLibraryArg = {
  "wgpuDeviceCreateSwapChain": _wgpuDeviceCreateSwapChain,
  "wgpuDeviceCreateTexture": _wgpuDeviceCreateTexture,
  "wgpuDeviceGetQueue": _wgpuDeviceGetQueue,
+ "wgpuDeviceReference": _wgpuDeviceReference,
  "wgpuDeviceRelease": _wgpuDeviceRelease,
  "wgpuDeviceSetUncapturedErrorCallback": _wgpuDeviceSetUncapturedErrorCallback,
  "wgpuInstanceCreateSurface": _wgpuInstanceCreateSurface,
  "wgpuInstanceRelease": _wgpuInstanceRelease,
+ "wgpuInstanceRequestAdapter": _wgpuInstanceRequestAdapter,
  "wgpuPipelineLayoutRelease": _wgpuPipelineLayoutRelease,
  "wgpuQuerySetRelease": _wgpuQuerySetRelease,
  "wgpuQueueRelease": _wgpuQueueRelease,

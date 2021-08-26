@@ -29,16 +29,26 @@
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgpu.h>
 
-wgpu::Device CreateCppWGPUDevice() {
-    return wgpu::Device::Acquire(emscripten_webgpu_get_device());
+void GetDevice(void (*callback)(wgpu::Device)) {
+    // Left as null (until supported in Emscripten)
+    static const WGPUInstance instance = nullptr;
+
+    wgpuInstanceRequestAdapter(instance, nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter adapter, void* userdata) {
+        assert(status == WGPURequestAdapterStatus_Success);
+        wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, void* userdata) {
+            assert(status == WGPURequestDeviceStatus_Success);
+            wgpu::Device device = wgpu::Device::Acquire(dev);
+            reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
+        }, userdata);
+    }, reinterpret_cast<void*>(callback));
 }
-#else
+#else  // __EMSCRIPTEN__
 #include <dawn/dawn_proc.h>
 #include <dawn_native/DawnNative.h>
 
 static std::unique_ptr<dawn_native::Instance> instance;
 
-wgpu::Device CreateCppWGPUDevice() {
+void GetDevice(void (*callback)(wgpu::Device)) {
     instance = std::make_unique<dawn_native::Instance>();
     instance->DiscoverDefaultAdapters();
 
@@ -50,9 +60,9 @@ wgpu::Device CreateCppWGPUDevice() {
     DawnProcTable procs = dawn_native::GetProcs();
 
     dawnProcSetProcs(&procs);
-    return device;
+    callback(device);
 }
-#endif
+#endif  // __EMSCRIPTEN__
 
 static const char shaderCode[] = R"(
     [[stage(vertex)]]
@@ -75,13 +85,10 @@ static wgpu::RenderPipeline pipeline;
 static int testsCompleted = 0;
 
 void init() {
-    {
-        device = CreateCppWGPUDevice();
-        device.SetUncapturedErrorCallback(
-            [](WGPUErrorType errorType, const char* message, void*) {
-                printf("%d: %s\n", errorType, message);
-            }, nullptr);
-    }
+    device.SetUncapturedErrorCallback(
+        [](WGPUErrorType errorType, const char* message, void*) {
+            printf("%d: %s\n", errorType, message);
+        }, nullptr);
 
     queue = device.GetQueue();
 
@@ -336,7 +343,7 @@ void frame() {
 }
 #endif
 
-int main() {
+void run() {
     init();
 
     static constexpr int kNumTests = 5;
@@ -370,4 +377,11 @@ int main() {
         device.Tick();
     }
 #endif
+}
+
+int main() {
+    GetDevice([](wgpu::Device dev) {
+        device = dev;
+        run();
+    });
 }

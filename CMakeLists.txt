@@ -17,6 +17,8 @@ add_executable(hello
     )
 
 if(EMSCRIPTEN)
+    set_target_properties(hello PROPERTIES
+        SUFFIX ".html")
     target_link_options(hello
         PRIVATE "SHELL:-gsource-map"
         PRIVATE "SHELL:--source-map-base https://kai.graphics/webgpu-cross-platform-demo/out/web/"
