@@ -2349,7 +2349,7 @@ var WebGPU = {
      return id;
     },
     get: function(id) {
-     if (id === 0) return undefined;
+     if (!id) return undefined;
      var o = this.objects[id];
      assert(typeof o !== "undefined");
      return o.object;
@@ -2445,7 +2445,7 @@ var WebGPU = {
   return bufferCopyView;
  },
  makeProgrammableStageDescriptor: function(ptr) {
-  if (ptr === 0) return undefined;
+  if (!ptr) return undefined;
   assert(ptr);
   assert((SAFE_HEAP_LOAD(ptr | 0, 4, 0) | 0) === 0);
   return {
@@ -2474,7 +2474,6 @@ var WebGPU = {
  FilterMode: [ "nearest", "linear" ],
  FrontFace: [ "ccw", "cw" ],
  IndexFormat: [ , "uint16", "uint32" ],
- LoadOp: [ "clear", "load" ],
  PipelineStatisticName: [ "vertex-shader-invocations", "clipper-invocations", "clipper-primitives-out", "fragment-shader-invocations", "compute-shader-invocations" ],
  PrimitiveTopology: [ "point-list", "line-list", "line-strip", "triangle-list", "triangle-strip" ],
  QueryType: [ "occlusion", "pipeline-statistics", "timestamp" ],
@@ -2607,10 +2606,9 @@ function _wgpuCommandBufferRelease(id) {
 function _wgpuCommandEncoderBeginRenderPass(encoderId, descriptor) {
  assert(descriptor);
  function makeColorAttachment(caPtr) {
-  var loadValue = WebGPU.LoadOp[SAFE_HEAP_LOAD(caPtr + 8 | 0, 4, 1) >>> 0];
-  if (loadValue === "clear") {
-   loadValue = WebGPU.makeColor(caPtr + 16);
-  }
+  var loadOpInt = SAFE_HEAP_LOAD(caPtr + 8 | 0, 4, 1) >>> 0;
+  assert(loadOpInt === 0 || loadOpInt === 1);
+  var loadValue = loadOpInt ? "load" : WebGPU.makeColor(caPtr + 16);
   return {
    "view": WebGPU.mgrTextureView.get(SAFE_HEAP_LOAD(caPtr | 0, 4, 1) >>> 0),
    "resolveTarget": WebGPU.mgrTextureView.get(SAFE_HEAP_LOAD(caPtr + 4 | 0, 4, 1) >>> 0),
@@ -2627,14 +2625,12 @@ function _wgpuCommandEncoderBeginRenderPass(encoderId, descriptor) {
  }
  function makeDepthStencilAttachment(dsaPtr) {
   if (dsaPtr === 0) return undefined;
-  var depthLoadValue = WebGPU.LoadOp[SAFE_HEAP_LOAD(dsaPtr + 4 | 0, 4, 1) >>> 0];
-  if (depthLoadValue === "clear") {
-   depthLoadValue = Math.fround(SAFE_HEAP_LOAD_D(dsaPtr + 12 | 0, 4, 0));
-  }
-  var stencilLoadValue = WebGPU.LoadOp[SAFE_HEAP_LOAD(dsaPtr + 20 | 0, 4, 1) >>> 0];
-  if (stencilLoadValue === "clear") {
-   stencilLoadValue = SAFE_HEAP_LOAD(dsaPtr + 28 | 0, 4, 1) >>> 0;
-  }
+  var depthLoadOpInt = SAFE_HEAP_LOAD(dsaPtr + 4 | 0, 4, 1) >>> 0;
+  assert(depthLoadOpInt === 0 || depthLoadOpInt === 1);
+  var depthLoadValue = depthLoadOpInt ? "load" : Math.fround(SAFE_HEAP_LOAD_D(dsaPtr + 12 | 0, 4, 0));
+  var stencilLoadOpInt = SAFE_HEAP_LOAD(dsaPtr + 20 | 0, 4, 1) >>> 0;
+  assert(stencilLoadOpInt === 0 || stencilLoadOpInt === 1);
+  var stencilLoadValue = stencilLoadOpInt ? "load" : SAFE_HEAP_LOAD(dsaPtr + 28 | 0, 4, 1) >>> 0;
   return {
    "view": WebGPU.mgrTextureView.get(SAFE_HEAP_LOAD(dsaPtr | 0, 4, 1) >>> 0),
    "depthStoreOp": WebGPU.StoreOp[SAFE_HEAP_LOAD(dsaPtr + 8 | 0, 4, 1) >>> 0],
@@ -2694,9 +2690,9 @@ function _wgpuDeviceCreateBindGroup(deviceId, descriptor) {
   var bufferId = SAFE_HEAP_LOAD(entryPtr + 8 | 0, 4, 1) >>> 0;
   var samplerId = SAFE_HEAP_LOAD(entryPtr + 32 | 0, 4, 1) >>> 0;
   var textureViewId = SAFE_HEAP_LOAD(entryPtr + 36 | 0, 4, 1) >>> 0;
-  assert((bufferId != 0) + (samplerId != 0) + (textureViewId != 0) == 1);
+  assert((bufferId !== 0) + (samplerId !== 0) + (textureViewId !== 0) === 1);
   var binding = SAFE_HEAP_LOAD(entryPtr + 4 | 0, 4, 1) >>> 0;
-  if (bufferId != 0) {
+  if (bufferId) {
    var size = undefined;
    var sizePart1 = SAFE_HEAP_LOAD(entryPtr + 24 | 0, 4, 1) >>> 0;
    var sizePart2 = SAFE_HEAP_LOAD(entryPtr + 28 | 0, 4, 1) >>> 0;
@@ -2711,7 +2707,7 @@ function _wgpuDeviceCreateBindGroup(deviceId, descriptor) {
      "size": size
     }
    };
-  } else if (samplerId != 0) {
+  } else if (samplerId) {
    return {
     "binding": binding,
     "resource": WebGPU.mgrSampler.get(samplerId)
@@ -2747,7 +2743,7 @@ function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  function makeBufferEntry(entryPtr) {
   assert(entryPtr);
   var typeInt = SAFE_HEAP_LOAD(entryPtr + 4 | 0, 4, 1) >>> 0;
-  if (typeInt === 0) return undefined;
+  if (!typeInt) return undefined;
   return {
    "type": WebGPU.BufferBindingType[typeInt],
    "hasDynamicOffset": (SAFE_HEAP_LOAD(entryPtr + 8 | 0, 1, 0) | 0) !== 0,
@@ -2757,7 +2753,7 @@ function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  function makeSamplerEntry(entryPtr) {
   assert(entryPtr);
   var typeInt = SAFE_HEAP_LOAD(entryPtr + 4 | 0, 4, 1) >>> 0;
-  if (typeInt === 0) return undefined;
+  if (!typeInt) return undefined;
   return {
    "type": WebGPU.SamplerBindingType[typeInt]
   };
@@ -2765,7 +2761,7 @@ function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  function makeTextureEntry(entryPtr) {
   assert(entryPtr);
   var sampleTypeInt = SAFE_HEAP_LOAD(entryPtr + 4 | 0, 4, 1) >>> 0;
-  if (sampleTypeInt === 0) return undefined;
+  if (!sampleTypeInt) return undefined;
   return {
    "sampleType": WebGPU.TextureSampleType[sampleTypeInt],
    "viewDimension": WebGPU.TextureViewDimension[SAFE_HEAP_LOAD(entryPtr + 8 | 0, 4, 1) >>> 0],
@@ -2775,7 +2771,7 @@ function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  function makeStorageTextureEntry(entryPtr) {
   assert(entryPtr);
   var accessInt = SAFE_HEAP_LOAD(entryPtr + 4 | 0, 4, 1) >>> 0;
-  if (accessInt === 0) return undefined;
+  if (!accessInt) return undefined;
   return {
    "access": WebGPU.StorageTextureAccess[accessInt],
    "format": WebGPU.TextureFormat[SAFE_HEAP_LOAD(entryPtr + 8 | 0, 4, 1) >>> 0],
@@ -2870,7 +2866,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
  assert(descriptor);
  assert((SAFE_HEAP_LOAD(descriptor | 0, 4, 0) | 0) === 0);
  function makePrimitiveState(rsPtr) {
-  if (rsPtr === 0) return undefined;
+  if (!rsPtr) return undefined;
   assert(rsPtr);
   assert((SAFE_HEAP_LOAD(rsPtr | 0, 4, 0) | 0) === 0);
   return {
@@ -2881,7 +2877,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeBlendComponent(bdPtr) {
-  if (bdPtr === 0) return undefined;
+  if (!bdPtr) return undefined;
   return {
    "operation": WebGPU.BlendOperation[SAFE_HEAP_LOAD(bdPtr | 0, 4, 1) >>> 0],
    "srcFactor": WebGPU.BlendFactor[SAFE_HEAP_LOAD(bdPtr + 4 | 0, 4, 1) >>> 0],
@@ -2889,7 +2885,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeBlendState(bsPtr) {
-  if (bsPtr === 0) return undefined;
+  if (!bsPtr) return undefined;
   assert(bsPtr);
   assert((SAFE_HEAP_LOAD(bsPtr | 0, 4, 0) | 0) === 0);
   return {
@@ -2923,7 +2919,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeDepthStencilState(dssPtr) {
-  if (dssPtr === 0) return undefined;
+  if (!dssPtr) return undefined;
   assert(dssPtr);
   return {
    "format": WebGPU.TextureFormat[SAFE_HEAP_LOAD(dssPtr + 4 | 0, 4, 1) >>> 0],
@@ -2954,15 +2950,15 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   return vas;
  }
  function makeVertexBuffer(vbPtr) {
-  if (vbPtr === 0) return undefined;
+  if (!vbPtr) return undefined;
   return {
    "arrayStride": (SAFE_HEAP_LOAD(vbPtr + 4 | 0, 4, 1) >>> 0) * 4294967296 + (SAFE_HEAP_LOAD(vbPtr | 0, 4, 1) >>> 0),
-   "stepMode": WebGPU.InputStepMode[SAFE_HEAP_LOAD(vbPtr + 8 | 0, 4, 1) >>> 0],
+   "stepMode": WebGPU.VertexStepMode[SAFE_HEAP_LOAD(vbPtr + 8 | 0, 4, 1) >>> 0],
    "attributes": makeVertexAttributes(SAFE_HEAP_LOAD(vbPtr + 12 | 0, 4, 1) >>> 0, SAFE_HEAP_LOAD(vbPtr + 16 | 0, 4, 0) | 0)
   };
  }
  function makeVertexBuffers(count, vbArrayPtr) {
-  if (count === 0) return undefined;
+  if (!count) return undefined;
   var vbs = [];
   for (var i = 0; i < count; ++i) {
    vbs.push(makeVertexBuffer(vbArrayPtr + i * 24));
@@ -2970,7 +2966,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   return vbs;
  }
  function makeVertexState(viPtr) {
-  if (viPtr === 0) return undefined;
+  if (!viPtr) return undefined;
   assert(viPtr);
   assert((SAFE_HEAP_LOAD(viPtr | 0, 4, 0) | 0) === 0);
   return {
@@ -2980,7 +2976,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeMultisampleState(msPtr) {
-  if (msPtr === 0) return undefined;
+  if (!msPtr) return undefined;
   assert(msPtr);
   assert((SAFE_HEAP_LOAD(msPtr | 0, 4, 0) | 0) === 0);
   return {
@@ -2990,7 +2986,7 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
   };
  }
  function makeFragmentState(fsPtr) {
-  if (fsPtr === 0) return undefined;
+  if (!fsPtr) return undefined;
   assert(fsPtr);
   assert((SAFE_HEAP_LOAD(fsPtr | 0, 4, 0) | 0) === 0);
   return {
@@ -3019,22 +3015,32 @@ function _wgpuDeviceCreateShaderModule(deviceId, descriptor) {
  var nextInChainPtr = SAFE_HEAP_LOAD(descriptor | 0, 4, 0) | 0;
  assert(nextInChainPtr !== 0);
  var sType = SAFE_HEAP_LOAD(nextInChainPtr + 4 | 0, 4, 1) >>> 0;
- assert(sType === 5 || sType === 6);
  var desc = {
   "label": undefined,
   "code": ""
  };
  var labelPtr = SAFE_HEAP_LOAD(descriptor + 4 | 0, 4, 0) | 0;
  if (labelPtr) desc["label"] = UTF8ToString(labelPtr);
- if (sType === 5) {
-  var count = SAFE_HEAP_LOAD(nextInChainPtr + 8 | 0, 4, 1) >>> 0;
-  var start = SAFE_HEAP_LOAD(nextInChainPtr + 12 | 0, 4, 0) | 0;
-  desc["code"] = HEAPU32.subarray(start >> 2, (start >> 2) + count);
- } else if (sType === 6) {
-  var sourcePtr = SAFE_HEAP_LOAD(nextInChainPtr + 8 | 0, 4, 0) | 0;
-  if (sourcePtr) {
-   desc["code"] = UTF8ToString(sourcePtr);
+ switch (sType) {
+ case 5:
+  {
+   var count = SAFE_HEAP_LOAD(nextInChainPtr + 8 | 0, 4, 1) >>> 0;
+   var start = SAFE_HEAP_LOAD(nextInChainPtr + 12 | 0, 4, 0) | 0;
+   desc["code"] = HEAPU32.subarray(start >> 2, (start >> 2) + count);
+   break;
   }
+
+ case 6:
+  {
+   var sourcePtr = SAFE_HEAP_LOAD(nextInChainPtr + 8 | 0, 4, 0) | 0;
+   if (sourcePtr) {
+    desc["code"] = UTF8ToString(sourcePtr);
+   }
+   break;
+  }
+
+ default:
+  abort("unrecognized ShaderModule sType");
  }
  var device = WebGPU["mgrDevice"].get(deviceId);
  return WebGPU.mgrShaderModule.create(device["createShaderModule"](desc));
@@ -3076,13 +3082,13 @@ function _wgpuDeviceCreateTexture(deviceId, descriptor) {
 
 function _wgpuDeviceGetQueue(deviceId) {
  var queueId = WebGPU.deviceQueues[deviceId];
- assert(queueId != 0, "got invalid queue");
- if (queueId === undefined) {
+ assert(queueId !== 0, "got invalid queue");
+ if (queueId) {
+  WebGPU.mgrQueue.reference(queueId);
+ } else {
   var device = WebGPU["mgrDevice"].get(deviceId);
   WebGPU.deviceQueues[deviceId] = WebGPU.mgrQueue.create(device["queue"]);
   queueId = WebGPU.deviceQueues[deviceId];
- } else {
-  WebGPU.mgrQueue.reference(queueId);
  }
  return queueId;
 }
