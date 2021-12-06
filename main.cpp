@@ -33,9 +33,9 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     // Left as null (until supported in Emscripten)
     static const WGPUInstance instance = nullptr;
 
-    wgpuInstanceRequestAdapter(instance, nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter adapter, void* userdata) {
+    wgpuInstanceRequestAdapter(instance, nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata) {
         assert(status == WGPURequestAdapterStatus_Success);
-        wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, void* userdata) {
+        wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata) {
             assert(status == WGPURequestDeviceStatus_Success);
             wgpu::Device device = wgpu::Device::Acquire(dev);
             reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
