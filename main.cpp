@@ -34,9 +34,22 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     static const WGPUInstance instance = nullptr;
 
     wgpuInstanceRequestAdapter(instance, nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata) {
+        if (message) {
+            printf("wgpuInstanceRequestAdapter: %s\n", message);
+        }
+        if (status == WGPURequestAdapterStatus_Unavailable) {
+            printf("WebGPU unavailable; exiting cleanly\n");
+            // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
+            exit(0);
+        }
         assert(status == WGPURequestAdapterStatus_Success);
+
         wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata) {
+            if (message) {
+                printf("wgpuAdapterRequestDevice: %s\n", message);
+            }
             assert(status == WGPURequestDeviceStatus_Success);
+
             wgpu::Device device = wgpu::Device::Acquire(dev);
             reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
         }, userdata);
@@ -65,15 +78,14 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 #endif  // __EMSCRIPTEN__
 
 static const char shaderCode[] = R"(
-    [[stage(vertex)]]
-    fn main_v([[builtin(vertex_index)]] idx: u32) -> [[builtin(position)]] vec4<f32> {
+    @stage(vertex)
+    fn main_v(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4<f32> {
         var pos = array<vec2<f32>, 3>(
             vec2<f32>(0.0, 0.5), vec2<f32>(-0.5, -0.5), vec2<f32>(0.5, -0.5));
         return vec4<f32>(pos[idx], 0.0, 1.0);
     }
-
-    [[stage(fragment)]]
-    fn main_f() -> [[location(0)]] vec4<f32> {
+    @stage(fragment)
+    fn main_f() -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.502, 1.0, 1.0); // 0x80/0xff ~= 0.502
     }
 )";
@@ -126,26 +138,41 @@ void init() {
         fragmentState.targetCount = 1;
         fragmentState.targets = &colorTargetState;
 
+        wgpu::DepthStencilState depthStencilState{};
+        depthStencilState.format = wgpu::TextureFormat::Depth32Float;
+
         wgpu::RenderPipelineDescriptor descriptor{};
         descriptor.layout = device.CreatePipelineLayout(&pl);
         descriptor.vertex.module = shaderModule;
         descriptor.vertex.entryPoint = "main_v";
         descriptor.fragment = &fragmentState;
         descriptor.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
+        descriptor.depthStencil = &depthStencilState;
         pipeline = device.CreateRenderPipeline(&descriptor);
     }
 }
 
-void render(wgpu::TextureView view) {
+// The depth stencil attachment isn't really needed to draw the triangle
+// and doesn't really affect the render result.
+// But having one should give us a slightly better test coverage for the compile of the depth stencil descriptor.
+void render(wgpu::TextureView view, wgpu::TextureView depthStencilView) {
     wgpu::RenderPassColorAttachment attachment{};
     attachment.view = view;
     attachment.loadOp = wgpu::LoadOp::Clear;
     attachment.storeOp = wgpu::StoreOp::Store;
-    attachment.clearColor = {0, 0, 0, 1};
+    attachment.clearValue = {0, 0, 0, 1};
 
     wgpu::RenderPassDescriptor renderpass{};
     renderpass.colorAttachmentCount = 1;
     renderpass.colorAttachments = &attachment;
+
+    wgpu::RenderPassDepthStencilAttachment depthStencilAttachment = {};
+    depthStencilAttachment.view = depthStencilView;
+    depthStencilAttachment.depthClearValue = 0;
+    depthStencilAttachment.depthLoadOp = wgpu::LoadOp::Clear;
+    depthStencilAttachment.depthStoreOp = wgpu::StoreOp::Store;
+
+    renderpass.depthStencilAttachment = &depthStencilAttachment;
 
     wgpu::CommandBuffer commands;
     {
@@ -153,8 +180,8 @@ void render(wgpu::TextureView view) {
         {
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
             pass.SetPipeline(pipeline);
-            pass.Draw(3, 1, 0, 0);
-            pass.EndPass();
+            pass.Draw(3);
+            pass.End();
         }
         commands = encoder.Finish();
     }
@@ -304,7 +331,15 @@ void doRenderTest() {
         descriptor.format = wgpu::TextureFormat::BGRA8Unorm;
         readbackTexture = device.CreateTexture(&descriptor);
     }
-    render(readbackTexture.CreateView());
+    wgpu::Texture depthTexture;
+    {
+        wgpu::TextureDescriptor descriptor{};
+        descriptor.usage = wgpu::TextureUsage::RenderAttachment;
+        descriptor.size = {1, 1, 1};
+        descriptor.format = wgpu::TextureFormat::Depth32Float;
+        depthTexture = device.CreateTexture(&descriptor);
+    }
+    render(readbackTexture.CreateView(), depthTexture.CreateView());
 
     {
         wgpu::BufferDescriptor descriptor{};
@@ -334,26 +369,33 @@ void doRenderTest() {
     issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
-#ifdef __EMSCRIPTEN__
 wgpu::SwapChain swapChain;
+wgpu::TextureView canvasDepthStencilView;
+const uint32_t kWidth = 300;
+const uint32_t kHeight = 150;
 
 void frame() {
     wgpu::TextureView backbuffer = swapChain.GetCurrentTextureView();
-    render(backbuffer);
+    render(backbuffer, canvasDepthStencilView);
+
+    // TODO: Read back from the canvas with drawImage() (or something) and
+    // check the result.
+
+    emscripten_cancel_main_loop();
+
+    // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
+    exit(0);
 }
-#endif
 
 void run() {
     init();
 
-    static constexpr int kNumTests = 5;
     doCopyTestMappedAtCreation(false);
     doCopyTestMappedAtCreation(true);
     doCopyTestMapAsync(false);
     doCopyTestMapAsync(true);
     doRenderTest();
 
-#ifdef __EMSCRIPTEN__
     {
         wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
         canvasDesc.selector = "#canvas";
@@ -366,17 +408,20 @@ void run() {
         wgpu::SwapChainDescriptor scDesc{};
         scDesc.usage = wgpu::TextureUsage::RenderAttachment;
         scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
-        scDesc.width = 200;
-        scDesc.height = 300;
+        scDesc.width = kWidth;
+        scDesc.height = kHeight;
         scDesc.presentMode = wgpu::PresentMode::Fifo;
         swapChain = device.CreateSwapChain(surface, &scDesc);
+
+        {
+            wgpu::TextureDescriptor descriptor{};
+            descriptor.usage = wgpu::TextureUsage::RenderAttachment;
+            descriptor.size = {kWidth, kHeight, 1};
+            descriptor.format = wgpu::TextureFormat::Depth32Float;
+            canvasDepthStencilView = device.CreateTexture(&descriptor).CreateView();
+        }
     }
     emscripten_set_main_loop(frame, 0, false);
-#else
-    while (testsCompleted < kNumTests) {
-        device.Tick();
-    }
-#endif
 }
 
 int main() {
@@ -384,4 +429,13 @@ int main() {
         device = dev;
         run();
     });
+
+    // The test result will be reported when the main_loop completes.
+    // emscripten_exit_with_live_runtime isn't needed because the WebGPU
+    // callbacks should all automatically keep the runtime alive until
+    // emscripten_set_main_loop, and that should keep it alive until
+    // emscripten_cancel_main_loop.
+    //
+    // This code is returned when the runtime exits unless something else sets it, like exit(0).
+    return 99;
 }
