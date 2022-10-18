@@ -57,20 +57,19 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 }
 #else  // __EMSCRIPTEN__
 #include <dawn/dawn_proc.h>
-#include <dawn_native/DawnNative.h>
+#include <dawn/native/DawnNative.h>
 
-static std::unique_ptr<dawn_native::Instance> instance;
+static std::unique_ptr<dawn::native::Instance> instance;
 
 void GetDevice(void (*callback)(wgpu::Device)) {
-    instance = std::make_unique<dawn_native::Instance>();
+    instance = std::make_unique<dawn::native::Instance>();
     instance->DiscoverDefaultAdapters();
 
     // Get an adapter for the backend to use, and create the device.
-    dawn_native::Adapter backendAdapter = instance->GetAdapters()[0];
-    assert(backendAdapter.GetBackendType() == dawn_native::BackendType::Metal);
+    dawn::native::Adapter backendAdapter = instance->GetAdapters()[0];
 
     wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
-    DawnProcTable procs = dawn_native::GetProcs();
+    DawnProcTable procs = dawn::native::GetProcs();
 
     dawnProcSetProcs(&procs);
     callback(device);
@@ -381,21 +380,26 @@ void frame() {
     // TODO: Read back from the canvas with drawImage() (or something) and
     // check the result.
 
+#ifdef __EMSCRIPTEN__
     emscripten_cancel_main_loop();
 
     // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
     exit(0);
+#endif
+
 }
 
 void run() {
     init();
 
+    static constexpr int kNumTests = 5;
     doCopyTestMappedAtCreation(false);
     doCopyTestMappedAtCreation(true);
     doCopyTestMapAsync(false);
     doCopyTestMapAsync(true);
     doRenderTest();
 
+#ifdef __EMSCRIPTEN__
     {
         wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
         canvasDesc.selector = "#canvas";
@@ -422,6 +426,11 @@ void run() {
         }
     }
     emscripten_set_main_loop(frame, 0, false);
+#else
+    while (testsCompleted < kNumTests) {
+        device.Tick();
+    }
+#endif
 }
 
 int main() {

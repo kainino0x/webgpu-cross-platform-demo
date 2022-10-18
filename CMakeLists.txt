@@ -35,4 +35,6 @@ else()
         dawn_native
         dawn_proc
         )
+    target_link_options(hello
+        PRIVATE "LINKER:--copy-dt-needed-entries")
 endif()
