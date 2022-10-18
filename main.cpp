@@ -19,6 +19,8 @@
 #endif
 
 #undef NDEBUG
+
+#include <algorithm>
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -61,13 +63,98 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 
 static std::unique_ptr<dawn::native::Instance> instance;
 
+// Return backend select priority, smaller number means higher priority.
+int GetBackendPriority(wgpu::BackendType t) {
+  switch (t) {
+    case wgpu::BackendType::Null:
+      return 9999;
+    case wgpu::BackendType::D3D12:
+    case wgpu::BackendType::Metal:
+    case wgpu::BackendType::Vulkan:
+      return 0;
+    case wgpu::BackendType::WebGPU:
+      return 5;
+    case wgpu::BackendType::D3D11:
+    case wgpu::BackendType::OpenGLES:
+      return 10;
+  }
+  return 100;
+}
+
+const char* BackendTypeName(wgpu::BackendType t)
+{
+  switch (t) {
+    case wgpu::BackendType::Null:
+      return "Null";
+    case wgpu::BackendType::WebGPU:
+      return "WebGPU";
+    case wgpu::BackendType::D3D11:
+      return "D3D11";
+    case wgpu::BackendType::D3D12:
+      return "D3D12";
+    case wgpu::BackendType::Metal:
+      return "Metal";
+    case wgpu::BackendType::Vulkan:
+      return "Vulkan";
+    case wgpu::BackendType::OpenGL:
+      return "OpenGL";
+    case wgpu::BackendType::OpenGLES:
+      return "OpenGL ES";
+  }
+  return "?";
+}
+
+const char* AdapterTypeName(wgpu::AdapterType t)
+{
+  switch (t) {
+    case wgpu::AdapterType::DiscreteGPU:
+      return "Discrete GPU";
+    case wgpu::AdapterType::IntegratedGPU:
+      return "Integrated GPU";
+    case wgpu::AdapterType::CPU:
+      return "CPU";
+    case wgpu::AdapterType::Unknown:
+      return "Unknown";
+  }
+  return "?";
+}
+
 void GetDevice(void (*callback)(wgpu::Device)) {
     instance = std::make_unique<dawn::native::Instance>();
     instance->DiscoverDefaultAdapters();
 
-    // Get an adapter for the backend to use, and create the device.
-    dawn::native::Adapter backendAdapter = instance->GetAdapters()[0];
+    auto adapters = instance->GetAdapters();
 
+    // Sort adapters by adapterType, 
+    std::sort(adapters.begin(), adapters.end(), [](const dawn::native::Adapter& a, const dawn::native::Adapter& b){
+        wgpu::AdapterProperties pa, pb;
+        a.GetProperties(&pa);
+        b.GetProperties(&pb);
+        
+        if (pa.adapterType != pb.adapterType) {
+            // Put GPU adapter (D3D, Vulkan, Metal) at front and CPU adapter at back.
+            return pa.adapterType < pb.adapterType;
+        }
+
+        return GetBackendPriority(pa.backendType) < GetBackendPriority(pb.backendType);
+    });
+    // Simply pick the first adapter in the sorted list.
+    dawn::native::Adapter backendAdapter = adapters[0];
+
+    printf("Available adapters sorted by their Adapter type, with GPU adapters listed at front and preferred:\n\n");
+    printf(" [Selected] -> ");
+    for (auto&& a : adapters) {
+        wgpu::AdapterProperties p;
+        a.GetProperties(&p);
+        printf(
+            "* %s (%s)\n"
+            "    deviceID=%u, vendorID=0x%x, BackendType::%s, AdapterType::%s\n",
+        p.name, p.driverDescription, p.deviceID, p.vendorID,
+        BackendTypeName(p.backendType), AdapterTypeName(p.adapterType));
+    }
+    printf("\n\n");
+
+    
     wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
     DawnProcTable procs = dawn::native::GetProcs();
 
@@ -213,10 +300,10 @@ void issueContentsCheck(const char* functionName,
                     ptr, ptr ? "" : " <------- FAILED");
             assert(ptr != nullptr);
             uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
-            userdata->readbackBuffer.Unmap();
             printf("  got %08x, expected %08x%s\n",
                 readback, userdata->expectData,
                 readback == userdata->expectData ? "" : " <------- FAILED");
+            userdata->readbackBuffer.Unmap();
 
             testsCompleted++;
         }, userdata);
@@ -439,6 +526,7 @@ int main() {
         run();
     });
 
+#ifdef __EMSCRIPTEN__
     // The test result will be reported when the main_loop completes.
     // emscripten_exit_with_live_runtime isn't needed because the WebGPU
     // callbacks should all automatically keep the runtime alive until
@@ -447,4 +535,7 @@ int main() {
     //
     // This code is returned when the runtime exits unless something else sets it, like exit(0).
     return 99;
+#else
+    return 0;
+#endif
 }
