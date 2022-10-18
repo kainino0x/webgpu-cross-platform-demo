@@ -29,6 +29,8 @@ if(EMSCRIPTEN)
         #PRIVATE "SHELL:-s VERBOSE=1"
         )
 else()
+    add_compile_definitions(DAWN_ENABLE_DESKTOP_GL=OFF)
+    add_compile_definitions(DAWN_ENABLE_OPENGLES=OFF)
     target_link_libraries(hello
         dawn_headers
         dawncpp
