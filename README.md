@@ -21,18 +21,34 @@ Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
 Build has only been tested on Linux/Mac.
 
+If you run into issues building the OpenGL or OpenGL ES backend, add these options to your `cmake`
+invocation: `-DDAWN_ENABLE_DESKTOP_GL=OFF -DDAWN_ENABLE_OPENGLES=OFF`
+
 ```sh
 ./setup_native_build.sh
 mkdir -p out/native
 cd out/native
+```
+
+Then:
+
+```sh
 cmake ../..
-make clean all
+make -j4 clean all
+```
+
+Or, to use Ninja instead of Make:
+
+```sh
+cmake -GNinja ../..
+ninja
 ```
 
 ### Web build
 
 This has been mainly tested with Chrome Canary on Mac, but should work on
-Chrome/Edge/Firefox on any platform with support.
+Chrome/Edge/Firefox on any platform with support (modulo compatibility differences due to
+pre-release spec changes).
 Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
 
 **Note:** To build, the active Emscripten version must be at least 2.0.0.
@@ -45,6 +61,20 @@ popd
 
 mkdir -p out/web
 cd out/web
-emcmake cmake ../..
-make clean all
 ```
+
+Then:
+
+```sh
+emcmake cmake ../..
+make -j4 clean all
+```
+
+Or, to use Ninja instead of Make:
+
+```sh
+emcmake cmake -GNinja ../..
+ninja
+```
+
+There are shorthands for these in `package.json` so you can use, for example, `npm run ninja-web`.
