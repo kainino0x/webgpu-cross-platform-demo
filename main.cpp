@@ -75,6 +75,7 @@ int GetBackendPriority(wgpu::BackendType t) {
     case wgpu::BackendType::WebGPU:
       return 5;
     case wgpu::BackendType::D3D11:
+    case wgpu::BackendType::OpenGL:
     case wgpu::BackendType::OpenGLES:
       return 10;
   }
