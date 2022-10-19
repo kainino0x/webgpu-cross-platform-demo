@@ -1,0 +1,9 @@
+{
+  "scripts": {
+    "install-mac": "brew install emscripten",
+    "install-nix": "sudo apt-get install emscripten",
+    "install-win": "choco install emscripten",
+    "build-web": "cd out/web && emcmake cmake ../.. && make clean all",
+    "build-native": "cd out/native && cmake ../.. && make clean all"
+  }
+}
