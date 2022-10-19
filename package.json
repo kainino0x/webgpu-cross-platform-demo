@@ -3,7 +3,9 @@
     "install-mac": "brew install emscripten",
     "install-nix": "sudo apt-get install emscripten",
     "install-win": "choco install emscripten",
-    "build-web": "cd out/web && emcmake cmake ../.. && make clean all",
-    "build-native": "cd out/native && cmake ../.. && make clean all"
+    "build-web":    "mkdir -p out/web    && cd out/web && emcmake cmake         ../.. && make -j8 clean all",
+    "build-native": "mkdir -p out/native && cd out/native &&      cmake         ../.. && make -j8",
+    "ninja-web":    "mkdir -p out/web    && cd out/web && emcmake cmake -GNinja ../.. && ninja",
+    "ninja-native": "mkdir -p out/native && cd out/native &&      cmake -GNinja ../.. && ninja"
   }
 }
