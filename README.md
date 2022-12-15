@@ -21,9 +21,6 @@ Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
 Build has only been tested on Linux/Mac.
 
-If you run into issues building the OpenGL or OpenGL ES backend, add these options to your `cmake`
-invocation: `-DDAWN_ENABLE_DESKTOP_GL=OFF -DDAWN_ENABLE_OPENGLES=OFF`
-
 ```sh
 ./setup_native_build.sh
 mkdir -p out/native
@@ -36,6 +33,20 @@ Then:
 cmake ../..
 make -j4 clean all
 ```
+
+Note: If you want to have window displayed, make sure to have glfw available.
+e.g. to install on Linux/Ubuntu:
+
+```sh
+apt-get install libglfw3-dev
+```
+
+Alternatively, you can disable using glfw and window display by
+
+```sh
+cmake ../.. -DDEMO_USE_GLFW=OFF
+```
+
 
 Or, to use Ninja instead of Make:
 
