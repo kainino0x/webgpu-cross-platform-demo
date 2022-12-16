@@ -18,15 +18,7 @@
 #include <dawn/webgpu_cpp.h>
 
 #ifdef DEMO_USE_GLFW
-
-#if defined(WIN32)
-#define GLFW_EXPOSE_NATIVE_WIN32
-#elif defined(__linux__)
-#define GLFW_EXPOSE_NATIVE_X11
-#endif
 #include "window.h"
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
 #endif
 
 #endif
@@ -101,20 +93,6 @@ static window_t* native_window;
 #define GET_DEFAULT_IF_ZERO(value, default_value)                              \
   (value != NULL) ? value : default_value
 
-struct window {
-  GLFWwindow* handle;
-  struct {
-    WGPUSurface handle;
-    uint32_t width, height;
-    float dpscale;
-  } surface;
-  callbacks_t callbacks;
-  int intialized;
-  /* common data */
-  float mouse_scroll_scale_factor;
-  void* userdata;
-};
-
 static std::unique_ptr<wgpu::ChainedStruct> SurfaceDescriptor(void* display,
                                                               void* window)
 {
@@ -130,18 +108,20 @@ static std::unique_ptr<wgpu::ChainedStruct> SurfaceDescriptor(void* display,
   desc->display = display;
   desc->window  = *((uint32_t*)window);
   return std::move(desc);
+#elif defined(__APPLE__) // Cocoa
+  // Not used
 #endif
 
+  assert(0);
   return nullptr;
 }
 
-WGPUSurface CreateSurface(void* display, void* window)
-// WGPUSurface CreateSurface(dawn::native::Instance* instance, void* display, void* window)
+WGPUSurface CreateSurface(wgpu::Instance instance, void* display, void* window)
 {
   std::unique_ptr<wgpu::ChainedStruct> sd = SurfaceDescriptor(display, window);
   wgpu::SurfaceDescriptor descriptor;
   descriptor.nextInChain = sd.get();
-  surface = wgpu::Instance(instance->Get()).CreateSurface(&descriptor);
+  surface = instance.CreateSurface(&descriptor);
   if (!surface) {
     return nullptr;
   }
@@ -179,8 +159,7 @@ window_t* window_create(window_config_t* config)
     return NULL;
   }
 
-  window_t* window = (window_t*)malloc(sizeof(window_t));
-  memset(window, 0, sizeof(window_t));
+  window_t* window = new window_t{};
   window->mouse_scroll_scale_factor = 1.0f;
 
   /* Initialize error handling */
@@ -196,6 +175,7 @@ window_t* window_create(window_config_t* config)
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_RESIZABLE, config->resizable ? GLFW_TRUE : GLFW_FALSE);
+  glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
 
   /* Create GLFW window */
   window->handle = glfwCreateWindow(config->width, config->height,
@@ -261,19 +241,20 @@ void* window_get_userdata(window_t* window)
   return window->userdata;
 }
 
-void* window_get_surface(window_t* window)
-{
 #if defined(WIN32)
-  void* display         = NULL;
-  uint32_t windowHandle = glfwGetWin32Window(window->handle);
-#elif defined(__linux__) /* X11 */
-  void* display         = glfwGetX11Display();
-  uint32_t windowHandle = glfwGetX11Window(window->handle);
-#endif
-  window->surface.handle = CreateSurface(display, &windowHandle);
-
-  return window->surface.handle;
+wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
+  uint32_t windowHandle  = glfwGetWin32Window(window->handle);
+  return window->surface.handle = CreateSurface(instance, nullptr, &windowHandle);
 }
+#elif defined(__linux__) /* X11 */
+wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
+  void* display          = glfwGetX11Display();
+  uint32_t windowHandle  = glfwGetX11Window(window->handle);
+  return window->surface.handle = CreateSurface(instance, display, &windowHandle);
+}
+#elif defined(__APPLE__) /* Cocoa */
+// Defined in window_macos.m
+#endif
 
 void window_get_size(window_t* window, uint32_t* width, uint32_t* height)
 {
@@ -705,16 +686,14 @@ void frame() {
     // TODO: Read back from the canvas with drawImage() (or something) and
     // check the result.
 
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
     emscripten_cancel_main_loop();
 
     // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
     exit(0);
-#else
-#ifdef DEMO_USE_GLFW
+#elif defined(DEMO_USE_GLFW)
     // Submit frame
     swapChain.Present();
-#endif
 #endif
 
 }
@@ -756,10 +735,9 @@ void run() {
         swapChain = device.CreateSwapChain(surface, &scDesc);
     }
     emscripten_set_main_loop(frame, 0, false);
-#else
-#ifdef DEMO_USE_GLFW
+#elif defined(DEMO_USE_GLFW)
     setup_window();
-    window_get_surface(native_window);
+    surface = window_init_surface(instance->Get(), native_window);
     wgpu_setup_swap_chain();
     while (!window_should_close(native_window)) {
       glfwPollEvents();
@@ -769,7 +747,6 @@ void run() {
     while (testsCompleted < kNumTests) {
       device.Tick();
     }
-#endif
 #endif
 }
 

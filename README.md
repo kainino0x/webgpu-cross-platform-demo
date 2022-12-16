@@ -34,6 +34,13 @@ cmake ../..
 make -j4 clean all
 ```
 
+Or, to use Ninja instead of Make:
+
+```sh
+cmake -GNinja ../..
+ninja
+```
+
 Note: If you want to have window displayed, make sure to have glfw available.
 e.g. to install on Linux/Ubuntu:
 
@@ -41,18 +48,16 @@ e.g. to install on Linux/Ubuntu:
 apt-get install libglfw3-dev
 ```
 
+Or on macOS:
+
+```sh
+brew install glfw
+```
+
 Alternatively, you can disable using glfw and window display by
 
 ```sh
 cmake ../.. -DDEMO_USE_GLFW=OFF
-```
-
-
-Or, to use Ninja instead of Make:
-
-```sh
-cmake -GNinja ../..
-ninja
 ```
 
 ### Web build
