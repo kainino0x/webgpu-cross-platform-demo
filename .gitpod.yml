@@ -1,8 +1,12 @@
 image: emscripten/emsdk
 
 tasks:
-  - name: Emscripten
+  - name: Emscripten Build
     command: |
       cd out/web
       emcmake cmake ../..
       make -j4 clean all
+  - name: Dev-Server
+    command: |
+      cd out/web
+      python3 -m http.server 8080
