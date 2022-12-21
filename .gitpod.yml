@@ -1,0 +1,8 @@
+image: emscripten/emsdk
+
+tasks:
+  - name: Emscripten
+    command: |
+      cd out/web
+      emcmake cmake ../..
+      make -j4 clean all
