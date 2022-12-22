@@ -13,6 +13,9 @@ but that is a goal.
 
 **Check the [issues](https://github.com/kainino0x/webgpu-cross-platform-demo/issues) tab for known issues.**
 
+## Open pre-installed VSCode in Browser
+[![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/kainino0x/webgpu-cross-platform-demo)
+
 ## Building
 
 Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
