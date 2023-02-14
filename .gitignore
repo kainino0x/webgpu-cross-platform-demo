@@ -1,2 +1,4 @@
 /out/
 /third_party/dawn/
+.vscode
+.idea

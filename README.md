@@ -22,7 +22,15 @@ Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
 ### Native build
 
-Build has only been tested on Linux/Mac.
+Clone the repository with submodules:
+
+```sh
+git clone https://github.com/kainino0x/webgpu-cross-platform-demo --recursive
+```
+
+Install `depot_tools` by following [these instructions](http://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up) and make sure `gclient` is available in your terminal
+
+Then run the following script (tested on Linux, Mac, and Windows via GitBash)
 
 ```sh
 ./setup_native_build.sh

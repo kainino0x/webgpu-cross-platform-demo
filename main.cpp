@@ -116,7 +116,7 @@ static std::unique_ptr<wgpu::ChainedStruct> SurfaceDescriptor(void* display,
   return nullptr;
 }
 
-WGPUSurface CreateSurface(wgpu::Instance instance, void* display, void* window)
+wgpu::Surface CreateSurface(wgpu::Instance instance, void* display, void* window)
 {
   std::unique_ptr<wgpu::ChainedStruct> sd = SurfaceDescriptor(display, window);
   wgpu::SurfaceDescriptor descriptor;
@@ -125,9 +125,7 @@ WGPUSurface CreateSurface(wgpu::Instance instance, void* display, void* window)
   if (!surface) {
     return nullptr;
   }
-  WGPUSurface surf = surface.Get();
-  wgpuSurfaceReference(surf);
-  return surf;
+  return wgpu::Surface::Acquire(surface.Get());
 }
 
 /* Function prototypes */
@@ -243,8 +241,7 @@ void* window_get_userdata(window_t* window)
 
 #if defined(WIN32)
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
-  uint32_t windowHandle  = glfwGetWin32Window(window->handle);
-  return window->surface.handle = CreateSurface(instance, nullptr, &windowHandle);
+  return window->surface.handle = CreateSurface(instance, nullptr, glfwGetWin32Window(window->handle));
 }
 #elif defined(__linux__) /* X11 */
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
