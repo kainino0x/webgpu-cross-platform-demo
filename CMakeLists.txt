@@ -19,10 +19,12 @@ if(NOT EMSCRIPTEN)
     endif()
 
     if (DEMO_USE_GLFW)
-        message("Demo use glfw for native window platform is turned on. If glfw is not found try `apt-get install libglfw3-dev`")
+        message("Demo use glfw for native window platform is turned on. If glfw is not found try `apt-get install libglfw3-dev` or `brew install glfw`")
         find_package(glfw3 REQUIRED)
-        set(DAWN_USE_X11 ON CACHE BOOL "Dawn use X11")
         set(DAWN_GLFW_DIR "third_party/glfw3" CACHE BOOL "Dawn use GLFW")
+        if (UNIX AND NOT APPLE)
+            set(DAWN_USE_X11 ON CACHE BOOL "Dawn use X11")
+        endif()
     endif()
 
     add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
@@ -32,10 +34,11 @@ if(EMSCRIPTEN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
-if(EMSCRIPTEN)
-    add_executable(hello
-        "main.cpp"
+add_executable(hello
+    "main.cpp"
     )
+
+if(EMSCRIPTEN)
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
@@ -48,31 +51,22 @@ if(EMSCRIPTEN)
         #PRIVATE "SHELL:-s VERBOSE=1"
         )
 else()
-    if (DEMO_USE_GLFW)
-        add_executable(hello
-            "window.h"
-            "main.cpp"
+    target_link_libraries(hello
+        dawn_headers
+        dawncpp_headers
+        dawncpp
+        dawn_native
+        dawn_proc
         )
+    if (DEMO_USE_GLFW)
+        target_sources(hello PRIVATE "window.h")
+        if (APPLE)
+            target_sources(hello PRIVATE "window_macos.mm")
+        endif()
         target_compile_definitions(hello PRIVATE DEMO_USE_GLFW)
         target_link_libraries(hello
-            dawn_headers
-            dawncpp_headers
-            dawncpp
-            dawn_native
-            dawn_proc
             webgpu_glfw
             glfw
-        )
-    else()
-        add_executable(hello
-            "main.cpp"
-        )
-        target_link_libraries(hello
-            dawn_headers
-            dawncpp_headers
-            dawncpp
-            dawn_native
-            dawn_proc
         )
     endif()
 endif()
