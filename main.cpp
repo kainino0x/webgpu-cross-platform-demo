@@ -391,13 +391,13 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 #endif  // __EMSCRIPTEN__
 
 static const char shaderCode[] = R"(
-    @stage(vertex)
+    @vertex
     fn main_v(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4<f32> {
         var pos = array<vec2<f32>, 3>(
             vec2<f32>(0.0, 0.5), vec2<f32>(-0.5, -0.5), vec2<f32>(0.5, -0.5));
         return vec4<f32>(pos[idx], 0.0, 1.0);
     }
-    @stage(fragment)
+    @fragment
     fn main_f() -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.502, 1.0, 1.0); // 0x80/0xff ~= 0.502
     }
