@@ -266,10 +266,10 @@ static void setup_window()
 {
   char window_title[] = "WebGPU Native Window";
     window_config_t config = {};
-    config.title     = static_cast<const char*>(window_title),
-    config.width     = kWidth,
-    config.height    = kHeight,
-    config.resizable = false,
+    config.title     = static_cast<const char*>(window_title);
+    config.width     = kWidth;
+    config.height    = kHeight;
+    config.resizable = false;
     native_window = window_create(&config);
 }
 
