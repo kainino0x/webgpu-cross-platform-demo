@@ -265,12 +265,11 @@ void window_get_aspect_ratio(window_t* window, float* aspect_ratio)
 static void setup_window()
 {
   char window_title[] = "WebGPU Native Window";
-    window_config_t config = {
-      .title     = static_cast<const char*>(window_title),
-      .width     = kWidth,
-      .height    = kHeight,
-      .resizable = false,
-    };
+    window_config_t config = {};
+    config.title     = static_cast<const char*>(window_title),
+    config.width     = kWidth,
+    config.height    = kHeight,
+    config.resizable = false,
     native_window = window_create(&config);
 }
 
