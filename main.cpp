@@ -116,18 +116,13 @@ static std::unique_ptr<wgpu::ChainedStruct> SurfaceDescriptor(void* display,
   return nullptr;
 }
 
-WGPUSurface CreateSurface(wgpu::Instance instance, void* display, void* window)
+wgpu::Surface CreateSurface(wgpu::Instance instance, void* display, void* window)
 {
   std::unique_ptr<wgpu::ChainedStruct> sd = SurfaceDescriptor(display, window);
   wgpu::SurfaceDescriptor descriptor;
   descriptor.nextInChain = sd.get();
   surface = instance.CreateSurface(&descriptor);
-  if (!surface) {
-    return nullptr;
-  }
-  WGPUSurface surf = surface.Get();
-  wgpuSurfaceReference(surf);
-  return surf;
+  return surface;
 }
 
 /* Function prototypes */
@@ -384,7 +379,6 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     }
     printf("\n\n");
 
-    
     wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
     DawnProcTable procs = dawn::native::GetProcs();
 
