@@ -23,7 +23,7 @@ set( _glfw3_LIB_SEARCH_DIRS
 "/usr/lib"
 "/usr/local/lib"
 "${CMAKE_SOURCE_DIR}/lib"
-"C:/Program Files (x86)/glfw/lib-vc2019" )
+"C:/Program Files (x86)/glfw/lib-vc2022" )
 
 # Check environment for root search directory
 set( _glfw3_ENV_ROOT $ENV{GLFW3_ROOT} )
