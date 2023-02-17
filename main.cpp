@@ -238,8 +238,7 @@ void* window_get_userdata(window_t* window)
 
 #if defined(WIN32)
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
-  uint32_t windowHandle  = glfwGetWin32Window(window->handle);
-  return window->surface.handle = CreateSurface(instance, nullptr, &windowHandle);
+  return window->surface.handle = CreateSurface(instance, nullptr, glfwGetWin32Window(window->handle));
 }
 #elif defined(__linux__) /* X11 */
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
@@ -265,11 +264,12 @@ void window_get_aspect_ratio(window_t* window, float* aspect_ratio)
 static void setup_window()
 {
   char window_title[] = "WebGPU Native Window";
-    window_config_t config = {};
-    config.title     = static_cast<const char*>(window_title);
-    config.width     = kWidth;
-    config.height    = kHeight;
-    config.resizable = false;
+    window_config_t config = {
+      .title     = static_cast<const char*>(window_title),
+      .width     = kWidth,
+      .height    = kHeight,
+      .resizable = false,
+    };
     native_window = window_create(&config);
 }
 

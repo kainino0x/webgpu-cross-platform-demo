@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(hello)
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 if(NOT EMSCRIPTEN)
     # Turning off OpenGL for Dawn
@@ -25,6 +25,8 @@ if(NOT EMSCRIPTEN)
         find_package(glfw3 REQUIRED)
         if (UNIX AND NOT APPLE)
             set(DAWN_USE_X11 ON CACHE BOOL "Dawn use X11")
+        else()
+            set(DAWN_USE_X11 OFF CACHE BOOL "Dawn use X11")
         endif()
     endif()
 
