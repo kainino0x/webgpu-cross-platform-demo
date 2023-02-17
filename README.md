@@ -22,7 +22,7 @@ Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
 ### Native build
 
-Build has only been tested on Linux/Mac.
+Build has been tested on Linux/Mac/Win10.
 
 ```sh
 ./setup_native_build.sh
@@ -45,17 +45,28 @@ ninja
 ```
 
 Note: If you want to have window displayed, make sure to have glfw available.
-e.g. to install on Linux/Ubuntu:
 
-```sh
-apt-get install libglfw3-dev
-```
+<details>
+  <summary>How to config glfw package on each platform?</summary>
 
-Or on macOS:
+  - Linux
+    ```sh
+    apt-get install libglfw3-dev
+    ```
+  - macOS
+    ```sh
+    brew install glfw
+    ```
+  - Win
+    - Manually
+        - Download glfw source package and windows pre-compiled binaries from [here](https://www.glfw.org/download)
+        - Unzip (e.g. version 3.3.8) `glfw-3.3.8.zip` to `C:/Program Files (x86)/glfw/`
+        - Unzip (e.g. version 3.3.8) `glfw-3.3.8.bin.WIN64.zip` and put `lib-vc2022` to `C:/Program Files (x86)/glfw/lib-vc2022` (assume you are using Visual Studio 2022 to build)
+        - You are done. `cmake/modules/Findglfw3.cmake` is used to find them (You can edit the path it uses)
+    - vcpkg
+        - Here is a fork that uses vcpkg to manage glfw: [link](https://github.com/bitsauce/webgpu-cross-platform-demo)
+</details>
 
-```sh
-brew install glfw
-```
 
 Alternatively, you can disable using glfw and window display by
 
