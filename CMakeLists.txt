@@ -14,7 +14,7 @@ if(NOT EMSCRIPTEN)
     set(TINT_BUILD_TESTS       OFF CACHE BOOL "Tint tests")
     set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "OpenGL SL writer")
 
-    # Use GLFW for native window support (on Linux)
+    # Use GLFW for native window support
     if (NOT DEFINED DEMO_USE_GLFW)
         option(DEMO_USE_GLFW "Demo use glfw for native window platform" ON)
     endif()
