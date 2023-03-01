@@ -116,18 +116,13 @@ static std::unique_ptr<wgpu::ChainedStruct> SurfaceDescriptor(void* display,
   return nullptr;
 }
 
-WGPUSurface CreateSurface(wgpu::Instance instance, void* display, void* window)
+wgpu::Surface CreateSurface(wgpu::Instance instance, void* display, void* window)
 {
   std::unique_ptr<wgpu::ChainedStruct> sd = SurfaceDescriptor(display, window);
   wgpu::SurfaceDescriptor descriptor;
   descriptor.nextInChain = sd.get();
   surface = instance.CreateSurface(&descriptor);
-  if (!surface) {
-    return nullptr;
-  }
-  WGPUSurface surf = surface.Get();
-  wgpuSurfaceReference(surf);
-  return surf;
+  return surface;
 }
 
 /* Function prototypes */
@@ -243,8 +238,7 @@ void* window_get_userdata(window_t* window)
 
 #if defined(WIN32)
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
-  uint32_t windowHandle  = glfwGetWin32Window(window->handle);
-  return window->surface.handle = CreateSurface(instance, nullptr, &windowHandle);
+  return window->surface.handle = CreateSurface(instance, nullptr, glfwGetWin32Window(window->handle));
 }
 #elif defined(__linux__) /* X11 */
 wgpu::Surface window_init_surface(wgpu::Instance instance, window_t* window) {
@@ -384,7 +378,6 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     }
     printf("\n\n");
 
-    
     wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
     DawnProcTable procs = dawn::native::GetProcs();
 
@@ -394,13 +387,13 @@ void GetDevice(void (*callback)(wgpu::Device)) {
 #endif  // __EMSCRIPTEN__
 
 static const char shaderCode[] = R"(
-    @stage(vertex)
+    @vertex
     fn main_v(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4<f32> {
         var pos = array<vec2<f32>, 3>(
             vec2<f32>(0.0, 0.5), vec2<f32>(-0.5, -0.5), vec2<f32>(0.5, -0.5));
         return vec4<f32>(pos[idx], 0.0, 1.0);
     }
-    @stage(fragment)
+    @fragment
     fn main_f() -> @location(0) vec4<f32> {
         return vec4<f32>(0.0, 0.502, 1.0, 1.0); // 0x80/0xff ~= 0.502
     }
