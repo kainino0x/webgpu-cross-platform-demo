@@ -52,6 +52,7 @@ if(EMSCRIPTEN)
         PRIVATE "-sUSE_WEBGPU=1"
         PRIVATE "-sASSERTIONS=1"
         PRIVATE "-sSAFE_HEAP=1"
+        PRIVATE "-sASYNCIFY=2"
         #PRIVATE "--closure=1"
         #PRIVATE "-sVERBOSE=1"
         )

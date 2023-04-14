@@ -52,26 +52,24 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     // Left as null (until supported in Emscripten)
     static const WGPUInstance instance = nullptr;
 
-    wgpuInstanceRequestAdapter(instance, nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter adapter, const char* message, void* userdata) {
+    WGPUAdapter adapter;
+    WGPURequestAdapterStatus status = wgpuInstanceRequestAdapterSync(instance, nullptr, &adapter);
+
+    if (status == WGPURequestAdapterStatus_Unavailable) {
+        printf("WebGPU unavailable; exiting cleanly\n");
+        // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
+        exit(0);
+    }
+    assert(status == WGPURequestAdapterStatus_Success);
+
+    wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata) {
         if (message) {
-            printf("wgpuInstanceRequestAdapter: %s\n", message);
+            printf("wgpuAdapterRequestDevice: %s\n", message);
         }
-        if (status == WGPURequestAdapterStatus_Unavailable) {
-            printf("WebGPU unavailable; exiting cleanly\n");
-            // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
-            exit(0);
-        }
-        assert(status == WGPURequestAdapterStatus_Success);
+        assert(status == WGPURequestDeviceStatus_Success);
 
-        wgpuAdapterRequestDevice(adapter, nullptr, [](WGPURequestDeviceStatus status, WGPUDevice dev, const char* message, void* userdata) {
-            if (message) {
-                printf("wgpuAdapterRequestDevice: %s\n", message);
-            }
-            assert(status == WGPURequestDeviceStatus_Success);
-
-            wgpu::Device device = wgpu::Device::Acquire(dev);
-            reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
-        }, userdata);
+        wgpu::Device device = wgpu::Device::Acquire(dev);
+        reinterpret_cast<void (*)(wgpu::Device)>(userdata)(device);
     }, reinterpret_cast<void*>(callback));
 }
 #else  // __EMSCRIPTEN__
