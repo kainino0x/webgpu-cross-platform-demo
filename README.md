@@ -81,7 +81,8 @@ Chrome/Edge/Firefox on any platform with support (modulo compatibility differenc
 pre-release spec changes).
 Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
 
-**Note:** To build, the active Emscripten version must be at least 2.0.0.
+**Note:** To build, the active Emscripten version must be recent.
+Use the latest Emscripten version for best results including bugfixes to the WebGPU bindings.
 
 ```sh
 # Make sure Emscripten tools are in the path.
