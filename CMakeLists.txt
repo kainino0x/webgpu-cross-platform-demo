@@ -45,13 +45,15 @@ if(EMSCRIPTEN)
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
-        PRIVATE "SHELL:-gsource-map"
-        PRIVATE "SHELL:--source-map-base https://kai.graphics/webgpu-cross-platform-demo/out/web/"
-        PRIVATE "SHELL:-s USE_WEBGPU=1"
-        PRIVATE "SHELL:-s ASSERTIONS=1"
-        PRIVATE "SHELL:-s SAFE_HEAP=1"
-        #PRIVATE "SHELL:--closure 1"
-        #PRIVATE "SHELL:-s VERBOSE=1"
+        # To enable DWARF debugging, remove -gsource-map and follow:
+        # https://developer.chrome.com/blog/wasm-debugging-2020/
+        PRIVATE "-gsource-map"
+        #PRIVATE "--source-map-base=./"
+        PRIVATE "-sUSE_WEBGPU=1"
+        PRIVATE "-sASSERTIONS=1"
+        PRIVATE "-sSAFE_HEAP=1"
+        #PRIVATE "--closure=1"
+        #PRIVATE "-sVERBOSE=1"
         )
 else()
     target_link_libraries(hello
