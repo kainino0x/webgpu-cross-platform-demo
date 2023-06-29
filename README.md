@@ -13,6 +13,8 @@ but that is a goal.
 
 **Check the [issues](https://github.com/kainino0x/webgpu-cross-platform-demo/issues) tab for known issues.**
 
+**Please note the `webgpu.h` and `webgpu_cpp.h` APIs (implemented by Dawn/wgpu-native/Emscripten) are not yet stabilized.**
+
 ## Open pre-installed VSCode in Browser
 [![Open in Gitpod](https://gitpod.io/button/open-in-gitpod.svg)](https://gitpod.io/#https://github.com/kainino0x/webgpu-cross-platform-demo)
 
