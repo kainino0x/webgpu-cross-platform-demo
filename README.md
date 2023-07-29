@@ -88,9 +88,7 @@ Use the latest Emscripten version for best results including bugfixes to the Web
 
 ```sh
 # Make sure Emscripten tools are in the path.
-pushd path/to/emsdk
-source emsdk_env.sh
-popd
+source /path/to/emsdk/emsdk_env.sh
 
 mkdir -p out/web
 cd out/web
