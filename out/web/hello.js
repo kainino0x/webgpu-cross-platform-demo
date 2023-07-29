@@ -326,6 +326,8 @@ function alignfault() {
 
 var wasmMemory;
 
+var wasmExports;
+
 var ABORT = false;
 
 var EXITSTATUS;
@@ -336,19 +338,15 @@ function assert(condition, text) {
  }
 }
 
-function _malloc() {
- abort("malloc() called but not included in the build - add '_malloc' to EXPORTED_FUNCTIONS");
-}
-
 var HEAP, HEAP8, HEAPU8, HEAP16, HEAPU16, HEAP32, HEAPU32, HEAPF32, HEAPF64;
 
 function updateMemoryViews() {
  var b = wasmMemory.buffer;
  Module["HEAP8"] = HEAP8 = new Int8Array(b);
  Module["HEAP16"] = HEAP16 = new Int16Array(b);
+ Module["HEAP32"] = HEAP32 = new Int32Array(b);
  Module["HEAPU8"] = HEAPU8 = new Uint8Array(b);
  Module["HEAPU16"] = HEAPU16 = new Uint16Array(b);
- Module["HEAP32"] = HEAP32 = new Int32Array(b);
  Module["HEAPU32"] = HEAPU32 = new Uint32Array(b);
  Module["HEAPF32"] = HEAPF32 = new Float32Array(b);
  Module["HEAPF64"] = HEAPF64 = new Float64Array(b);
@@ -683,6 +681,7 @@ function createWasm() {
  };
  function receiveInstance(instance, module) {
   var exports = instance.exports;
+  exports = Asyncify.instrumentWasmExports(exports);
   wasmExports = exports;
   wasmMemory = wasmExports["memory"];
   assert(wasmMemory, "memory not found in wasm exports");
@@ -751,8 +750,6 @@ function missingGlobal(sym, msg) {
 }
 
 missingGlobal("buffer", "Please use HEAP8.buffer or wasmMemory.buffer");
-
-missingGlobal("asm", "Please use wasmExports instead");
 
 function missingLibrarySymbol(sym) {
  if (typeof globalThis !== "undefined" && !Object.getOwnPropertyDescriptor(globalThis, sym)) {
@@ -1018,9 +1015,98 @@ var ___assert_fail = (condition, filename, line, func) => {
  abort(`Assertion failed: ${UTF8ToString(condition)}, at: ` + [ filename ? UTF8ToString(filename) : "unknown filename", line, func ? UTF8ToString(func) : "unknown function" ]);
 };
 
+___assert_fail.sig = "vppip";
+
+var nowIsMonotonic = true;
+
+var __emscripten_get_now_is_monotonic = () => nowIsMonotonic;
+
+__emscripten_get_now_is_monotonic.sig = "i";
+
 var _abort = () => {
  abort("native code called abort()");
 };
+
+_abort.sig = "v";
+
+var handleException = e => {
+ if (e instanceof ExitStatus || e == "unwind") {
+  return EXITSTATUS;
+ }
+ checkStackCookie();
+ if (e instanceof WebAssembly.RuntimeError) {
+  if (_emscripten_stack_get_current() <= 0) {
+   err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)");
+  }
+ }
+ quit_(1, e);
+};
+
+var SYSCALLS = {
+ varargs: undefined,
+ get() {
+  assert(SYSCALLS.varargs != undefined);
+  SYSCALLS.varargs += 4;
+  var ret = SAFE_HEAP_LOAD((SYSCALLS.varargs - 4 >> 2) * 4, 4, 0);
+  return ret;
+ },
+ getStr(ptr) {
+  var ret = UTF8ToString(ptr);
+  return ret;
+ }
+};
+
+var _proc_exit = code => {
+ EXITSTATUS = code;
+ if (!keepRuntimeAlive()) {
+  if (Module["onExit"]) Module["onExit"](code);
+  ABORT = true;
+ }
+ quit_(code, new ExitStatus(code));
+};
+
+_proc_exit.sig = "vi";
+
+var exitJS = (status, implicit) => {
+ EXITSTATUS = status;
+ checkUnflushedContent();
+ if (keepRuntimeAlive() && !implicit) {
+  var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
+  err(msg);
+ }
+ _proc_exit(status);
+};
+
+var _exit = exitJS;
+
+_exit.sig = "vi";
+
+var maybeExit = () => {
+ if (!keepRuntimeAlive()) {
+  try {
+   _exit(EXITSTATUS);
+  } catch (e) {
+   handleException(e);
+  }
+ }
+};
+
+var callUserCallback = func => {
+ if (ABORT) {
+  err("user callback triggered after runtime exited or application aborted.  Ignoring.");
+  return;
+ }
+ try {
+  func();
+  maybeExit();
+ } catch (e) {
+  handleException(e);
+ }
+};
+
+var safeSetTimeout = (func, timeout) => setTimeout(() => {
+ callUserCallback(func);
+}, timeout);
 
 function _emscripten_set_main_loop_timing(mode, value) {
  Browser.mainLoop.timingMode = mode;
@@ -1073,9 +1159,13 @@ function _emscripten_set_main_loop_timing(mode, value) {
  return 0;
 }
 
+_emscripten_set_main_loop_timing.sig = "iii";
+
 var _emscripten_get_now;
 
 _emscripten_get_now = () => performance.now();
+
+_emscripten_get_now.sig = "d";
 
 function setMainLoop(browserIterationFunc, fps, simulateInfiniteLoop, arg, noSetTiming) {
  assert(!Browser.mainLoop.func, "emscripten_set_main_loop: there can only be one main loop function at once: call emscripten_cancel_main_loop to cancel the previous one before setting a new one with different parameters.");
@@ -1141,81 +1231,6 @@ function setMainLoop(browserIterationFunc, fps, simulateInfiniteLoop, arg, noSet
   throw "unwind";
  }
 }
-
-var handleException = e => {
- if (e instanceof ExitStatus || e == "unwind") {
-  return EXITSTATUS;
- }
- checkStackCookie();
- if (e instanceof WebAssembly.RuntimeError) {
-  if (_emscripten_stack_get_current() <= 0) {
-   err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)");
-  }
- }
- quit_(1, e);
-};
-
-var SYSCALLS = {
- varargs: undefined,
- get() {
-  assert(SYSCALLS.varargs != undefined);
-  SYSCALLS.varargs += 4;
-  var ret = SAFE_HEAP_LOAD((SYSCALLS.varargs - 4 >> 2) * 4, 4, 0);
-  return ret;
- },
- getStr(ptr) {
-  var ret = UTF8ToString(ptr);
-  return ret;
- }
-};
-
-var _proc_exit = code => {
- EXITSTATUS = code;
- if (!keepRuntimeAlive()) {
-  if (Module["onExit"]) Module["onExit"](code);
-  ABORT = true;
- }
- quit_(code, new ExitStatus(code));
-};
-
-var exitJS = (status, implicit) => {
- EXITSTATUS = status;
- checkUnflushedContent();
- if (keepRuntimeAlive() && !implicit) {
-  var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
-  err(msg);
- }
- _proc_exit(status);
-};
-
-var _exit = exitJS;
-
-var maybeExit = () => {
- if (!keepRuntimeAlive()) {
-  try {
-   _exit(EXITSTATUS);
-  } catch (e) {
-   handleException(e);
-  }
- }
-};
-
-var callUserCallback = func => {
- if (ABORT) {
-  err("user callback triggered after runtime exited or application aborted.  Ignoring.");
-  return;
- }
- try {
-  func();
-  maybeExit();
- } catch (e) {
-  handleException(e);
- }
-};
-
-var safeSetTimeout = (func, timeout) => setTimeout(() => {
- callUserCallback(func);
-}, timeout);
 
 var preloadPlugins = Module["preloadPlugins"] || [];
 
@@ -1719,12 +1734,49 @@ var Browser = {
  }
 };
 
+var wasmTableMirror = [];
+
+var getWasmTableEntry = funcPtr => {
+ var func = wasmTableMirror[funcPtr];
+ if (!func) {
+  if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
+  wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
+  if (Asyncify.isAsyncExport(func)) {
+   wasmTableMirror[funcPtr] = func = Asyncify.makeAsyncFunction(func);
+  }
+ }
+ return func;
+};
+
+function _emscripten_async_call(func, arg, millis) {
+ function wrapper() {
+  getWasmTableEntry(func)(arg);
+ }
+ if (millis >= 0 || ENVIRONMENT_IS_NODE) {
+  safeSetTimeout(wrapper, millis);
+ } else {
+  Browser.safeRequestAnimationFrame(wrapper);
+ }
+}
+
+_emscripten_async_call.sig = "vppi";
+
 function _emscripten_cancel_main_loop() {
  Browser.mainLoop.pause();
  Browser.mainLoop.func = null;
 }
 
+_emscripten_cancel_main_loop.sig = "v";
+
+function _emscripten_date_now() {
+ return Date.now();
+}
+
+_emscripten_date_now.sig = "d";
+
 var _emscripten_memcpy_big = (dest, src, num) => HEAPU8.copyWithin(dest, src, src + num);
+
+_emscripten_memcpy_big.sig = "vppp";
 
 var getHeapMax = () => HEAPU8.length;
 
@@ -1738,26 +1790,20 @@ var _emscripten_resize_heap = requestedSize => {
  abortOnCannotGrowMemory(requestedSize);
 };
 
-var wasmTableMirror = [];
-
-var getWasmTableEntry = funcPtr => {
- var func = wasmTableMirror[funcPtr];
- if (!func) {
-  if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
-  wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
- }
- assert(wasmTable.get(funcPtr) == func, "JavaScript-side Wasm function table mirror is out of date!");
- return func;
-};
+_emscripten_resize_heap.sig = "ip";
 
 function _emscripten_set_main_loop(func, fps, simulateInfiniteLoop) {
  var browserIterationFunc = getWasmTableEntry(func);
  setMainLoop(browserIterationFunc, fps, simulateInfiniteLoop);
 }
 
+_emscripten_set_main_loop.sig = "vpii";
+
 var _fd_close = fd => {
  abort("fd_close called without SYSCALLS_REQUIRE_FILESYSTEM");
 };
+
+_fd_close.sig = "ii";
 
 function convertI32PairToI53Checked(lo, hi) {
  assert(lo == lo >>> 0 || lo == (lo | 0));
@@ -1769,6 +1815,8 @@ function _fd_seek(fd, offset_low, offset_high, whence, newOffset) {
  var offset = convertI32PairToI53Checked(offset_low, offset_high);
  return 70;
 }
+
+_fd_seek.sig = "iiiiip";
 
 var printCharBuffers = [ null, [], [] ];
 
@@ -1803,6 +1851,8 @@ var _fd_write = (fd, iov, iovcnt, pnum) => {
  SAFE_HEAP_STORE((pnum >> 2) * 4, num, 4);
  return 0;
 };
+
+_fd_write.sig = "iippp";
 
 var withStackSave = f => {
  var stack = stackSave();
@@ -1883,6 +1933,39 @@ var WebGPU = {
    var messagePtr = stringToUTF8OnStack(message);
    getWasmTableEntry(callback)(type, messagePtr, userdata);
   });
+ },
+ _nextFutureID: 1,
+ _trackedFutures: [],
+ trackFuture: function(promise, callbackFlags, onResolve) {
+  const spontaneous = Boolean(callbackFlags & 2);
+  const futureID = WebGPU._nextFutureID++;
+  let resolveOnReady;
+  const tracked = {
+   succeeded: undefined,
+   result: undefined,
+   onReady: new Promise(res => {
+    resolveOnReady = res;
+   }),
+   setReady(succeeded, result) {
+    this.succeeded = succeeded;
+    this.result = result;
+    if (spontaneous) this.complete();
+    resolveOnReady(futureID);
+   },
+   complete() {
+    assert(futureID in WebGPU._trackedFutures);
+    assert(this.succeeded !== undefined);
+    delete WebGPU._trackedFutures[futureID];
+    onResolve(this.succeeded, this.result);
+   }
+  };
+  WebGPU._trackedFutures[futureID] = tracked;
+  promise.then(result => {
+   tracked.setReady(true);
+  }, result => {
+   tracked.setReady(false);
+  });
+  return futureID;
  },
  initManagers: function() {
   if (WebGPU.mgrDevice) return;
@@ -2077,6 +2160,8 @@ function _wgpuAdapterRelease(id) {
  WebGPU.mgrAdapter.release(id);
 }
 
+_wgpuAdapterRelease.sig = "vp";
+
 function _wgpuAdapterRequestDevice(adapterId, descriptor, callback, userdata) {
  var adapter = WebGPU.mgrAdapter.get(adapterId);
  var desc = {};
@@ -2174,17 +2259,25 @@ function _wgpuAdapterRequestDevice(adapterId, descriptor, callback, userdata) {
  });
 }
 
+_wgpuAdapterRequestDevice.sig = "vpppp";
+
 function _wgpuBindGroupLayoutReference(id) {
  WebGPU.mgrBindGroupLayout.reference(id);
 }
+
+_wgpuBindGroupLayoutReference.sig = "vp";
 
 function _wgpuBindGroupLayoutRelease(id) {
  WebGPU.mgrBindGroupLayout.release(id);
 }
 
+_wgpuBindGroupLayoutRelease.sig = "vp";
+
 function _wgpuBindGroupRelease(id) {
  WebGPU.mgrBindGroup.release(id);
 }
+
+_wgpuBindGroupRelease.sig = "vp";
 
 function _wgpuBufferGetConstMappedRange(bufferId, offset, size) {
  var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
@@ -2203,6 +2296,8 @@ function _wgpuBufferGetConstMappedRange(bufferId, offset, size) {
  bufferWrapper.onUnmap.push(() => _free(data));
  return data;
 }
+
+_wgpuBufferGetConstMappedRange.sig = "pppp";
 
 function _wgpuBufferGetMappedRange(bufferId, offset, size) {
  var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
@@ -2229,6 +2324,8 @@ function _wgpuBufferGetMappedRange(bufferId, offset, size) {
  return data;
 }
 
+_wgpuBufferGetMappedRange.sig = "pppp";
+
 var _wgpuBufferMapAsync = function(bufferId, mode, offset, size, callback, userdata) {
  var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
  assert(typeof bufferWrapper != "undefined");
@@ -2247,13 +2344,19 @@ var _wgpuBufferMapAsync = function(bufferId, mode, offset, size, callback, userd
  });
 };
 
+_wgpuBufferMapAsync.sig = "vpipppp";
+
 function _wgpuBufferReference(id) {
  WebGPU.mgrBuffer.reference(id);
 }
 
+_wgpuBufferReference.sig = "vp";
+
 function _wgpuBufferRelease(id) {
  WebGPU.mgrBuffer.release(id);
 }
+
+_wgpuBufferRelease.sig = "vp";
 
 function _wgpuBufferUnmap(bufferId) {
  var bufferWrapper = WebGPU.mgrBuffer.objects[bufferId];
@@ -2268,9 +2371,13 @@ function _wgpuBufferUnmap(bufferId) {
  bufferWrapper.object["unmap"]();
 }
 
+_wgpuBufferUnmap.sig = "vp";
+
 function _wgpuCommandBufferRelease(id) {
  WebGPU.mgrCommandBuffer.release(id);
 }
+
+_wgpuCommandBufferRelease.sig = "vp";
 
 function _wgpuCommandEncoderBeginRenderPass(encoderId, descriptor) {
  assert(descriptor);
@@ -2360,6 +2467,8 @@ function _wgpuCommandEncoderBeginRenderPass(encoderId, descriptor) {
  return WebGPU.mgrRenderPassEncoder.create(commandEncoder["beginRenderPass"](desc));
 }
 
+_wgpuCommandEncoderBeginRenderPass.sig = "ppp";
+
 function _wgpuCommandEncoderCopyBufferToBuffer(encoderId, srcId, srcOffset_low, srcOffset_high, dstId, dstOffset_low, dstOffset_high, size_low, size_high) {
  var srcOffset = convertI32PairToI53Checked(srcOffset_low, srcOffset_high);
  var dstOffset = convertI32PairToI53Checked(dstOffset_low, dstOffset_high);
@@ -2370,24 +2479,34 @@ function _wgpuCommandEncoderCopyBufferToBuffer(encoderId, srcId, srcOffset_low, 
  commandEncoder["copyBufferToBuffer"](src, srcOffset, dst, dstOffset, size);
 }
 
+_wgpuCommandEncoderCopyBufferToBuffer.sig = "vppiipiiii";
+
 function _wgpuCommandEncoderCopyTextureToBuffer(encoderId, srcPtr, dstPtr, copySizePtr) {
  var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
  var copySize = WebGPU.makeExtent3D(copySizePtr);
  commandEncoder["copyTextureToBuffer"](WebGPU.makeImageCopyTexture(srcPtr), WebGPU.makeImageCopyBuffer(dstPtr), copySize);
 }
 
-function _wgpuCommandEncoderFinish(encoderId, descriptor) {
+_wgpuCommandEncoderCopyTextureToBuffer.sig = "vpppp";
+
+function _wgpuCommandEncoderFinish(encoderId) {
  var commandEncoder = WebGPU.mgrCommandEncoder.get(encoderId);
  return WebGPU.mgrCommandBuffer.create(commandEncoder["finish"]());
 }
+
+_wgpuCommandEncoderFinish.sig = "ppp";
 
 function _wgpuCommandEncoderRelease(id) {
  WebGPU.mgrCommandEncoder.release(id);
 }
 
-function _wgpuCreateInstance(descriptor) {
+_wgpuCommandEncoderRelease.sig = "vp";
+
+function _wgpuCreateInstance() {
  return 1;
 }
+
+_wgpuCreateInstance.sig = "pp";
 
 function readI53FromI64(ptr) {
  return SAFE_HEAP_LOAD((ptr >> 2) * 4, 4, 1) + SAFE_HEAP_LOAD((ptr + 4 >> 2) * 4, 4, 0) * 4294967296;
@@ -2443,6 +2562,8 @@ function _wgpuDeviceCreateBindGroup(deviceId, descriptor) {
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrBindGroup.create(device["createBindGroup"](desc));
 }
+
+_wgpuDeviceCreateBindGroup.sig = "ppp";
 
 function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  assert(descriptor);
@@ -2512,6 +2633,8 @@ function _wgpuDeviceCreateBindGroupLayout(deviceId, descriptor) {
  return WebGPU.mgrBindGroupLayout.create(device["createBindGroupLayout"](desc));
 }
 
+_wgpuDeviceCreateBindGroupLayout.sig = "ppp";
+
 function _wgpuDeviceCreateBuffer(deviceId, descriptor) {
  assert(descriptor);
  assert(SAFE_HEAP_LOAD((descriptor >> 2) * 4, 4, 1) === 0);
@@ -2534,6 +2657,8 @@ function _wgpuDeviceCreateBuffer(deviceId, descriptor) {
  return id;
 }
 
+_wgpuDeviceCreateBuffer.sig = "ppp";
+
 function _wgpuDeviceCreateCommandEncoder(deviceId, descriptor) {
  var desc;
  if (descriptor) {
@@ -2548,6 +2673,8 @@ function _wgpuDeviceCreateCommandEncoder(deviceId, descriptor) {
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrCommandEncoder.create(device["createCommandEncoder"](desc));
 }
+
+_wgpuDeviceCreateCommandEncoder.sig = "ppp";
 
 function _wgpuDeviceCreatePipelineLayout(deviceId, descriptor) {
  assert(descriptor);
@@ -2567,6 +2694,8 @@ function _wgpuDeviceCreatePipelineLayout(deviceId, descriptor) {
  var device = WebGPU.mgrDevice.get(deviceId);
  return WebGPU.mgrPipelineLayout.create(device["createPipelineLayout"](desc));
 }
+
+_wgpuDeviceCreatePipelineLayout.sig = "ppp";
 
 function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
  assert(descriptor);
@@ -2720,6 +2849,8 @@ function _wgpuDeviceCreateRenderPipeline(deviceId, descriptor) {
  return WebGPU.mgrRenderPipeline.create(device["createRenderPipeline"](desc));
 }
 
+_wgpuDeviceCreateRenderPipeline.sig = "ppp";
+
 function _wgpuDeviceCreateShaderModule(deviceId, descriptor) {
  assert(descriptor);
  var nextInChainPtr = SAFE_HEAP_LOAD((descriptor >> 2) * 4, 4, 1);
@@ -2756,6 +2887,8 @@ function _wgpuDeviceCreateShaderModule(deviceId, descriptor) {
  return WebGPU.mgrShaderModule.create(device["createShaderModule"](desc));
 }
 
+_wgpuDeviceCreateShaderModule.sig = "ppp";
+
 function _wgpuDeviceCreateSwapChain(deviceId, surfaceId, descriptor) {
  assert(descriptor);
  assert(SAFE_HEAP_LOAD((descriptor >> 2) * 4, 4, 1) === 0);
@@ -2778,6 +2911,8 @@ function _wgpuDeviceCreateSwapChain(deviceId, surfaceId, descriptor) {
  context["configure"](configuration);
  return WebGPU.mgrSwapChain.create(context);
 }
+
+_wgpuDeviceCreateSwapChain.sig = "pppp";
 
 function _wgpuDeviceCreateTexture(deviceId, descriptor) {
  assert(descriptor);
@@ -2804,6 +2939,8 @@ function _wgpuDeviceCreateTexture(deviceId, descriptor) {
  return WebGPU.mgrTexture.create(device["createTexture"](desc));
 }
 
+_wgpuDeviceCreateTexture.sig = "ppp";
+
 function _wgpuDeviceGetQueue(deviceId) {
  var queueId = WebGPU.mgrDevice.objects[deviceId].queueId;
  assert(queueId, "wgpuDeviceGetQueue: queue was missing or null");
@@ -2811,13 +2948,19 @@ function _wgpuDeviceGetQueue(deviceId) {
  return queueId;
 }
 
+_wgpuDeviceGetQueue.sig = "pp";
+
 function _wgpuDeviceReference(id) {
  WebGPU.mgrDevice.reference(id);
 }
 
+_wgpuDeviceReference.sig = "vp";
+
 function _wgpuDeviceRelease(id) {
  WebGPU.mgrDevice.release(id);
 }
+
+_wgpuDeviceRelease.sig = "vp";
 
 var _wgpuDeviceSetUncapturedErrorCallback = function(deviceId, callback, userdata) {
  var device = WebGPU.mgrDevice.get(deviceId);
@@ -2833,6 +2976,8 @@ var _wgpuDeviceSetUncapturedErrorCallback = function(deviceId, callback, userdat
   });
  };
 };
+
+_wgpuDeviceSetUncapturedErrorCallback.sig = "vppp";
 
 function maybeCStringToJsString(cString) {
  return cString > 2 ? UTF8ToString(cString) : cString;
@@ -2870,7 +3015,11 @@ function _wgpuInstanceCreateSurface(instanceId, descriptor) {
  return WebGPU.mgrSurface.create(context);
 }
 
-function _wgpuInstanceRelease(instance) {}
+_wgpuInstanceCreateSurface.sig = "ppp";
+
+function _wgpuInstanceRelease() {}
+
+_wgpuInstanceRelease.sig = "vp";
 
 function _wgpuInstanceRequestAdapter(instanceId, options, callback, userdata) {
  assert(instanceId === 1, "WGPUInstance must be created by wgpuCreateInstance");
@@ -2912,17 +3061,96 @@ function _wgpuInstanceRequestAdapter(instanceId, options, callback, userdata) {
  });
 }
 
+_wgpuInstanceRequestAdapter.sig = "vpppp";
+
+async function _wgpuInstanceWaitAny(instanceId, count, infosPtr, timeoutNS_low, timeoutNS_high) {
+ var timeoutNS = convertI32PairToI53Checked(timeoutNS_low, timeoutNS_high);
+ assert(instanceId === 1, "WGPUInstance must be created by wgpuCreateInstance");
+ if (!count) {
+  return 0;
+ }
+ const futureIDToIndex = new Map;
+ let anyCompleted = false;
+ for (let i = 0; i < count; ++i) {
+  const infoPtr = infosPtr + i * 16;
+  const futureID = SAFE_HEAP_LOAD((infoPtr + 4 >> 2) * 4, 4, 1) * 4294967296 + SAFE_HEAP_LOAD((infoPtr >> 2) * 4, 4, 1);
+  const completed = !(futureID in WebGPU._trackedFutures);
+  SAFE_HEAP_STORE((infoPtr + 8 >> 2) * 4, completed, 4);
+  if (completed) {
+   anyCompleted = true;
+  } else {
+   futureIDToIndex.set(futureID, i);
+  }
+ }
+ if (anyCompleted) {
+  return 0;
+ }
+ if (timeoutNS == 0) {
+  return 1;
+ }
+ const waitPromises = [];
+ const kFutureIDForTimeout = 0;
+ if (timeoutNS != -1) {
+  waitPromises.push(new Promise(resolve => {
+   setTimeout(() => {
+    resolve(kFutureIDForTimeout);
+   }, timeoutNS / 1e6);
+  }));
+ }
+ for (const futureID of futureIDToIndex.keys()) {
+  const tracked = WebGPU._trackedFutures[futureID];
+  waitPromises.push(tracked.onReady);
+ }
+ const firstCompletedFutureID = await Promise.any(waitPromises);
+ if (firstCompletedFutureID == kFutureIDForTimeout) {
+  return 1;
+ }
+ WebGPU._trackedFutures[firstCompletedFutureID].complete();
+ {
+  const i = futureIDToIndex.get(firstCompletedFutureID);
+  const infoPtr = infosPtr + i * 16;
+  SAFE_HEAP_STORE((infoPtr + 8 >> 2) * 4, 1, 4);
+ }
+ return 0;
+}
+
+_wgpuInstanceWaitAny.sig = "ipppii";
+
+_wgpuInstanceWaitAny.isAsync = true;
+
 function _wgpuPipelineLayoutRelease(id) {
  WebGPU.mgrPipelineLayout.release(id);
 }
+
+_wgpuPipelineLayoutRelease.sig = "vp";
 
 function _wgpuQuerySetRelease(id) {
  WebGPU.mgrQuerySet.release(id);
 }
 
+_wgpuQuerySetRelease.sig = "vp";
+
+var _wgpuQueueOnSubmittedWorkDone2 = function(queueId, callbackFlags, callback, userdata) {
+ var ret = (() => {
+  var queue = WebGPU.mgrQueue.get(queueId);
+  return WebGPU.trackFuture(queue["onSubmittedWorkDone"](), callbackFlags, succeeded => {
+   callUserCallback(() => {
+    const status = succeeded ? 0 : 1;
+    getWasmTableEntry(callback)(status, userdata);
+   });
+  });
+ })();
+ return setTempRet0((tempDouble = ret, +Math.abs(tempDouble) >= 1 ? tempDouble > 0 ? +Math.floor(tempDouble / 4294967296) >>> 0 : ~~+Math.ceil((tempDouble - +(~~tempDouble >>> 0)) / 4294967296) >>> 0 : 0)), 
+ ret >>> 0;
+};
+
+_wgpuQueueOnSubmittedWorkDone2.sig = "ipipp";
+
 function _wgpuQueueRelease(id) {
  WebGPU.mgrQueue.release(id);
 }
+
+_wgpuQueueRelease.sig = "vp";
 
 function _wgpuQueueSubmit(queueId, commandCount, commands) {
  assert(commands % 4 === 0);
@@ -2933,19 +3161,27 @@ function _wgpuQueueSubmit(queueId, commandCount, commands) {
  queue["submit"](cmds);
 }
 
+_wgpuQueueSubmit.sig = "vppp";
+
 function _wgpuRenderPassEncoderDraw(passId, vertexCount, instanceCount, firstVertex, firstInstance) {
  var pass = WebGPU.mgrRenderPassEncoder.get(passId);
  pass["draw"](vertexCount, instanceCount, firstVertex, firstInstance);
 }
+
+_wgpuRenderPassEncoderDraw.sig = "vpiiii";
 
 function _wgpuRenderPassEncoderEnd(encoderId) {
  var encoder = WebGPU.mgrRenderPassEncoder.get(encoderId);
  encoder["end"]();
 }
 
+_wgpuRenderPassEncoderEnd.sig = "vp";
+
 function _wgpuRenderPassEncoderRelease(id) {
  WebGPU.mgrRenderPassEncoder.release(id);
 }
+
+_wgpuRenderPassEncoderRelease.sig = "vp";
 
 function _wgpuRenderPassEncoderSetPipeline(passId, pipelineId) {
  var pass = WebGPU.mgrRenderPassEncoder.get(passId);
@@ -2953,30 +3189,44 @@ function _wgpuRenderPassEncoderSetPipeline(passId, pipelineId) {
  pass["setPipeline"](pipeline);
 }
 
+_wgpuRenderPassEncoderSetPipeline.sig = "vpp";
+
 function _wgpuRenderPipelineRelease(id) {
  WebGPU.mgrRenderPipeline.release(id);
 }
+
+_wgpuRenderPipelineRelease.sig = "vp";
 
 function _wgpuShaderModuleReference(id) {
  WebGPU.mgrShaderModule.reference(id);
 }
 
+_wgpuShaderModuleReference.sig = "vp";
+
 function _wgpuShaderModuleRelease(id) {
  WebGPU.mgrShaderModule.release(id);
 }
 
+_wgpuShaderModuleRelease.sig = "vp";
+
 function _wgpuSurfaceRelease(id) {
  WebGPU.mgrSurface.release(id);
 }
+
+_wgpuSurfaceRelease.sig = "vp";
 
 function _wgpuSwapChainGetCurrentTextureView(swapChainId) {
  var context = WebGPU.mgrSwapChain.get(swapChainId);
  return WebGPU.mgrTextureView.create(context["getCurrentTexture"]()["createView"]());
 }
 
+_wgpuSwapChainGetCurrentTextureView.sig = "pp";
+
 function _wgpuSwapChainRelease(id) {
  WebGPU.mgrSwapChain.release(id);
 }
+
+_wgpuSwapChainRelease.sig = "vp";
 
 function _wgpuTextureCreateView(textureId, descriptor) {
  var desc;
@@ -3001,21 +3251,148 @@ function _wgpuTextureCreateView(textureId, descriptor) {
  return WebGPU.mgrTextureView.create(texture["createView"](desc));
 }
 
+_wgpuTextureCreateView.sig = "ppp";
+
 function _wgpuTextureReference(id) {
  WebGPU.mgrTexture.reference(id);
 }
+
+_wgpuTextureReference.sig = "vp";
 
 function _wgpuTextureRelease(id) {
  WebGPU.mgrTexture.release(id);
 }
 
+_wgpuTextureRelease.sig = "vp";
+
 function _wgpuTextureViewReference(id) {
  WebGPU.mgrTextureView.reference(id);
 }
 
+_wgpuTextureViewReference.sig = "vp";
+
 function _wgpuTextureViewRelease(id) {
  WebGPU.mgrTextureView.release(id);
 }
+
+_wgpuTextureViewRelease.sig = "vp";
+
+function runAndAbortIfError(func) {
+ try {
+  return func();
+ } catch (e) {
+  abort(e);
+ }
+}
+
+function sigToWasmTypes(sig) {
+ assert(!sig.includes("j"), "i64 not permitted in function signatures when WASM_BIGINT is disabled");
+ var typeNames = {
+  "i": "i32",
+  "j": "i64",
+  "f": "f32",
+  "d": "f64",
+  "p": "i32"
+ };
+ var type = {
+  parameters: [],
+  results: sig[0] == "v" ? [] : [ typeNames[sig[0]] ]
+ };
+ for (var i = 1; i < sig.length; ++i) {
+  assert(sig[i] in typeNames, "invalid signature char: " + sig[i]);
+  type.parameters.push(typeNames[sig[i]]);
+ }
+ return type;
+}
+
+var runtimeKeepalivePush = () => {
+ runtimeKeepaliveCounter += 1;
+};
+
+runtimeKeepalivePush.sig = "v";
+
+var runtimeKeepalivePop = () => {
+ assert(runtimeKeepaliveCounter > 0);
+ runtimeKeepaliveCounter -= 1;
+};
+
+runtimeKeepalivePop.sig = "v";
+
+var Asyncify = {
+ instrumentWasmImports: function(imports) {
+  var importPatterns = [ /^invoke_.*$/, /^fd_sync$/, /^__wasi_fd_sync$/, /^__asyncjs__.*$/, /^emscripten_promise_await$/, /^emscripten_idb_load$/, /^emscripten_idb_store$/, /^emscripten_idb_delete$/, /^emscripten_idb_exists$/, /^emscripten_idb_load_blob$/, /^emscripten_idb_store_blob$/, /^emscripten_sleep$/, /^emscripten_wget_data$/, /^emscripten_scan_registers$/, /^emscripten_lazy_load_code$/, /^_load_secondary_module$/, /^emscripten_fiber_swap$/, /^SDL_Delay$/, /^wgpuInstanceWaitAny$/ ];
+  for (var x in imports) {
+   (function(x) {
+    var original = imports[x];
+    var sig = original.sig;
+    if (typeof original == "function") {
+     var isAsyncifyImport = original.isAsync || importPatterns.some(pattern => !!x.match(pattern));
+     if (isAsyncifyImport) {
+      assert(sig, `Missing __sig for ${x}`);
+      var type = sigToWasmTypes(sig);
+      type.parameters.unshift("externref");
+      imports[x] = original = new WebAssembly.Function(type, original, {
+       suspending: "first"
+      });
+     }
+    }
+   })(x);
+  }
+ },
+ instrumentWasmExports: function(exports) {
+  var exportPatterns = [ /^doFuturesTest$/, /^main$/, /^__main_argc_argv$/, /^_ZN10emscripten8internal5async.*$/ ];
+  Asyncify.asyncExports = new Set;
+  var ret = {};
+  for (var x in exports) {
+   (function(x) {
+    var original = exports[x];
+    if (typeof original == "function") {
+     var isAsyncifyExport = exportPatterns.some(pattern => !!x.match(pattern));
+     if (isAsyncifyExport) {
+      Asyncify.asyncExports.add(original);
+      original = Asyncify.makeAsyncFunction(original);
+     }
+     ret[x] = function() {
+      return original.apply(null, arguments);
+     };
+    } else {
+     ret[x] = original;
+    }
+   })(x);
+  }
+  return ret;
+ },
+ asyncExports: null,
+ isAsyncExport: function(func) {
+  return Asyncify.asyncExports && Asyncify.asyncExports.has(func);
+ },
+ handleSleep: function(startAsync) {
+  var promise = new Promise(resolve => {
+   startAsync(resolve);
+  });
+  promise.finally(() => {});
+  return promise;
+ },
+ handleAsync: function(startAsync) {
+  return Asyncify.handleSleep(wakeUp => {
+   startAsync().then(wakeUp);
+  });
+ },
+ makeAsyncFunction: function(original) {
+  var type = WebAssembly.Function.type(original);
+  var parameters = type.parameters;
+  var results = type.results;
+  assert(results.length !== 0, "There must be a return result");
+  assert(parameters[0] === "externref", "First param must be externref.");
+  parameters.shift();
+  return new WebAssembly.Function({
+   parameters: parameters,
+   results: [ "externref" ]
+  }, original, {
+   promising: "first"
+  });
+ }
+};
 
 Module["requestFullscreen"] = function Module_requestFullscreen(lockPointer, resizeCanvas) {
  Browser.requestFullscreen(lockPointer, resizeCanvas);
@@ -3061,9 +3438,13 @@ function checkIncomingModuleAPI() {
 
 var wasmImports = {
  __assert_fail: ___assert_fail,
+ _emscripten_get_now_is_monotonic: __emscripten_get_now_is_monotonic,
  abort: _abort,
  alignfault: alignfault,
+ emscripten_async_call: _emscripten_async_call,
  emscripten_cancel_main_loop: _emscripten_cancel_main_loop,
+ emscripten_date_now: _emscripten_date_now,
+ emscripten_get_now: _emscripten_get_now,
  emscripten_memcpy_big: _emscripten_memcpy_big,
  emscripten_resize_heap: _emscripten_resize_heap,
  emscripten_set_main_loop: _emscripten_set_main_loop,
@@ -3106,8 +3487,10 @@ var wasmImports = {
  wgpuInstanceCreateSurface: _wgpuInstanceCreateSurface,
  wgpuInstanceRelease: _wgpuInstanceRelease,
  wgpuInstanceRequestAdapter: _wgpuInstanceRequestAdapter,
+ wgpuInstanceWaitAny: _wgpuInstanceWaitAny,
  wgpuPipelineLayoutRelease: _wgpuPipelineLayoutRelease,
  wgpuQuerySetRelease: _wgpuQuerySetRelease,
+ wgpuQueueOnSubmittedWorkDone2: _wgpuQueueOnSubmittedWorkDone2,
  wgpuQueueRelease: _wgpuQueueRelease,
  wgpuQueueSubmit: _wgpuQueueSubmit,
  wgpuRenderPassEncoderDraw: _wgpuRenderPassEncoderDraw,
@@ -3127,9 +3510,13 @@ var wasmImports = {
  wgpuTextureViewRelease: _wgpuTextureViewRelease
 };
 
-var wasmExports = createWasm();
+Asyncify.instrumentWasmImports(wasmImports);
+
+var asm = createWasm();
 
 var ___wasm_call_ctors = createExportWrapper("__wasm_call_ctors");
+
+var _doFuturesTest = Module["_doFuturesTest"] = createExportWrapper("doFuturesTest");
 
 var _main = Module["_main"] = createExportWrapper("main");
 
@@ -3140,6 +3527,8 @@ var _fflush = Module["_fflush"] = createExportWrapper("fflush");
 var _emscripten_get_sbrk_ptr = createExportWrapper("emscripten_get_sbrk_ptr");
 
 var _sbrk = createExportWrapper("sbrk");
+
+var _malloc = createExportWrapper("malloc");
 
 var _free = createExportWrapper("free");
 
@@ -3165,11 +3554,11 @@ var _emscripten_stack_get_current = () => (_emscripten_stack_get_current = wasmE
 
 var dynCall_jiji = Module["dynCall_jiji"] = createExportWrapper("dynCall_jiji");
 
-var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53ToI64Signaling", "writeI53ToU64Clamped", "writeI53ToU64Signaling", "readI53FromU64", "convertI32PairToI53", "convertU32PairToI53", "zeroMemory", "growMemory", "isLeapYear", "ydayFromDate", "arraySum", "addDays", "setErrNo", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "getHostByName", "initRandomFill", "randomFill", "getCallstack", "emscriptenLog", "convertPCtoSourceLocation", "readEmAsmArgs", "jstoi_q", "jstoi_s", "getExecutableName", "listenOnce", "autoResumeAudioContext", "dynCallLegacy", "getDynCaller", "dynCall", "runtimeKeepalivePush", "runtimeKeepalivePop", "asmjsMangle", "asyncLoad", "alignMemory", "mmapAlloc", "handleAllocatorInit", "HandleAllocator", "getNativeTypeSize", "STACK_SIZE", "STACK_ALIGN", "POINTER_SIZE", "ASSERTIONS", "getCFunc", "ccall", "cwrap", "uleb128Encode", "sigToWasmTypes", "generateFuncType", "convertJsFunctionToWasm", "getEmptyTableSlot", "updateTableMap", "getFunctionAddress", "addFunction", "removeFunction", "reallyNegative", "strLen", "reSign", "formatString", "intArrayFromString", "intArrayToString", "AsciiToString", "stringToAscii", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToNewUTF8", "writeArrayToMemory", "registerKeyEventCallback", "getBoundingClientRect", "fillMouseEventData", "registerMouseEventCallback", "registerWheelEventCallback", "registerUiEventCallback", "registerFocusEventCallback", "fillDeviceOrientationEventData", "registerDeviceOrientationEventCallback", "fillDeviceMotionEventData", "registerDeviceMotionEventCallback", "screenOrientation", "fillOrientationChangeEventData", "registerOrientationChangeEventCallback", "fillFullscreenChangeEventData", "registerFullscreenChangeEventCallback", "JSEvents_requestFullscreen", "JSEvents_resizeCanvasForFullscreen", "registerRestoreOldStyle", "hideEverythingExceptGivenElement", "restoreHiddenElements", "setLetterbox", "softFullscreenResizeWebGLRenderTarget", "doRequestFullscreen", "fillPointerlockChangeEventData", "registerPointerlockChangeEventCallback", "registerPointerlockErrorEventCallback", "requestPointerLock", "fillVisibilityChangeEventData", "registerVisibilityChangeEventCallback", "registerTouchEventCallback", "fillGamepadEventData", "registerGamepadEventCallback", "registerBeforeUnloadEventCallback", "fillBatteryEventData", "battery", "registerBatteryEventCallback", "setCanvasElementSize", "getCanvasElementSize", "demangle", "demangleAll", "jsStackTrace", "stackTrace", "getEnvStrings", "checkWasiClock", "wasiRightsToMuslOFlags", "wasiOFlagsToMuslOFlags", "createDyncallWrapper", "setImmediateWrapped", "clearImmediateWrapped", "polyfillSetImmediate", "getPromise", "makePromise", "idsToPromises", "makePromiseCallback", "ExceptionInfo", "findMatchingCatch", "getSocketFromFD", "getSocketAddress", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar", "_setNetworkCallback", "heapObjectForWebGLType", "heapAccessShiftForWebGLHeap", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "__glGenObject", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "writeGLArray", "registerWebGlEventCallback", "runAndAbortIfError", "SDL_unicode", "SDL_ttfContext", "SDL_audio", "GLFW_Window", "ALLOC_NORMAL", "ALLOC_STACK", "allocate", "writeStringToMemory", "writeAsciiToMemory" ];
+var missingLibrarySymbols = [ "writeI53ToI64", "writeI53ToI64Clamped", "writeI53ToI64Signaling", "writeI53ToU64Clamped", "writeI53ToU64Signaling", "readI53FromU64", "convertI32PairToI53", "convertU32PairToI53", "zeroMemory", "growMemory", "isLeapYear", "ydayFromDate", "arraySum", "addDays", "setErrNo", "inetPton4", "inetNtop4", "inetPton6", "inetNtop6", "readSockaddr", "writeSockaddr", "getHostByName", "initRandomFill", "randomFill", "getCallstack", "emscriptenLog", "convertPCtoSourceLocation", "readEmAsmArgs", "jstoi_q", "jstoi_s", "getExecutableName", "listenOnce", "autoResumeAudioContext", "dynCallLegacy", "getDynCaller", "dynCall", "asmjsMangle", "asyncLoad", "alignMemory", "mmapAlloc", "handleAllocatorInit", "HandleAllocator", "getNativeTypeSize", "STACK_SIZE", "STACK_ALIGN", "POINTER_SIZE", "ASSERTIONS", "getCFunc", "ccall", "cwrap", "uleb128Encode", "generateFuncType", "convertJsFunctionToWasm", "getEmptyTableSlot", "updateTableMap", "getFunctionAddress", "addFunction", "removeFunction", "reallyNegative", "strLen", "reSign", "formatString", "intArrayFromString", "intArrayToString", "AsciiToString", "stringToAscii", "UTF16ToString", "stringToUTF16", "lengthBytesUTF16", "UTF32ToString", "stringToUTF32", "lengthBytesUTF32", "stringToNewUTF8", "writeArrayToMemory", "registerKeyEventCallback", "getBoundingClientRect", "fillMouseEventData", "registerMouseEventCallback", "registerWheelEventCallback", "registerUiEventCallback", "registerFocusEventCallback", "fillDeviceOrientationEventData", "registerDeviceOrientationEventCallback", "fillDeviceMotionEventData", "registerDeviceMotionEventCallback", "screenOrientation", "fillOrientationChangeEventData", "registerOrientationChangeEventCallback", "fillFullscreenChangeEventData", "registerFullscreenChangeEventCallback", "JSEvents_requestFullscreen", "JSEvents_resizeCanvasForFullscreen", "registerRestoreOldStyle", "hideEverythingExceptGivenElement", "restoreHiddenElements", "setLetterbox", "softFullscreenResizeWebGLRenderTarget", "doRequestFullscreen", "fillPointerlockChangeEventData", "registerPointerlockChangeEventCallback", "registerPointerlockErrorEventCallback", "requestPointerLock", "fillVisibilityChangeEventData", "registerVisibilityChangeEventCallback", "registerTouchEventCallback", "fillGamepadEventData", "registerGamepadEventCallback", "registerBeforeUnloadEventCallback", "fillBatteryEventData", "battery", "registerBatteryEventCallback", "setCanvasElementSize", "getCanvasElementSize", "demangle", "demangleAll", "jsStackTrace", "stackTrace", "getEnvStrings", "checkWasiClock", "wasiRightsToMuslOFlags", "wasiOFlagsToMuslOFlags", "createDyncallWrapper", "setImmediateWrapped", "clearImmediateWrapped", "polyfillSetImmediate", "getPromise", "makePromise", "idsToPromises", "makePromiseCallback", "ExceptionInfo", "findMatchingCatch", "getSocketFromFD", "getSocketAddress", "FS_createPreloadedFile", "FS_modeStringToFlags", "FS_getMode", "FS_stdin_getChar", "_setNetworkCallback", "heapObjectForWebGLType", "heapAccessShiftForWebGLHeap", "webgl_enable_ANGLE_instanced_arrays", "webgl_enable_OES_vertex_array_object", "webgl_enable_WEBGL_draw_buffers", "webgl_enable_WEBGL_multi_draw", "emscriptenWebGLGet", "computeUnpackAlignedImageSize", "colorChannelsInGlTextureFormat", "emscriptenWebGLGetTexPixelData", "__glGenObject", "emscriptenWebGLGetUniform", "webglGetUniformLocation", "webglPrepareUniformLocationsBeforeFirstUse", "webglGetLeftBracePos", "emscriptenWebGLGetVertexAttrib", "__glGetActiveAttribOrUniform", "writeGLArray", "registerWebGlEventCallback", "SDL_unicode", "SDL_ttfContext", "SDL_audio", "GLFW_Window", "ALLOC_NORMAL", "ALLOC_STACK", "allocate", "writeStringToMemory", "writeAsciiToMemory" ];
 
 missingLibrarySymbols.forEach(missingLibrarySymbol);
 
-var unexportedSymbols = [ "run", "addOnPreRun", "addOnInit", "addOnPreMain", "addOnExit", "addOnPostRun", "addRunDependency", "removeRunDependency", "FS_createFolder", "FS_createPath", "FS_createDataFile", "FS_createLazyFile", "FS_createLink", "FS_createDevice", "FS_readFile", "FS_unlink", "out", "err", "callMain", "abort", "keepRuntimeAlive", "wasmMemory", "wasmTable", "wasmExports", "stackAlloc", "stackSave", "stackRestore", "getTempRet0", "setTempRet0", "writeStackCookie", "checkStackCookie", "readI53FromI64", "convertI32PairToI53Checked", "ptrToString", "exitJS", "getHeapMax", "abortOnCannotGrowMemory", "ENV", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "ERRNO_CODES", "ERRNO_MESSAGES", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "UNWIND_CACHE", "readEmAsmArgsArray", "handleException", "callUserCallback", "maybeExit", "safeSetTimeout", "freeTableIndexes", "functionsInTableMap", "unSign", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "UTF16Decoder", "stringToUTF8OnStack", "JSEvents", "specialHTMLTargets", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "ExitStatus", "flush_NO_FILESYSTEM", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "setMainLoop", "wget", "SYSCALLS", "preloadPlugins", "FS_stdin_getChar_buffer", "FS", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "emscripten_webgl_power_preferences", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "SDL", "SDL_gfx", "GLFW", "WebGPU", "JsValStore", "allocateUTF8", "allocateUTF8OnStack" ];
+var unexportedSymbols = [ "run", "addOnPreRun", "addOnInit", "addOnPreMain", "addOnExit", "addOnPostRun", "addRunDependency", "removeRunDependency", "FS_createFolder", "FS_createPath", "FS_createDataFile", "FS_createLazyFile", "FS_createLink", "FS_createDevice", "FS_unlink", "out", "err", "callMain", "abort", "keepRuntimeAlive", "wasmMemory", "wasmTable", "wasmExports", "stackAlloc", "stackSave", "stackRestore", "getTempRet0", "setTempRet0", "writeStackCookie", "checkStackCookie", "readI53FromI64", "convertI32PairToI53Checked", "ptrToString", "exitJS", "getHeapMax", "abortOnCannotGrowMemory", "ENV", "MONTH_DAYS_REGULAR", "MONTH_DAYS_LEAP", "MONTH_DAYS_REGULAR_CUMULATIVE", "MONTH_DAYS_LEAP_CUMULATIVE", "ERRNO_CODES", "ERRNO_MESSAGES", "DNS", "Protocols", "Sockets", "timers", "warnOnce", "UNWIND_CACHE", "readEmAsmArgsArray", "handleException", "runtimeKeepalivePush", "runtimeKeepalivePop", "callUserCallback", "maybeExit", "safeSetTimeout", "sigToWasmTypes", "freeTableIndexes", "functionsInTableMap", "unSign", "setValue", "getValue", "PATH", "PATH_FS", "UTF8Decoder", "UTF8ArrayToString", "UTF8ToString", "stringToUTF8Array", "stringToUTF8", "lengthBytesUTF8", "UTF16Decoder", "stringToUTF8OnStack", "JSEvents", "specialHTMLTargets", "maybeCStringToJsString", "findEventTarget", "findCanvasEventTarget", "currentFullscreenStrategy", "restoreOldWindowedStyle", "ExitStatus", "flush_NO_FILESYSTEM", "promiseMap", "uncaughtExceptionCount", "exceptionLast", "exceptionCaught", "Browser", "setMainLoop", "wget", "SYSCALLS", "preloadPlugins", "FS_stdin_getChar_buffer", "FS", "MEMFS", "TTY", "PIPEFS", "SOCKFS", "tempFixedLengthArray", "miniTempWebGLFloatBuffers", "miniTempWebGLIntBuffers", "GL", "emscripten_webgl_power_preferences", "AL", "GLUT", "EGL", "GLEW", "IDBStore", "runAndAbortIfError", "Asyncify", "Fibers", "SDL", "SDL_gfx", "GLFW", "WebGPU", "JsValStore", "allocateUTF8", "allocateUTF8OnStack" ];
 
 unexportedSymbols.forEach(unexportedRuntimeSymbol);
 
@@ -3188,7 +3577,11 @@ function callMain() {
  var argv = 0;
  try {
   var ret = entryFunction(argc, argv);
-  exitJS(ret, true);
+  Promise.resolve(ret).then(result => {
+   exitJS(result, true);
+  }).catch(e => {
+   handleException(e);
+  });
   return ret;
  } catch (e) {
   return handleException(e);

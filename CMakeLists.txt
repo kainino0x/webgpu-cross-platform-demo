@@ -45,15 +45,19 @@ if(EMSCRIPTEN)
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
-        # To enable DWARF debugging, remove -gsource-map and follow:
-        # https://developer.chrome.com/blog/wasm-debugging-2020/
-        PRIVATE "-gsource-map"
-        #PRIVATE "--source-map-base=./"
-        PRIVATE "-sUSE_WEBGPU=1"
-        PRIVATE "-sASSERTIONS=1"
-        PRIVATE "-sSAFE_HEAP=1"
-        #PRIVATE "--closure=1"
-        #PRIVATE "-sVERBOSE=1"
+        PRIVATE
+            -Wno-limited-postlink-optimizations
+            # To enable DWARF debugging, remove -gsource-map and follow:
+            # https://developer.chrome.com/blog/wasm-debugging-2020/
+            #-gsource-map
+            #--source-map-base=./
+            -sUSE_WEBGPU=1
+            -sASSERTIONS=1
+            -sSAFE_HEAP=1
+            #-sASYNCIFY=1
+            -sASYNCIFY=2 -sASYNCIFY_EXPORTS=doFuturesTest -Wno-experimental
+            #--closure=1
+            #-sVERBOSE=1
         )
 else()
     target_link_libraries(hello

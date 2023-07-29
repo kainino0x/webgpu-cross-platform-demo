@@ -49,6 +49,10 @@ const uint32_t kHeight = 150;
 #include <emscripten/html5.h>
 #include <emscripten/html5_webgpu.h>
 
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE void doFuturesTest(void*);
+}
+
 void GetDevice(void (*callback)(wgpu::Device)) {
     instance.RequestAdapter(nullptr, [](WGPURequestAdapterStatus status, WGPUAdapter cAdapter, const char* message, void* userdata) {
         wgpu::Adapter adapter = wgpu::Adapter::Acquire(cAdapter);
@@ -474,6 +478,8 @@ void render(wgpu::TextureView view, wgpu::TextureView depthStencilView) {
     queue.Submit(1, &commands);
 }
 
+static std::chrono::time_point<std::chrono::high_resolution_clock> start;
+
 void issueContentsCheck(const char* functionName,
         wgpu::Buffer readbackBuffer, uint32_t expectData) {
     struct UserData {
@@ -654,6 +660,46 @@ void doRenderTest() {
     issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
+void doFuturesTest(void*) {
+    printf("-- doFuturesTest\n");
+    static constexpr bool kUseFuture = true;  // FIXME
+    static constexpr uint64_t kTimeoutNS = 1'000'000'000;  // 1 second
+    start = std::chrono::high_resolution_clock::now();
+    bool done = false;
+    WGPUQueueWorkDoneCallback callback = [](WGPUQueueWorkDoneStatus status, void* userdata) {
+        *reinterpret_cast<bool*>(userdata) = true;
+
+        auto end = std::chrono::high_resolution_clock::now();
+        printf("-- OnSubmittedWorkDone callback after %lldus\n",
+            std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+    };
+
+    if constexpr (kUseFuture) {
+        wgpu::Future future = queue.OnSubmittedWorkDone2(wgpu::CallbackFlag::Spontaneous, callback, &done);
+        wgpu::FutureWaitInfo info{future, false};
+
+        while (!info.completed) {
+            wgpu::WaitStatus status = instance.WaitAny(1, &info, kTimeoutNS);
+            if (status == wgpu::WaitStatus::TimedOut) {
+                printf("WaitAny timed out...\n");
+                continue;
+            }
+            assert(status == wgpu::WaitStatus::Success);
+            assert(info.completed);
+            assert(done);
+        }
+    } else {
+        queue.OnSubmittedWorkDone(0, callback, &done);
+        while (!done) {
+            emscripten_sleep(100);  // FIXME: crashes
+        }
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    printf("-- OnSubmittedWorkDone: total completion after %lldus\n",
+        std::chrono::duration_cast<std::chrono::microseconds>(end - start).count());
+}
+
 void frame() {
     wgpu::TextureView backbuffer = swapChain.GetCurrentTextureView();
     render(backbuffer, canvasDepthStencilView);
@@ -681,6 +727,8 @@ void run() {
     doCopyTestMapAsync(false);
     doCopyTestMapAsync(true);
     doRenderTest();
+
+    emscripten_async_call(doFuturesTest, nullptr, 0);
 
     {
         wgpu::TextureDescriptor descriptor{};
