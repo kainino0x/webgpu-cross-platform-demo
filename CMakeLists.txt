@@ -34,7 +34,11 @@ if(NOT EMSCRIPTEN)
 endif()
 
 if(EMSCRIPTEN)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
+    add_compile_options(
+        "-Wall"
+        "-Wextra"
+        "$<$<CONFIG:Release>:-flto>"
+        )
 endif()
 
 add_executable(hello
@@ -45,15 +49,21 @@ if(EMSCRIPTEN)
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
-        # To enable DWARF debugging, remove -gsource-map and follow:
-        # https://developer.chrome.com/blog/wasm-debugging-2020/
-        PRIVATE "-gsource-map"
-        #PRIVATE "--source-map-base=./"
-        PRIVATE "-sUSE_WEBGPU=1"
-        PRIVATE "-sASSERTIONS=1"
-        PRIVATE "-sSAFE_HEAP=1"
-        #PRIVATE "--closure=1"
-        #PRIVATE "-sVERBOSE=1"
+        PRIVATE
+            # To enable DWARF debugging, remove -gsource-map and follow:
+            # https://developer.chrome.com/blog/wasm-debugging-2020/
+            "$<$<CONFIG:Debug>:-gsource-map>"
+            #"$<$<CONFIG:Debug>:--source-map-base=./>"
+
+            "-sUSE_WEBGPU=1"
+
+            "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
+            "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>"
+            "$<$<CONFIG:Release>:-flto>"
+            "$<$<CONFIG:Release>:--closure=1>"
+
+            # Verbose compilation output
+            #"-sVERBOSE=1"
         )
 else()
     target_link_libraries(hello
