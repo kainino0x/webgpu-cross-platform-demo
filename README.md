@@ -22,27 +22,36 @@ but that is a goal.
 
 Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
+This step is required for both native and web builds:
+
+```sh
+./setup_build.sh
+```
+
 ### Native build
 
 Build has been tested on Linux/Mac/Win10.
 
+For a quick build, use:
+
 ```sh
-./setup_native_build.sh
+npm run build-native  # using Make
+# or
+npm run ninja-native  # using Ninja
+```
+
+Detailed steps:
+
+```sh
 mkdir -p out/native
 cd out/native
-```
 
-Then:
-
-```sh
-cmake ../..
+# Using Make:
+cmake ../..  # Add -DCMAKE_BUILD_TYPE=Release, -DDEMO_USE_GLFW=OFF, etc. here as desired
 make -j4 clean all
-```
 
-Or, to use Ninja instead of Make:
-
-```sh
-cmake -GNinja ../..
+# Or, to use Ninja instead of Make:
+cmake -GNinja ../..  # Add flags here as desired
 ninja
 ```
 
@@ -83,29 +92,7 @@ Chrome/Edge/Firefox on any platform with support (modulo compatibility differenc
 pre-release spec changes).
 Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
 
-**Note:** To build, the active Emscripten version must be recent.
-Use the latest Emscripten version for best results including bugfixes to the WebGPU bindings.
-
 ```sh
-# Make sure Emscripten tools are in the path.
-source /path/to/emsdk/emsdk_env.sh
-
-mkdir -p out/web
-cd out/web
+./build_webdbg.sh
+./build_webrel.sh
 ```
-
-Then:
-
-```sh
-emcmake cmake ../..
-make -j4 clean all
-```
-
-Or, to use Ninja instead of Make:
-
-```sh
-emcmake cmake -GNinja ../..
-ninja
-```
-
-There are shorthands for these in `package.json` so you can use, for example, `npm run ninja-web`.

@@ -39,6 +39,9 @@ if(EMSCRIPTEN)
         "-Wextra"
         "$<$<CONFIG:Release>:-flto>"
         )
+    include_directories(BEFORE
+        "third_party/dawn/out/wasm/gen/src/emdawnwebgpu/include"
+        )
 endif()
 
 add_executable(hello
@@ -46,19 +49,37 @@ add_executable(hello
     )
 
 if(EMSCRIPTEN)
+    add_library(webgpu_layer
+        "third_party/dawn/third_party/emdawnwebgpu/webgpu.cpp"
+        )
+    target_link_libraries(hello
+        webgpu_layer
+        )
+
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
         PRIVATE
-            # To enable DWARF debugging, remove -gsource-map and follow:
+            # DWARF symbols are enabled by default (-g). To use, follow:
             # https://developer.chrome.com/blog/wasm-debugging-2020/
-            "$<$<CONFIG:Debug>:-gsource-map>"
+            # Or, switch to -gsource-map for more basic debugging.
+            #"$<$<CONFIG:Debug>:-gsource-map>"
+            # Use this to adjust the source map's relative URLs to source files.
             #"$<$<CONFIG:Debug>:--source-map-base=./>"
 
-            "-sUSE_WEBGPU=1"
+            # We are using Dawn-generated bindings, not built-in ones
+            "-sUSE_WEBGPU=0"
+            # The JS libraries needed for bindings
+            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_enum_tables.js"
+            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_struct_info.js"
+            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_sig_info.js"
+            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
+            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_html5_webgpu.js"
+            "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
             "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
             "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>"
+            "$<$<CONFIG:Debug>:-Wno-limited-postlink-optimizations>"
             "$<$<CONFIG:Release>:-flto>"
             "$<$<CONFIG:Release>:--closure=1>"
 
