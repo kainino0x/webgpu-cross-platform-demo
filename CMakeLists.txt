@@ -36,7 +36,8 @@ endif()
 if(EMSCRIPTEN)
     add_compile_options(
         "-Wall"
-        "$<$<CONFIG:RELEASE>:-flto>"
+        #"$<$<CONFIG:RELEASE>:-O3>"
+        #"$<$<CONFIG:RELEASE>:-flto>"
         )
 endif()
 
