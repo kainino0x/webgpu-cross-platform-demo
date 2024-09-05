@@ -1,0 +1,10 @@
+Flaky alignfault on `new WGPUTextureImpl` and similar, fixed locally by adding
+a member `int x = 0` to WGPUTextureImpl but then the problem moves to TextureViewImpl.
+Adding that to all "PASSTHROUGH" objects doesn't work (then fails in Texture).
+Likely related to next item
+
+ASan use-after-free errors, trying to release a Buffer after it's been released already?
+This is happening on shutdown due to destruction of static objects in particular.
+
+Release build crashes with "memory access out of bounds" (before even rendering anything),
+not sure if fixing ASan build will fix this

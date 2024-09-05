@@ -4,7 +4,9 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(hello)
 set(CMAKE_CXX_STANDARD 20)
 
-if(NOT EMSCRIPTEN)
+option(DEMO_USE_EMSCRIPTEN_SANITIZERS "Enable ASan/UBSan when building for Emscripten" OFF)
+
+if (NOT EMSCRIPTEN)
     # Turning off OpenGL for Dawn
     set(DAWN_ENABLE_PIC        ON CACHE BOOL "Position-Independent-Code")
     set(DAWN_ENABLE_DESKTOP_GL OFF CACHE BOOL "OpenGL backend")
@@ -33,12 +35,18 @@ if(NOT EMSCRIPTEN)
     add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
 endif()
 
-if(EMSCRIPTEN)
+if (EMSCRIPTEN)
     add_compile_options(
         "-Wall"
         "-Wextra"
         "$<$<CONFIG:Release>:-flto>"
         )
+    if (DEMO_USE_EMSCRIPTEN_SANITIZERS)
+        add_compile_options(
+            "-fsanitize=address"
+            "-fsanitize=undefined"
+            )
+    endif()
     include_directories(BEFORE
         "third_party/dawn/out/wasm/gen/src/emdawnwebgpu/include"
         )
@@ -48,7 +56,7 @@ add_executable(hello
     "main.cpp"
     )
 
-if(EMSCRIPTEN)
+if (EMSCRIPTEN)
     add_library(webgpu_layer
         "third_party/dawn/third_party/emdawnwebgpu/webgpu.cpp"
         )
@@ -78,14 +86,25 @@ if(EMSCRIPTEN)
             "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
             "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
-            "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>"
             "$<$<CONFIG:Debug>:-Wno-limited-postlink-optimizations>"
             "$<$<CONFIG:Release>:-flto>"
             "$<$<CONFIG:Release>:--closure=1>"
 
             # Verbose compilation output
             #"-sVERBOSE=1"
-        )
+            )
+    if (DEMO_USE_EMSCRIPTEN_SANITIZERS)
+        target_link_options(hello
+            PRIVATE
+                "-fsanitize=address"
+                "-fsanitize=undefined"
+            )
+    else()
+        target_link_options(hello
+            PRIVATE
+                "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>" # Incompatible with ASan
+            )
+    endif()
 else()
     target_link_libraries(hello
         dawn_headers
@@ -103,6 +122,6 @@ else()
         target_link_libraries(hello
             webgpu_glfw
             glfw
-        )
+            )
     endif()
 endif()

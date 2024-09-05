@@ -35,11 +35,10 @@
 static wgpu::Instance instance;
 static wgpu::Device device;
 static wgpu::Queue queue;
-static wgpu::Buffer readbackBuffer;
 static wgpu::RenderPipeline pipeline;
 static int testsCompleted = 0;
 
-wgpu::SwapChain swapChain;
+wgpu::Surface surface;
 wgpu::TextureView canvasDepthStencilView;
 const uint32_t kWidth = 300;
 const uint32_t kHeight = 150;
@@ -445,7 +444,7 @@ void render(wgpu::TextureView view, wgpu::TextureView depthStencilView) {
     attachment.view = view;
     attachment.loadOp = wgpu::LoadOp::Clear;
     attachment.storeOp = wgpu::StoreOp::Store;
-    attachment.clearValue = {0, 0, 0, 1};
+    attachment.clearValue = {0, 1, 0, 0.5};
 
     wgpu::RenderPassDescriptor renderpass{};
     renderpass.colorAttachmentCount = 1;
@@ -626,6 +625,7 @@ void doRenderTest() {
     }
     render(readbackTexture.CreateView(), depthTexture.CreateView());
 
+    wgpu::Buffer readbackBuffer;
     {
         wgpu::BufferDescriptor descriptor{};
         descriptor.size = 4;
@@ -655,7 +655,10 @@ void doRenderTest() {
 }
 
 void frame() {
-    wgpu::TextureView backbuffer = swapChain.GetCurrentTextureView();
+    wgpu::SurfaceTexture surfaceTexture;
+    surface.GetCurrentTexture(&surfaceTexture);
+    assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Success);
+    wgpu::TextureView backbuffer = surfaceTexture.texture.CreateView();
     render(backbuffer, canvasDepthStencilView);
 
     // TODO: Read back from the canvas with drawImage() (or something) and
@@ -697,15 +700,17 @@ void run() {
 
         wgpu::SurfaceDescriptor surfDesc{};
         surfDesc.nextInChain = &canvasDesc;
-        wgpu::Surface surface = instance.CreateSurface(&surfDesc);
+        surface = instance.CreateSurface(&surfDesc);
 
-        wgpu::SwapChainDescriptor scDesc{};
-        scDesc.usage = wgpu::TextureUsage::RenderAttachment;
-        scDesc.format = wgpu::TextureFormat::BGRA8Unorm;
-        scDesc.width = kWidth;
-        scDesc.height = kHeight;
-        scDesc.presentMode = wgpu::PresentMode::Fifo;
-        swapChain = device.CreateSwapChain(surface, &scDesc);
+        wgpu::SurfaceConfiguration configuration{};
+        configuration.device = device;
+        configuration.usage = wgpu::TextureUsage::RenderAttachment;
+        configuration.format = wgpu::TextureFormat::BGRA8Unorm;
+        configuration.width = kWidth;
+        configuration.height = kHeight;
+        configuration.alphaMode = wgpu::CompositeAlphaMode::Premultiplied;
+        configuration.presentMode = wgpu::PresentMode::Fifo;
+        surface.Configure(&configuration);
     }
     emscripten_set_main_loop(frame, 0, false);
 #elif defined(DEMO_USE_GLFW)
