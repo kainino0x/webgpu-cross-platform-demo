@@ -666,9 +666,7 @@ void frame() {
 
 #if defined(__EMSCRIPTEN__)
     emscripten_cancel_main_loop();
-
-    // exit(0) (rather than emscripten_force_exit(0)) ensures there is no dangling keepalive.
-    exit(0);
+    // (We don't exit here because the readback test may still be running.)
 #elif defined(DEMO_USE_GLFW)
     // Submit frame
     swapChain.Present();
@@ -679,6 +677,8 @@ void frame() {
 void run() {
     init();
 
+    // Kick off all of the tests before setting up to render a frame.
+    // (Note we don't wait for the tests so they may complete before or after the frame.)
     doCopyTestMappedAtCreation(false);
     doCopyTestMappedAtCreation(true);
     doCopyTestMapAsync(false);
@@ -737,10 +737,10 @@ int main() {
 
 #ifdef __EMSCRIPTEN__
     // The test result will be reported when the main_loop completes.
-    // emscripten_exit_with_live_runtime isn't needed because the WebGPU
-    // callbacks should all automatically keep the runtime alive until
-    // emscripten_set_main_loop, and that should keep it alive until
-    // emscripten_cancel_main_loop.
+    // emscripten_exit_with_live_runtime() shouldn't be needed, because the async stuff we do keeps
+    // the runtime alive automatically. (Note the tests may complete before or after the frame.)
+    // - The WebGPU callbacks keep the runtime alive until they complete.
+    // - emscripten_set_main_loop keeps it alive until emscripten_cancel_main_loop.
     //
     // This code is returned when the runtime exits unless something else sets it, like exit(0).
     return 99;

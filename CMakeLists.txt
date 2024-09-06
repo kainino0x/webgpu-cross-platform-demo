@@ -4,8 +4,6 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(hello)
 set(CMAKE_CXX_STANDARD 20)
 
-option(DEMO_USE_EMSCRIPTEN_SANITIZERS "Enable ASan/UBSan when building for Emscripten" OFF)
-
 if (NOT EMSCRIPTEN)
     # Turning off OpenGL for Dawn
     set(DAWN_ENABLE_PIC        ON CACHE BOOL "Position-Independent-Code")
@@ -35,18 +33,33 @@ if (NOT EMSCRIPTEN)
     add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
 endif()
 
+add_compile_options(
+    "-fno-exceptions"
+    "$<$<CONFIG:Release>:-flto>"
+    )
+add_link_options(
+    "-fno-exceptions"
+    "$<$<CONFIG:Release>:-flto>"
+    )
+
+option(DEMO_USE_SANITIZERS "Enable ASan/UBSan" OFF)
+if (DEMO_USE_SANITIZERS)
+    add_compile_options(
+        "-fsanitize=address"
+        "-fsanitize=undefined"
+        )
+    add_link_options(
+        "-fsanitize=address"
+        "-fsanitize=undefined"
+        )
+endif()
+
 if (EMSCRIPTEN)
     add_compile_options(
         "-Wall"
         "-Wextra"
-        "$<$<CONFIG:Release>:-flto>"
+        #"-Weverything"
         )
-    if (DEMO_USE_EMSCRIPTEN_SANITIZERS)
-        add_compile_options(
-            "-fsanitize=address"
-            "-fsanitize=undefined"
-            )
-    endif()
     include_directories(BEFORE
         "third_party/dawn/out/wasm/gen/src/emdawnwebgpu/include"
         )
@@ -85,25 +98,20 @@ if (EMSCRIPTEN)
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_html5_webgpu.js"
             "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
+            "-sEXIT_RUNTIME=0"
+            #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"
             "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
             "$<$<CONFIG:Debug>:-Wno-limited-postlink-optimizations>"
-            "$<$<CONFIG:Release>:-flto>"
             "$<$<CONFIG:Release>:--closure=1>"
 
             # Verbose compilation output
             #"-sVERBOSE=1"
             )
-    if (DEMO_USE_EMSCRIPTEN_SANITIZERS)
-        target_link_options(hello
-            PRIVATE
-                "-fsanitize=address"
-                "-fsanitize=undefined"
-            )
-    else()
+    if (NOT DEMO_USE_SANITIZERS)
         target_link_options(hello
             PRIVATE
                 "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>" # Incompatible with ASan
-            )
+                )
     endif()
 else()
     target_link_libraries(hello

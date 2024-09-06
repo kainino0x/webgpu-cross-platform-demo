@@ -1,9 +1,6 @@
 /out/*/*
-!/out/webdbg/hello.html
-!/out/webdbg/hello.js
-!/out/webdbg/hello.wasm
-!/out/webdbg/hello.wasm.map
-!/out/webrel/hello.html
-!/out/webrel/hello.js
-!/out/webrel/hello.wasm
+!/out/*/hello.html
+!/out/*/hello.js
+!/out/*/hello.wasm
+!/out/*/hello.wasm.map
 /third_party/
