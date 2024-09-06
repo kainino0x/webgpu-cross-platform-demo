@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=3.1.65 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=18.20.3_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=2ee982ec3febbe137caa8f740b92c1fc0f4a27ed
+DAWN_REVISION=8dbe759b2e866a010abbf4471ccdfc07ce926dc2
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -68,8 +68,8 @@ source emsdk/emsdk_env.sh
     mkdir -p out/wasm
     cd out/wasm
     # TODO: It should be unnecessary to build this with emscripten; can just build normally but dawn's CMake disables some of the targets if we do that
-    # TODO: This path currently has to be relative to out/wasm/gen/emdawnwebgpu instead of out/wasm
     source ../../../emsdk/emsdk_env.sh
+    # TODO: This path currently has to be relative to out/wasm/gen/emdawnwebgpu instead of out/wasm
     emcmake cmake -GNinja \
         -DDAWN_EMSCRIPTEN_TOOLCHAIN="../../../../../emscripten" \
         ../..

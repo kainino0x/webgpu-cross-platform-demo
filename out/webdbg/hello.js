@@ -2843,7 +2843,8 @@ var _wgpuBufferGetMappedRange = (bufferPtr, offset, size) => {
   return data;
 };
 
-var _wgpuBufferMapAsync = (bufferPtr, mode, offset, size, callback, userdata) => {
+var _wgpuBufferMapAsync = function(bufferPtr, mode_low, mode_high, offset, size, callback, userdata) {
+  var mode = convertI32PairToI53Checked(mode_low, mode_high);
   var bufferWrapper = WebGPU._tableGet(bufferPtr);
   assert(typeof bufferWrapper != "undefined");
   bufferWrapper.mapMode = mode;
@@ -2938,10 +2939,10 @@ var _wgpuCommandEncoderBeginRenderPass = (encoderPtr, descriptor) => {
       var sType = SAFE_HEAP_LOAD((((nextInChainPtr) + (4)) >> 2) * 4, 4, 1);
       assert(sType === 3);
       assert(0 === SAFE_HEAP_LOAD(((nextInChainPtr) >> 2) * 4, 4, 1));
-      var renderPassDescriptorMaxDrawCount = nextInChainPtr;
-      assert(renderPassDescriptorMaxDrawCount);
-      assert(SAFE_HEAP_LOAD(((renderPassDescriptorMaxDrawCount) >> 2) * 4, 4, 1) === 0);
-      maxDrawCount = SAFE_HEAP_LOAD(((((renderPassDescriptorMaxDrawCount + 4)) + (8)) >> 2) * 4, 4, 1) * 4294967296 + SAFE_HEAP_LOAD((((renderPassDescriptorMaxDrawCount) + (8)) >> 2) * 4, 4, 1);
+      var renderPassMaxDrawCount = nextInChainPtr;
+      assert(renderPassMaxDrawCount);
+      assert(SAFE_HEAP_LOAD(((renderPassMaxDrawCount) >> 2) * 4, 4, 1) === 0);
+      maxDrawCount = SAFE_HEAP_LOAD(((((renderPassMaxDrawCount + 4)) + (8)) >> 2) * 4, 4, 1) * 4294967296 + SAFE_HEAP_LOAD((((renderPassMaxDrawCount) + (8)) >> 2) * 4, 4, 1);
     }
     var desc = {
       "label": undefined,
@@ -3284,10 +3285,10 @@ var _wgpuInstanceCreateSurface = (instancePtr, descriptor) => {
   var nextInChainPtr = SAFE_HEAP_LOAD(((descriptor) >> 2) * 4, 4, 1);
   assert(nextInChainPtr !== 0);
   assert(262144 === SAFE_HEAP_LOAD((((nextInChainPtr) + (4)) >> 2) * 4, 4, 1));
-  var descriptorFromCanvasHTMLSelector = nextInChainPtr;
-  assert(descriptorFromCanvasHTMLSelector);
-  assert(SAFE_HEAP_LOAD(((descriptorFromCanvasHTMLSelector) >> 2) * 4, 4, 1) === 0);
-  var selectorPtr = SAFE_HEAP_LOAD((((descriptorFromCanvasHTMLSelector) + (8)) >> 2) * 4, 4, 1);
+  var sourceCanvasHTMLSelector = nextInChainPtr;
+  assert(sourceCanvasHTMLSelector);
+  assert(SAFE_HEAP_LOAD(((sourceCanvasHTMLSelector) >> 2) * 4, 4, 1) === 0);
+  var selectorPtr = SAFE_HEAP_LOAD((((sourceCanvasHTMLSelector) + (8)) >> 2) * 4, 4, 1);
   assert(selectorPtr);
   var canvas = findCanvasEventTarget(selectorPtr);
   var context = canvas.getContext("webgpu");

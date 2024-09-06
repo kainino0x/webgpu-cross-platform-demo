@@ -5899,7 +5899,8 @@ var _wgpuBufferGetMappedRange = (bufferPtr, offset, size) => {
   return data;
 };
 
-var _wgpuBufferMapAsync = (bufferPtr, mode, offset, size, callback, userdata) => {
+var _wgpuBufferMapAsync = function(bufferPtr, mode_low, mode_high, offset, size, callback, userdata) {
+  var mode = convertI32PairToI53Checked(mode_low, mode_high);
   var bufferWrapper = WebGPU._tableGet(bufferPtr);
   assert(typeof bufferWrapper != "undefined");
   bufferWrapper.mapMode = mode;
@@ -5994,10 +5995,10 @@ var _wgpuCommandEncoderBeginRenderPass = (encoderPtr, descriptor) => {
       var sType = _asan_js_load_4u((((nextInChainPtr) + (4)) >> 2));
       assert(sType === 3);
       assert(0 === _asan_js_load_4u(((nextInChainPtr) >> 2)));
-      var renderPassDescriptorMaxDrawCount = nextInChainPtr;
-      assert(renderPassDescriptorMaxDrawCount);
-      assert(_asan_js_load_4u(((renderPassDescriptorMaxDrawCount) >> 2)) === 0);
-      maxDrawCount = _asan_js_load_4u(((((renderPassDescriptorMaxDrawCount + 4)) + (8)) >> 2)) * 4294967296 + _asan_js_load_4u((((renderPassDescriptorMaxDrawCount) + (8)) >> 2));
+      var renderPassMaxDrawCount = nextInChainPtr;
+      assert(renderPassMaxDrawCount);
+      assert(_asan_js_load_4u(((renderPassMaxDrawCount) >> 2)) === 0);
+      maxDrawCount = _asan_js_load_4u(((((renderPassMaxDrawCount + 4)) + (8)) >> 2)) * 4294967296 + _asan_js_load_4u((((renderPassMaxDrawCount) + (8)) >> 2));
     }
     var desc = {
       "label": undefined,
@@ -6340,10 +6341,10 @@ var _wgpuInstanceCreateSurface = (instancePtr, descriptor) => {
   var nextInChainPtr = _asan_js_load_4u(((descriptor) >> 2));
   assert(nextInChainPtr !== 0);
   assert(262144 === _asan_js_load_4u((((nextInChainPtr) + (4)) >> 2)));
-  var descriptorFromCanvasHTMLSelector = nextInChainPtr;
-  assert(descriptorFromCanvasHTMLSelector);
-  assert(_asan_js_load_4u(((descriptorFromCanvasHTMLSelector) >> 2)) === 0);
-  var selectorPtr = _asan_js_load_4u((((descriptorFromCanvasHTMLSelector) + (8)) >> 2));
+  var sourceCanvasHTMLSelector = nextInChainPtr;
+  assert(sourceCanvasHTMLSelector);
+  assert(_asan_js_load_4u(((sourceCanvasHTMLSelector) >> 2)) === 0);
+  var selectorPtr = _asan_js_load_4u((((sourceCanvasHTMLSelector) + (8)) >> 2));
   assert(selectorPtr);
   var canvas = findCanvasEventTarget(selectorPtr);
   var context = canvas.getContext("webgpu");
