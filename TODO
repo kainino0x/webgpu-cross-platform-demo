@@ -1,17 +1,2 @@
-Flaky alignfault on `new WGPUTextureImpl` and similar
-This goes away if I add a member `int x = 0` to WGPUTextureImpl but then the
-problem moves to TextureViewImpl.
-Adding that to all "PASSTHROUGH" objects doesn't work (then it just fails in Texture again).
-ASan seems to progress past this point so it might not catch it.
-
-ASan use-after-free errors
-The destructor of (at least one of) the static variables runs more than once.
-(It seems to run _5 times_ in fact.)
-Initially it was on readbackBuffer, which I made non-static, then it moved to
-others.
-
-Release build crashes with "memory access out of bounds" (before even rendering anything),
-not sure if fixing ASan build will fix this
-
 Switch to stackSave/stackRestore, see https://github.com/emscripten-core/emscripten/pull/21764
 (As a bonus this _may_ fix the "depends on internal symbol" warning, but it doesn't really matter.)
