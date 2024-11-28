@@ -3,10 +3,10 @@ set -euo pipefail
 
 THIRD_PARTY="$(dirname "$0")"/third_party
 
-EMSCRIPTEN_RELEASE=3.1.65 # This the emsdk tag, the emscripten tag, and the emsdk install target
-NODE_RELEASE=18.20.3_64bit # Must match the Node release used in this Emscripten release
+EMSCRIPTEN_RELEASE=3.1.73 # This the emsdk tag, the emscripten tag, and the emsdk install target
+NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=8dbe759b2e866a010abbf4471ccdfc07ce926dc2
+DAWN_REVISION=5a657da0d714a201775a0557063ddfcad3ad580e
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"

@@ -159,7 +159,7 @@ canvas.emscripten { border: 0px none; background-color: black; }
           return canvas;
         })(),
         setStatus: (text) => {
-          if (!Module.setStatus.last) Module.setStatus.last = { time: Date.now(), text: '' };
+          Module.setStatus.last ??= { time: Date.now(), text: '' };
           if (text === Module.setStatus.last.text) return;
           var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
           var now = Date.now();
