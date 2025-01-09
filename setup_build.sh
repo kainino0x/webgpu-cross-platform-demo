@@ -3,10 +3,10 @@ set -euo pipefail
 
 THIRD_PARTY="$(dirname "$0")"/third_party
 
-EMSCRIPTEN_RELEASE=3.1.73 # This the emsdk tag, the emscripten tag, and the emsdk install target
+EMSCRIPTEN_RELEASE=3.1.74 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=5a657da0d714a201775a0557063ddfcad3ad580e
+DAWN_REVISION=476fe7ff1d9da242a64970b4a0c60471b81cc9d9
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -28,6 +28,7 @@ THIRD_PARTY=$PWD
 )
 
 (
+    # Copy of Emscripten used only for gen_struct_info.py
     if [ ! -e emscripten ] ; then
         mkdir emscripten
         cd emscripten
@@ -38,16 +39,17 @@ THIRD_PARTY=$PWD
     fi
     git checkout --detach $EMSCRIPTEN_RELEASE -- || ( git fetch --tags --depth 1 origin $EMSCRIPTEN_RELEASE && git checkout --detach FETCH_HEAD )
 
-    ./bootstrap
     cat >.emscripten << EOF
 LLVM_ROOT = '${THIRD_PARTY}/emsdk/upstream/bin'
 BINARYEN_ROOT = '${THIRD_PARTY}/emsdk/upstream'
 NODE_JS = '${THIRD_PARTY}/emsdk/node/${NODE_RELEASE}/bin/node'
 JAVA = 'java'
 EOF
+    ./bootstrap
 )
 
 source emsdk/emsdk_env.sh
+emcc --clear-cache
 
 (
     if [ ! -e dawn ] ; then
@@ -69,9 +71,8 @@ source emsdk/emsdk_env.sh
     cd out/wasm
     # TODO: It should be unnecessary to build this with emscripten; can just build normally but dawn's CMake disables some of the targets if we do that
     source ../../../emsdk/emsdk_env.sh
-    # TODO: This path currently has to be relative to out/wasm/gen/emdawnwebgpu instead of out/wasm
     emcmake cmake -GNinja \
-        -DDAWN_EMSCRIPTEN_TOOLCHAIN="../../../../../emscripten" \
+        -DDAWN_EMSCRIPTEN_TOOLCHAIN="${THIRD_PARTY}/emscripten" \
         ../..
     ninja emdawnwebgpu_headers_gen emdawnwebgpu_js_gen webgpu_generated_struct_info_js
 )
