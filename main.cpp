@@ -648,15 +648,20 @@ void doRenderTest() {
     issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
+static int frameNum = 0;
 void frame() {
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
     assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Success);
     wgpu::TextureView backbuffer = surfaceTexture.texture.CreateView();
-    render(backbuffer, canvasDepthStencilView);
-
-    // TODO: Read back from the canvas with drawImage() (or something) and
-    // check the result.
+    if (frameNum == 0) {
+        // Another copy of doRenderTest to make sure it works in the frame loop.
+        doRenderTest();
+    } else {
+        render(backbuffer, canvasDepthStencilView);
+        // TODO: On frame 1, read back from the canvas with drawImage() (or something) and
+        // check the result.
+    }
 
 #if defined(__EMSCRIPTEN__)
     emscripten_cancel_main_loop();
@@ -666,6 +671,7 @@ void frame() {
     swapChain.Present();
 #endif
 
+    frameNum++;
 }
 
 void run() {
