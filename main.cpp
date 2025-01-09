@@ -650,32 +650,41 @@ void doRenderTest() {
 
 static int frameNum = 0;
 void frame() {
+    frameNum++;
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
     assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Success);
     wgpu::TextureView backbuffer = surfaceTexture.texture.CreateView();
-    if (frameNum == 0) {
+    if (frameNum == 1) {
+        printf("Running frame-1 tests...\n");
         // Another copy of doRenderTest to make sure it works in the frame loop.
         doRenderTest();
-    } else {
-        render(backbuffer, canvasDepthStencilView);
-        // TODO: On frame 1, read back from the canvas with drawImage() (or something) and
-        // check the result.
+        return;
     }
 
+    if (frameNum == 2) {
+        printf("Running frame 2 and continuing!\n");
+    }
+    render(backbuffer, canvasDepthStencilView);
+    // TODO: On frame 1, read back from the canvas with drawImage() (or something) and
+    // check the result.
+
 #if defined(__EMSCRIPTEN__)
-    emscripten_cancel_main_loop();
-    // (We don't exit here because the readback test may still be running.)
+    // Stop running after a few frames in Emscripten.
+    if (frameNum >= 3) {
+        printf("Wasm stopping after frame 3, nothing else to do :) (readback tests may still be pending)\n");
+        emscripten_cancel_main_loop();
+    }
 #elif defined(DEMO_USE_GLFW)
     // Submit frame
     swapChain.Present();
 #endif
-
-    frameNum++;
 }
 
 void run() {
     init();
+
+    printf("Running startup tests...\n");
 
     // Kick off all of the tests before setting up to render a frame.
     // (Note we don't wait for the tests so they may complete before or after the frame.)
@@ -693,6 +702,7 @@ void run() {
         canvasDepthStencilView = device.CreateTexture(&descriptor).CreateView();
     }
 
+    printf("Starting main loop...\n");
 #ifdef __EMSCRIPTEN__
     {
         wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
@@ -729,6 +739,7 @@ void run() {
 }
 
 int main() {
+    printf("Initializing...\n");
     instance = wgpu::CreateInstance();
     device = GetDevice();
     run();

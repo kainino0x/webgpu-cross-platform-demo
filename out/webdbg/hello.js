@@ -75,21 +75,18 @@ if (ENVIRONMENT_IS_NODE) {
   scriptDirectory = __dirname + "/";
   // include: node_shell_read.js
   readBinary = filename => {
-    // We need to re-wrap `file://` strings to URLs. Normalizing isn't
-    // necessary in that case, the path should already be absolute.
-    filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
+    // We need to re-wrap `file://` strings to URLs.
+    filename = isFileURI(filename) ? new URL(filename) : filename;
     var ret = fs.readFileSync(filename);
-    assert(ret.buffer);
+    assert(Buffer.isBuffer(ret));
     return ret;
   };
-  readAsync = (filename, binary = true) => {
+  readAsync = async (filename, binary = true) => {
     // See the comment in the `readBinary` function.
-    filename = isFileURI(filename) ? new URL(filename) : nodePath.normalize(filename);
-    return new Promise((resolve, reject) => {
-      fs.readFile(filename, binary ? undefined : "utf8", (err, data) => {
-        if (err) reject(err); else resolve(binary ? data.buffer : data);
-      });
-    });
+    filename = isFileURI(filename) ? new URL(filename) : filename;
+    var ret = fs.readFileSync(filename, binary ? undefined : "utf8");
+    assert(binary ? Buffer.isBuffer(ret) : typeof ret == "string");
+    return ret;
   };
   // end include: node_shell_read.js
   if (!Module["thisProgram"] && process.argv.length > 1) {
@@ -139,7 +136,7 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
         return new Uint8Array(/** @type{!ArrayBuffer} */ (xhr.response));
       };
     }
-    readAsync = url => {
+    readAsync = async url => {
       // Fetch has some additional restrictions over XHR, like it can't be used on a file:// url.
       // See https://github.com/github/fetch/pull/92#issuecomment-140665932
       // Cordova or Electron apps are typically loaded from a file:// url.
@@ -161,14 +158,13 @@ if (ENVIRONMENT_IS_WEB || ENVIRONMENT_IS_WORKER) {
           xhr.send(null);
         });
       }
-      return fetch(url, {
+      var response = await fetch(url, {
         credentials: "same-origin"
-      }).then(response => {
-        if (response.ok) {
-          return response.arrayBuffer();
-        }
-        return Promise.reject(new Error(response.status + " : " + response.url));
       });
+      if (response.ok) {
+        return response.arrayBuffer();
+      }
+      throw new Error(response.status + " : " + response.url);
     };
   }
 } else // end include: web_or_worker_shell_read.js
@@ -517,12 +513,12 @@ assert(Math.trunc, "This browser does not support Math.trunc(), build with LEGAC
 // the dependencies are met.
 var runDependencies = 0;
 
-var runDependencyWatcher = null;
-
 var dependenciesFulfilled = null;
 
 // overridden to take different actions when all run dependencies are fulfilled
 var runDependencyTracking = {};
+
+var runDependencyWatcher = null;
 
 function getUniqueRunDependency(id) {
   var orig = id;
@@ -700,29 +696,35 @@ function getBinarySync(file) {
   throw "both async and sync fetching of the wasm failed";
 }
 
-function getBinaryPromise(binaryFile) {
+async function getWasmBinary(binaryFile) {
   // If we don't have the binary yet, load it asynchronously using readAsync.
   if (!wasmBinary) {
     // Fetch the binary using readAsync
-    return readAsync(binaryFile).then(response => new Uint8Array(/** @type{!ArrayBuffer} */ (response)), // Fall back to getBinarySync if readAsync fails
-    () => getBinarySync(binaryFile));
+    try {
+      var response = await readAsync(binaryFile);
+      return new Uint8Array(response);
+    } catch {}
   }
   // Otherwise, getBinarySync should be able to get it synchronously
-  return Promise.resolve().then(() => getBinarySync(binaryFile));
+  return getBinarySync(binaryFile);
 }
 
-function instantiateArrayBuffer(binaryFile, imports, receiver) {
-  return getBinaryPromise(binaryFile).then(binary => WebAssembly.instantiate(binary, imports)).then(receiver, reason => {
+async function instantiateArrayBuffer(binaryFile, imports) {
+  try {
+    var binary = await getWasmBinary(binaryFile);
+    var instance = await WebAssembly.instantiate(binary, imports);
+    return instance;
+  } catch (reason) {
     err(`failed to asynchronously prepare wasm: ${reason}`);
     // Warn on some common problems.
     if (isFileURI(wasmBinaryFile)) {
       err(`warning: Loading from a file URI (${wasmBinaryFile}) is not supported in most browsers. See https://emscripten.org/docs/getting_started/FAQ.html#how-do-i-run-a-local-webserver-for-testing-why-does-my-program-stall-in-downloading-or-preparing`);
     }
     abort(reason);
-  });
+  }
 }
 
-function instantiateAsync(binary, binaryFile, imports, callback) {
+async function instantiateAsync(binary, binaryFile, imports) {
   if (!binary && typeof WebAssembly.instantiateStreaming == "function" && !isDataURI(binaryFile) && // Don't use streaming for file:// delivered objects in a webview, fetch them synchronously.
   !isFileURI(binaryFile) && // Avoid instantiateStreaming() on Node.js environment for now, as while
   // Node.js v18.1.0 implements it, it does not have a full fetch()
@@ -730,24 +732,20 @@ function instantiateAsync(binary, binaryFile, imports, callback) {
   // Reference:
   //   https://github.com/emscripten-core/emscripten/pull/16917
   !ENVIRONMENT_IS_NODE && typeof fetch == "function") {
-    return fetch(binaryFile, {
-      credentials: "same-origin"
-    }).then(response => {
-      // Suppress closure warning here since the upstream definition for
-      // instantiateStreaming only allows Promise<Repsponse> rather than
-      // an actual Response.
-      // TODO(https://github.com/google/closure-compiler/pull/3913): Remove if/when upstream closure is fixed.
-      /** @suppress {checkTypes} */ var result = WebAssembly.instantiateStreaming(response, imports);
-      return result.then(callback, function(reason) {
-        // We expect the most common failure cause to be a bad MIME type for the binary,
-        // in which case falling back to ArrayBuffer instantiation should work.
-        err(`wasm streaming compile failed: ${reason}`);
-        err("falling back to ArrayBuffer instantiation");
-        return instantiateArrayBuffer(binaryFile, imports, callback);
+    try {
+      var response = fetch(binaryFile, {
+        credentials: "same-origin"
       });
-    });
+      var instantiationResult = await WebAssembly.instantiateStreaming(response, imports);
+      return instantiationResult;
+    } catch (reason) {
+      // We expect the most common failure cause to be a bad MIME type for the binary,
+      // in which case falling back to ArrayBuffer instantiation should work.
+      err(`wasm streaming compile failed: ${reason}`);
+      err("falling back to ArrayBuffer instantiation");
+    }
   }
-  return instantiateArrayBuffer(binaryFile, imports, callback);
+  return instantiateArrayBuffer(binaryFile, imports);
 }
 
 function getWasmImports() {
@@ -764,7 +762,7 @@ function getWasmImports() {
 
 // Create the wasm instance.
 // Receives the wasm imports, returns the exports.
-function createWasm() {
+async function createWasm() {
   // Load the wasm module and create an instance of using native support in the JS engine.
   // handle a generated wasm instance, receiving its exports and
   // performing other necessary setup
@@ -812,8 +810,9 @@ function createWasm() {
     }
   }
   wasmBinaryFile ??= findWasmBinary();
-  instantiateAsync(wasmBinary, wasmBinaryFile, info, receiveInstantiationResult);
-  return {};
+  var result = await instantiateAsync(wasmBinary, wasmBinaryFile, info);
+  receiveInstantiationResult(result);
+  return result;
 }
 
 // Globals used by JS i64 conversions (see makeSetValue)
@@ -1648,8 +1647,7 @@ var WebGPU = {
     futures: [],
     futureInsert: (futureId, promise) => {
       WebGPU.Internals.futures[futureId] = new Promise(resolve => promise.finally(() => resolve(futureId)));
-    },
-    waitAnyPromisesList: []
+    }
   },
   getJsObject: ptr => {
     if (!ptr) return undefined;
@@ -1852,7 +1850,7 @@ var WebGPU = {
     if (!layoutPtr) return "auto";
     return WebGPU.getJsObject(layoutPtr);
   },
-  makeProgrammableStageDescriptor: ptr => {
+  makeComputeState: ptr => {
     if (!ptr) return undefined;
     assert(ptr);
     assert(SAFE_HEAP_LOAD(((ptr) >> 2) * 4, 4, 1) === 0);
@@ -1869,7 +1867,7 @@ var WebGPU = {
     var desc = {
       "label": WebGPU.makeStringFromOptionalStringView(descriptor + 4),
       "layout": WebGPU.makePipelineLayout(SAFE_HEAP_LOAD((((descriptor) + (12)) >> 2) * 4, 4, 1)),
-      "compute": WebGPU.makeProgrammableStageDescriptor(descriptor + 16)
+      "compute": WebGPU.makeComputeState(descriptor + 16)
     };
     return desc;
   },
@@ -1963,10 +1961,14 @@ var WebGPU = {
     function makeVertexBuffer(vbPtr) {
       if (!vbPtr) return undefined;
       var stepModeInt = SAFE_HEAP_LOAD((((vbPtr) + (8)) >> 2) * 4, 4, 1);
-      return stepModeInt === 0 ? null : {
+      var attributeCountInt = SAFE_HEAP_LOAD((((vbPtr) + (12)) >> 2) * 4, 4, 1);
+      if (stepModeInt === 0 && attributeCountInt === 0) {
+        return null;
+      }
+      return {
         "arrayStride": SAFE_HEAP_LOAD((((vbPtr + 4)) >> 2) * 4, 4, 1) * 4294967296 + SAFE_HEAP_LOAD(((vbPtr) >> 2) * 4, 4, 1),
         "stepMode": WebGPU.VertexStepMode[stepModeInt],
-        "attributes": makeVertexAttributes(SAFE_HEAP_LOAD((((vbPtr) + (12)) >> 2) * 4, 4, 1), SAFE_HEAP_LOAD((((vbPtr) + (16)) >> 2) * 4, 4, 1))
+        "attributes": makeVertexAttributes(attributeCountInt, SAFE_HEAP_LOAD((((vbPtr) + (16)) >> 2) * 4, 4, 1))
       };
     }
     function makeVertexBuffers(count, vbArrayPtr) {
@@ -2094,7 +2096,7 @@ var WebGPU = {
   AddressMode: [ , "clamp-to-edge", "repeat", "mirror-repeat" ],
   BlendFactor: [ , "zero", "one", "src", "one-minus-src", "src-alpha", "one-minus-src-alpha", "dst", "one-minus-dst", "dst-alpha", "one-minus-dst-alpha", "src-alpha-saturated", "constant", "one-minus-constant", "src1", "one-minus-src1", "src1alpha", "one-minus-src1alpha" ],
   BlendOperation: [ , "add", "subtract", "reverse-subtract", "min", "max" ],
-  BufferBindingType: [ , "uniform", "storage", "read-only-storage" ],
+  BufferBindingType: [ "binding-not-used", , "uniform", "storage", "read-only-storage" ],
   BufferMapState: {
     1: "unmapped",
     2: "pending",
@@ -2115,6 +2117,7 @@ var WebGPU = {
     2: "out-of-memory",
     3: "internal"
   },
+  FeatureLevel: [ , "compatibility", "core" ],
   FeatureName: {
     1: "depth-clip-control",
     2: "depth32float-stencil8",
@@ -2143,13 +2146,13 @@ var WebGPU = {
     1: "occlusion",
     2: "timestamp"
   },
-  SamplerBindingType: [ , "filtering", "non-filtering", "comparison" ],
+  SamplerBindingType: [ "binding-not-used", , "filtering", "non-filtering", "comparison" ],
   Status: {
     1: "success",
     2: "error"
   },
   StencilOperation: [ , "keep", "zero", "replace", "invert", "increment-clamp", "decrement-clamp", "increment-wrap", "decrement-wrap" ],
-  StorageTextureAccess: [ , "write-only", "read-only", "read-write" ],
+  StorageTextureAccess: [ "binding-not-used", , "write-only", "read-only", "read-write" ],
   StoreOp: [ , "store", "discard" ],
   SurfaceGetCurrentTextureStatus: {
     1: "success",
@@ -2163,7 +2166,7 @@ var WebGPU = {
   TextureAspect: [ , "all", "stencil-only", "depth-only" ],
   TextureDimension: [ , "1d", "2d", "3d" ],
   TextureFormat: [ , "r8unorm", "r8snorm", "r8uint", "r8sint", "r16uint", "r16sint", "r16float", "rg8unorm", "rg8snorm", "rg8uint", "rg8sint", "r32float", "r32uint", "r32sint", "rg16uint", "rg16sint", "rg16float", "rgba8unorm", "rgba8unorm-srgb", "rgba8snorm", "rgba8uint", "rgba8sint", "bgra8unorm", "bgra8unorm-srgb", "rgb10a2uint", "rgb10a2unorm", "rg11b10ufloat", "rgb9e5ufloat", "rg32float", "rg32uint", "rg32sint", "rgba16uint", "rgba16sint", "rgba16float", "rgba32float", "rgba32uint", "rgba32sint", "stencil8", "depth16unorm", "depth24plus", "depth24plus-stencil8", "depth32float", "depth32float-stencil8", "bc1-rgba-unorm", "bc1-rgba-unorm-srgb", "bc2-rgba-unorm", "bc2-rgba-unorm-srgb", "bc3-rgba-unorm", "bc3-rgba-unorm-srgb", "bc4-r-unorm", "bc4-r-snorm", "bc5-rg-unorm", "bc5-rg-snorm", "bc6h-rgb-ufloat", "bc6h-rgb-float", "bc7-rgba-unorm", "bc7-rgba-unorm-srgb", "etc2-rgb8unorm", "etc2-rgb8unorm-srgb", "etc2-rgb8a1unorm", "etc2-rgb8a1unorm-srgb", "etc2-rgba8unorm", "etc2-rgba8unorm-srgb", "eac-r11unorm", "eac-r11snorm", "eac-rg11unorm", "eac-rg11snorm", "astc-4x4-unorm", "astc-4x4-unorm-srgb", "astc-5x4-unorm", "astc-5x4-unorm-srgb", "astc-5x5-unorm", "astc-5x5-unorm-srgb", "astc-6x5-unorm", "astc-6x5-unorm-srgb", "astc-6x6-unorm", "astc-6x6-unorm-srgb", "astc-8x5-unorm", "astc-8x5-unorm-srgb", "astc-8x6-unorm", "astc-8x6-unorm-srgb", "astc-8x8-unorm", "astc-8x8-unorm-srgb", "astc-10x5-unorm", "astc-10x5-unorm-srgb", "astc-10x6-unorm", "astc-10x6-unorm-srgb", "astc-10x8-unorm", "astc-10x8-unorm-srgb", "astc-10x10-unorm", "astc-10x10-unorm-srgb", "astc-12x10-unorm", "astc-12x10-unorm-srgb", "astc-12x12-unorm", "astc-12x12-unorm-srgb" ],
-  TextureSampleType: [ , "float", "unfilterable-float", "depth", "sint", "uint" ],
+  TextureSampleType: [ "binding-not-used", , "float", "unfilterable-float", "depth", "sint", "uint" ],
   TextureViewDimension: [ , "1d", "2d", "2d-array", "cube", "cube-array", "3d" ],
   VertexFormat: {
     1: "uint8",
@@ -2208,7 +2211,7 @@ var WebGPU = {
     40: "unorm10-10-10-2",
     41: "unorm8x4-bgra"
   },
-  VertexStepMode: [ "vertex-buffer-not-used", , "vertex", "instance" ],
+  VertexStepMode: [ , "vertex", "instance" ],
   FeatureNameString2Enum: {
     "depth-clip-control": "1",
     "depth32float-stencil8": "2",
@@ -2401,7 +2404,7 @@ var _emwgpuBufferMapAsync = function(bufferPtr, futureId_low, futureId_high, mod
   }, ex => {
     var sp = stackSave();
     var messagePtr = stringToUTF8OnStack(ex.message);
-    var status = ex instanceof AbortError ? 4 : ex instanceof OperationError ? 3 : 5;
+    var status = ex.name === "AbortError" ? 4 : ex.name === "OperationError" ? 3 : 5;
     _emwgpuOnMapAsyncCompleted(futureId, status, messagePtr);
     delete WebGPU.Internals.bufferOnUnmaps[bufferPtr];
   }));
@@ -2475,9 +2478,11 @@ function _emwgpuInstanceRequestAdapter(instancePtr, futureId_low, futureId_high,
   if (options) {
     assert(options);
     assert(SAFE_HEAP_LOAD(((options) >> 2) * 4, 4, 1) === 0);
+    var featureLevel = SAFE_HEAP_LOAD((((options) + (8)) >> 2) * 4, 4, 1);
     opts = {
-      "powerPreference": WebGPU.PowerPreference[SAFE_HEAP_LOAD((((options) + (8)) >> 2) * 4, 4, 1)],
-      "forceFallbackAdapter": !!(SAFE_HEAP_LOAD((((options) + (16)) >> 2) * 4, 4, 1))
+      "featureLevel": featureLevel === 1 ? "compatibility" : "core",
+      "powerPreference": WebGPU.PowerPreference[SAFE_HEAP_LOAD((((options) + (12)) >> 2) * 4, 4, 1)],
+      "forceFallbackAdapter": !!(SAFE_HEAP_LOAD((((options) + (20)) >> 2) * 4, 4, 1))
     };
   }
   if (!("gpu" in navigator)) {
@@ -2510,8 +2515,8 @@ function _emwgpuInstanceRequestAdapter(instancePtr, futureId_low, futureId_high,
 
 var _setTempRet0 = setTempRet0;
 
-var _emwgpuWaitAny = (futurePtr, futureCount, timeoutNSPtr) => {
-  var promises = WebGPU.Internals.waitAnyPromisesList;
+var _emwgpuWaitAny = async (futurePtr, futureCount, timeoutNSPtr) => {
+  var promises = [];
   if (timeoutNSPtr) {
     var timeoutMS = SAFE_HEAP_LOAD((((timeoutNSPtr + 4)) >> 2) * 4, 4, 1) * 4294967296 + SAFE_HEAP_LOAD(((timeoutNSPtr) >> 2) * 4, 4, 1) / 1e6;
     promises.length = futureCount + 1;
@@ -2527,11 +2532,9 @@ var _emwgpuWaitAny = (futurePtr, futureCount, timeoutNSPtr) => {
     }
     promises[i] = WebGPU.Internals.futures[futureId];
   }
-  var result = Asyncify.handleAsync(async () => await Promise.race(promises));
-  // Clean up internal futures state.
-  delete WebGPU.Internals.futures[result];
-  WebGPU.Internals.waitAnyPromisesList.length = 0;
-  return result;
+  var firstResolvedFuture = await Promise.race(promises);
+  delete WebGPU.Internals.futures[firstResolvedFuture];
+  return firstResolvedFuture;
 };
 
 _emwgpuWaitAny.isAsync = true;
@@ -3154,7 +3157,9 @@ var wasmImports = {
   /** @export */ wgpuTextureCreateView: _wgpuTextureCreateView
 };
 
-var wasmExports = createWasm();
+var wasmExports;
+
+createWasm();
 
 var ___wasm_call_ctors = createExportWrapper("__wasm_call_ctors", 0);
 
