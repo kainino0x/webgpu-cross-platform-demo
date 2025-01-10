@@ -649,6 +649,11 @@ void doRenderTest() {
     issueContentsCheck(__FUNCTION__, readbackBuffer, expectData);
 }
 
+// Export `frame` so it can be used with `ccall`, below.
+extern "C" {
+EMSCRIPTEN_KEEPALIVE bool frame();
+}
+
 static int frameNum = 0;
 bool frame() {
     frameNum++;
@@ -686,27 +691,6 @@ bool frame() {
 
     return true; // Continue the requestAnimationFrame loop
 }
-
-// If callback returns true, continues the loop.
-typedef bool (*FrameCallback)();
-
-// Workaround for JSPI not working in emscripten_set_main_loop. Loosely based on this code:
-// https://github.com/emscripten-core/emscripten/issues/22493#issuecomment-2330275282
-// With JSPI, I believe -sEXPORTED_RUNTIME_METHODS=getWasmTableEntry is technically necessary.
-EM_JS(void, requestAnimationFrameLoopWithAsyncify, (FrameCallback callback), {
-#if ASYNCIFY == 2
-    var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
-#elif ASYNCIFY == 1
-    var wrappedCallback = getWasmTableEntry(callback);
-#endif
-    async function tick() {
-        // Start the frame callback. 'await' means we won't call
-        // requestAnimationFrame again until it completes.
-        var keepLooping = await wrappedCallback();
-        if (keepLooping) requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-})
 
 void run() {
     init();
@@ -749,7 +733,29 @@ void run() {
         configuration.presentMode = wgpu::PresentMode::Fifo;
         surface.Configure(&configuration);
     }
-    requestAnimationFrameLoopWithAsyncify(frame);
+
+    // Workaround for JSPI not working in emscripten_set_main_loop. Loosely based on this code:
+    // https://github.com/emscripten-core/emscripten/issues/22493#issuecomment-2330275282
+    // Note the following link args are required:
+    // - JSPI: -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry
+    // - Asyncify: -sEXPORTED_RUNTIME_METHODS=ccall
+    EM_ASM({
+#if DEMO_USE_JSPI // -sJSPI=1 (aka -sASYNCIFY=2)
+        var callback = WebAssembly.promising(getWasmTableEntry($0));
+#else // -sASYNCIFY=1
+        // ccall seems to be the only thing in Emscripten which lets us turn an
+        // Asyncified Wasm function into a JS function returning a Promise.
+        // It can only call exported functions.
+        var callback = () => globalThis['Module']['ccall']("frame", "boolean", [], [], {async: true});
+#endif // DEMO_USE_JSPI
+        async function tick() {
+            // Start the frame callback. 'await' means we won't call
+            // requestAnimationFrame again until it completes.
+            var keepLooping = await callback();
+            if (keepLooping) requestAnimationFrame(tick);
+        }
+        requestAnimationFrame(tick);
+    }, frame);
 #elif defined(DEMO_USE_GLFW)
     setup_window();
     surface = window_init_surface(instance->Get(), native_window);

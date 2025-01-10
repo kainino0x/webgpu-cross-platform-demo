@@ -102,10 +102,6 @@ if (EMSCRIPTEN)
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
             "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
-            # Used in requestAnimationFrameLoopWithAsyncify.
-            "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry"
-            "-sEXPORTED_RUNTIME_METHODS=ccall"
-
             "-sEXIT_RUNTIME=0"
             #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"
             "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
@@ -125,12 +121,14 @@ if (EMSCRIPTEN)
         target_link_options(hello
             PRIVATE
                 "-sJSPI=1"
+                "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry"
                 )
     else()
         target_link_options(hello
             PRIVATE
                 "-sASYNCIFY=1"
                 "-sASYNCIFY_STACK_SIZE=65536"
+                "-sEXPORTED_RUNTIME_METHODS=ccall"
                 )
     endif()
 else()
