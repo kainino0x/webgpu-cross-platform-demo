@@ -651,16 +651,19 @@ void doRenderTest() {
 static int frameNum = 0;
 bool frame() {
     frameNum++;
+    if (frameNum == 1) {
+        printf("Running frame-1 tests...\n");
+        // Another copy of doRenderTest to make sure it works in the frame loop.
+        // Note this function is async (via Asyncify/JSPI) so the SurfaceTexture lifetime
+        // must not span it! (it may expire while waiting for mapAsync to complete)
+        doRenderTest();
+        return true;
+    }
+
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
     assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Success);
     wgpu::TextureView backbuffer = surfaceTexture.texture.CreateView();
-    if (frameNum == 1) {
-        printf("Running frame-1 tests...\n");
-        // Another copy of doRenderTest to make sure it works in the frame loop.
-        doRenderTest();
-        return true;
-    }
 
     if (frameNum == 2) {
         printf("Running frame 2 and continuing!\n");
