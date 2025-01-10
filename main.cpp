@@ -692,10 +692,13 @@ typedef bool (*FrameCallback)();
 
 // Workaround for JSPI not working in emscripten_set_main_loop. Loosely based on this code:
 // https://github.com/emscripten-core/emscripten/issues/22493#issuecomment-2330275282
-// This code only works with JSPI is enabled.
-// I believe -sEXPORTED_RUNTIME_METHODS=getWasmTableEntry is technically necessary to link this.
-EM_JS(void, requestAnimationFrameLoopWithJSPI, (FrameCallback callback), {
+// With JSPI, I believe -sEXPORTED_RUNTIME_METHODS=getWasmTableEntry is technically necessary.
+EM_JS(void, requestAnimationFrameLoopWithAsyncify, (FrameCallback callback), {
+#if ASYNCIFY == 2
     var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
+#elif ASYNCIFY == 1
+    var wrappedCallback = getWasmTableEntry(callback);
+#endif
     async function tick() {
         // Start the frame callback. 'await' means we won't call
         // requestAnimationFrame again until it completes.
@@ -746,7 +749,7 @@ void run() {
         configuration.presentMode = wgpu::PresentMode::Fifo;
         surface.Configure(&configuration);
     }
-    requestAnimationFrameLoopWithJSPI(frame);
+    requestAnimationFrameLoopWithAsyncify(frame);
 #elif defined(DEMO_USE_GLFW)
     setup_window();
     surface = window_init_surface(instance->Get(), native_window);

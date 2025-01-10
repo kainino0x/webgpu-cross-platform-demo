@@ -54,6 +54,11 @@ if (DEMO_USE_SANITIZERS)
         )
 endif()
 
+option(DEMO_USE_JSPI "Use JSPI (if off, uses ASYNCIFY=1 instead)" OFF)
+if (DEMO_USE_JSPI)
+    add_compile_definitions(DEMO_USE_JSPI=1)
+endif()
+
 if (EMSCRIPTEN)
     add_compile_options(
         "-Wall"
@@ -97,8 +102,10 @@ if (EMSCRIPTEN)
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
             "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
-            "-sEXPORTED_RUNTIME_METHODS=getWasmTableEntry"
-            "-sJSPI=1"
+            # Used in requestAnimationFrameLoopWithAsyncify.
+            "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry"
+            "-sEXPORTED_RUNTIME_METHODS=ccall"
+
             "-sEXIT_RUNTIME=0"
             #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"
             "$<$<CONFIG:Debug>:-sASSERTIONS=1>"
@@ -112,6 +119,18 @@ if (EMSCRIPTEN)
         target_link_options(hello
             PRIVATE
                 "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>" # Incompatible with ASan
+                )
+    endif()
+    if (DEMO_USE_JSPI)
+        target_link_options(hello
+            PRIVATE
+                "-sJSPI=1"
+                )
+    else()
+        target_link_options(hello
+            PRIVATE
+                "-sASYNCIFY=1"
+                "-sASYNCIFY_STACK_SIZE=65536"
                 )
     endif()
 else()
