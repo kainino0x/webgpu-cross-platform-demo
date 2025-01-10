@@ -649,7 +649,7 @@ void doRenderTest() {
 }
 
 static int frameNum = 0;
-void frame() {
+bool frame() {
     frameNum++;
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
@@ -659,7 +659,7 @@ void frame() {
         printf("Running frame-1 tests...\n");
         // Another copy of doRenderTest to make sure it works in the frame loop.
         doRenderTest();
-        return;
+        return true;
     }
 
     if (frameNum == 2) {
@@ -672,14 +672,33 @@ void frame() {
 #if defined(__EMSCRIPTEN__)
     // Stop running after a few frames in Emscripten.
     if (frameNum >= 3) {
-        printf("Wasm stopping after frame 3, nothing else to do :) (readback tests may still be pending)\n");
-        emscripten_cancel_main_loop();
+        printf("Wasm stopping after a few frames, nothing else to do :) (readback tests may still be pending)\n");
+        return false; // Stop the requestAnimationFrame loop
     }
 #elif defined(DEMO_USE_GLFW)
     // Submit frame
     swapChain.Present();
 #endif
+
+    return true; // Continue the requestAnimationFrame loop
 }
+
+// If callback returns true, continues the loop.
+typedef bool (*FrameCallback)();
+
+// Workaround for JSPI not working in emscripten_set_main_loop. Loosely based on this code:
+// https://github.com/emscripten-core/emscripten/issues/22493#issuecomment-2330275282
+// This code only works with JSPI is enabled.
+EM_JS(void, requestAnimationFrameLoopWithJSPI, (FrameCallback callback), {
+    var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
+    async function tick() {
+        // Start the frame callback. 'await' means we won't call
+        // requestAnimationFrame again until it completes.
+        var keepLooping = await wrappedCallback();
+        if (keepLooping) requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+})
 
 void run() {
     init();
@@ -722,14 +741,15 @@ void run() {
         configuration.presentMode = wgpu::PresentMode::Fifo;
         surface.Configure(&configuration);
     }
-    emscripten_set_main_loop(frame, 0, false);
+    requestAnimationFrameLoopWithJSPI(frame);
 #elif defined(DEMO_USE_GLFW)
     setup_window();
     surface = window_init_surface(instance->Get(), native_window);
     wgpu_setup_swap_chain();
     while (!window_should_close(native_window)) {
         glfwPollEvents();
-        frame();
+        bool keepLooping = frame();
+        if (!keepLooping) break;
     }
 #else
     while (testsCompleted < kNumTests) {

@@ -1103,6 +1103,17 @@ function dbg(...args) {
 
 // end include: runtime_debug.js
 // === Body ===
+function requestAnimationFrameLoopWithJSPI(callback) {
+  var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
+  async function tick() {
+    var keepLooping = await wrappedCallback();
+    if (keepLooping) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrameLoopWithJSPI.sig = "vi";
+
 // end include: preamble.js
 class ExitStatus {
   name="ExitStatus";
@@ -4142,307 +4153,6 @@ function _clock_time_get(clk_id, ignored_precision_low, ignored_precision_high, 
   return 0;
 }
 
-var _emscripten_set_main_loop_timing = (mode, value) => {
-  MainLoop.timingMode = mode;
-  MainLoop.timingValue = value;
-  if (!MainLoop.func) {
-    err("emscripten_set_main_loop_timing: Cannot set timing mode for main loop since a main loop does not exist! Call emscripten_set_main_loop first to set one up.");
-    return 1;
-  }
-  // Return non-zero on failure, can't set timing mode when there is no main loop.
-  if (!MainLoop.running) {
-    MainLoop.running = true;
-  }
-  if (mode == 0) {
-    MainLoop.scheduler = function MainLoop_scheduler_setTimeout() {
-      var timeUntilNextTick = Math.max(0, MainLoop.tickStartTime + value - _emscripten_get_now()) | 0;
-      setTimeout(MainLoop.runner, timeUntilNextTick);
-    };
-    // doing this each time means that on exception, we stop
-    MainLoop.method = "timeout";
-  } else if (mode == 1) {
-    MainLoop.scheduler = function MainLoop_scheduler_rAF() {
-      MainLoop.requestAnimationFrame(MainLoop.runner);
-    };
-    MainLoop.method = "rAF";
-  } else if (mode == 2) {
-    if (typeof MainLoop.setImmediate == "undefined") {
-      if (typeof setImmediate == "undefined") {
-        // Emulate setImmediate. (note: not a complete polyfill, we don't emulate clearImmediate() to keep code size to minimum, since not needed)
-        var setImmediates = [];
-        var emscriptenMainLoopMessageId = "setimmediate";
-        /** @param {Event} event */ var MainLoop_setImmediate_messageHandler = event => {
-          // When called in current thread or Worker, the main loop ID is structured slightly different to accommodate for --proxy-to-worker runtime listening to Worker events,
-          // so check for both cases.
-          if (event.data === emscriptenMainLoopMessageId || event.data.target === emscriptenMainLoopMessageId) {
-            event.stopPropagation();
-            setImmediates.shift()();
-          }
-        };
-        addEventListener("message", MainLoop_setImmediate_messageHandler, true);
-        MainLoop.setImmediate = /** @type{function(function(): ?, ...?): number} */ (func => {
-          setImmediates.push(func);
-          if (ENVIRONMENT_IS_WORKER) {
-            Module["setImmediates"] ??= [];
-            Module["setImmediates"].push(func);
-            postMessage({
-              target: emscriptenMainLoopMessageId
-            });
-          } else // In --proxy-to-worker, route the message via proxyClient.js
-          postMessage(emscriptenMainLoopMessageId, "*");
-        });
-      } else {
-        MainLoop.setImmediate = setImmediate;
-      }
-    }
-    MainLoop.scheduler = function MainLoop_scheduler_setImmediate() {
-      MainLoop.setImmediate(MainLoop.runner);
-    };
-    MainLoop.method = "immediate";
-  }
-  return 0;
-};
-
-var runtimeKeepaliveCounter = 0;
-
-var keepRuntimeAlive = () => noExitRuntime || runtimeKeepaliveCounter > 0;
-
-var _proc_exit = code => {
-  EXITSTATUS = code;
-  if (!keepRuntimeAlive()) {
-    Module["onExit"]?.(code);
-    ABORT = true;
-  }
-  quit_(code, new ExitStatus(code));
-};
-
-/** @suppress {duplicate } */ /** @param {boolean|number=} implicit */ var exitJS = (status, implicit) => {
-  EXITSTATUS = status;
-  checkUnflushedContent();
-  // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
-  if (keepRuntimeAlive() && !implicit) {
-    var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
-    err(msg);
-  }
-  _proc_exit(status);
-};
-
-var _exit = exitJS;
-
-var handleException = e => {
-  // Certain exception types we do not treat as errors since they are used for
-  // internal control flow.
-  // 1. ExitStatus, which is thrown by exit()
-  // 2. "unwind", which is thrown by emscripten_unwind_to_js_event_loop() and others
-  //    that wish to return to JS event loop.
-  if (e instanceof ExitStatus || e == "unwind") {
-    return EXITSTATUS;
-  }
-  checkStackCookie();
-  if (e instanceof WebAssembly.RuntimeError) {
-    if (_emscripten_stack_get_current() <= 0) {
-      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)");
-    }
-  }
-  quit_(1, e);
-};
-
-var maybeExit = () => {
-  if (!keepRuntimeAlive()) {
-    try {
-      _exit(EXITSTATUS);
-    } catch (e) {
-      handleException(e);
-    }
-  }
-};
-
-/**
-     * @param {number=} arg
-     * @param {boolean=} noSetTiming
-     */ var setMainLoop = (iterFunc, fps, simulateInfiniteLoop, arg, noSetTiming) => {
-  assert(!MainLoop.func, "emscripten_set_main_loop: there can only be one main loop function at once: call emscripten_cancel_main_loop to cancel the previous one before setting a new one with different parameters.");
-  MainLoop.func = iterFunc;
-  MainLoop.arg = arg;
-  var thisMainLoopId = MainLoop.currentlyRunningMainloop;
-  function checkIsRunning() {
-    if (thisMainLoopId < MainLoop.currentlyRunningMainloop) {
-      maybeExit();
-      return false;
-    }
-    return true;
-  }
-  // We create the loop runner here but it is not actually running until
-  // _emscripten_set_main_loop_timing is called (which might happen a
-  // later time).  This member signifies that the current runner has not
-  // yet been started so that we can call runtimeKeepalivePush when it
-  // gets it timing set for the first time.
-  MainLoop.running = false;
-  MainLoop.runner = function MainLoop_runner() {
-    if (ABORT) return;
-    if (MainLoop.queue.length > 0) {
-      var start = Date.now();
-      var blocker = MainLoop.queue.shift();
-      blocker.func(blocker.arg);
-      if (MainLoop.remainingBlockers) {
-        var remaining = MainLoop.remainingBlockers;
-        var next = remaining % 1 == 0 ? remaining - 1 : Math.floor(remaining);
-        if (blocker.counted) {
-          MainLoop.remainingBlockers = next;
-        } else {
-          // not counted, but move the progress along a tiny bit
-          next = next + .5;
-          // do not steal all the next one's progress
-          MainLoop.remainingBlockers = (8 * remaining + next) / 9;
-        }
-      }
-      MainLoop.updateStatus();
-      // catches pause/resume main loop from blocker execution
-      if (!checkIsRunning()) return;
-      setTimeout(MainLoop.runner, 0);
-      return;
-    }
-    // catch pauses from non-main loop sources
-    if (!checkIsRunning()) return;
-    // Implement very basic swap interval control
-    MainLoop.currentFrameNumber = MainLoop.currentFrameNumber + 1 | 0;
-    if (MainLoop.timingMode == 1 && MainLoop.timingValue > 1 && MainLoop.currentFrameNumber % MainLoop.timingValue != 0) {
-      // Not the scheduled time to render this frame - skip.
-      MainLoop.scheduler();
-      return;
-    } else if (MainLoop.timingMode == 0) {
-      MainLoop.tickStartTime = _emscripten_get_now();
-    }
-    if (MainLoop.method === "timeout" && Module["ctx"]) {
-      warnOnce("Looks like you are rendering without using requestAnimationFrame for the main loop. You should use 0 for the frame rate in emscripten_set_main_loop in order to use requestAnimationFrame, as that can greatly improve your frame rates!");
-      MainLoop.method = "";
-    }
-    // just warn once per call to set main loop
-    MainLoop.runIter(iterFunc);
-    // catch pauses from the main loop itself
-    if (!checkIsRunning()) return;
-    MainLoop.scheduler();
-  };
-  if (!noSetTiming) {
-    if (fps && fps > 0) {
-      _emscripten_set_main_loop_timing(0, 1e3 / fps);
-    } else {
-      // Do rAF by rendering each frame (no decimating)
-      _emscripten_set_main_loop_timing(1, 1);
-    }
-    MainLoop.scheduler();
-  }
-  if (simulateInfiniteLoop) {
-    throw "unwind";
-  }
-};
-
-var callUserCallback = func => {
-  if (ABORT) {
-    err("user callback triggered after runtime exited or application aborted.  Ignoring.");
-    return;
-  }
-  try {
-    func();
-    maybeExit();
-  } catch (e) {
-    handleException(e);
-  }
-};
-
-var MainLoop = {
-  running: false,
-  scheduler: null,
-  method: "",
-  currentlyRunningMainloop: 0,
-  func: null,
-  arg: 0,
-  timingMode: 0,
-  timingValue: 0,
-  currentFrameNumber: 0,
-  queue: [],
-  preMainLoop: [],
-  postMainLoop: [],
-  pause() {
-    MainLoop.scheduler = null;
-    // Incrementing this signals the previous main loop that it's now become old, and it must return.
-    MainLoop.currentlyRunningMainloop++;
-  },
-  resume() {
-    MainLoop.currentlyRunningMainloop++;
-    var timingMode = MainLoop.timingMode;
-    var timingValue = MainLoop.timingValue;
-    var func = MainLoop.func;
-    MainLoop.func = null;
-    // do not set timing and call scheduler, we will do it on the next lines
-    setMainLoop(func, 0, false, MainLoop.arg, true);
-    _emscripten_set_main_loop_timing(timingMode, timingValue);
-    MainLoop.scheduler();
-  },
-  updateStatus() {
-    if (Module["setStatus"]) {
-      var message = Module["statusMessage"] || "Please wait...";
-      var remaining = MainLoop.remainingBlockers ?? 0;
-      var expected = MainLoop.expectedBlockers ?? 0;
-      if (remaining) {
-        if (remaining < expected) {
-          Module["setStatus"](`{message} ({expected - remaining}/{expected})`);
-        } else {
-          Module["setStatus"](message);
-        }
-      } else {
-        Module["setStatus"]("");
-      }
-    }
-  },
-  init() {
-    Module["preMainLoop"] && MainLoop.preMainLoop.push(Module["preMainLoop"]);
-    Module["postMainLoop"] && MainLoop.postMainLoop.push(Module["postMainLoop"]);
-  },
-  runIter(func) {
-    if (ABORT) return;
-    for (var pre of MainLoop.preMainLoop) {
-      if (pre() === false) {
-        return;
-      }
-    }
-    // |return false| skips a frame
-    callUserCallback(func);
-    for (var post of MainLoop.postMainLoop) {
-      post();
-    }
-    checkStackCookie();
-  },
-  nextRAF: 0,
-  fakeRequestAnimationFrame(func) {
-    // try to keep 60fps between calls to here
-    var now = Date.now();
-    if (MainLoop.nextRAF === 0) {
-      MainLoop.nextRAF = now + 1e3 / 60;
-    } else {
-      while (now + 2 >= MainLoop.nextRAF) {
-        // fudge a little, to avoid timer jitter causing us to do lots of delay:0
-        MainLoop.nextRAF += 1e3 / 60;
-      }
-    }
-    var delay = Math.max(MainLoop.nextRAF - now, 0);
-    setTimeout(func, delay);
-  },
-  requestAnimationFrame(func) {
-    if (typeof requestAnimationFrame == "function") {
-      requestAnimationFrame(func);
-      return;
-    }
-    var RAF = MainLoop.fakeRequestAnimationFrame;
-    RAF(func);
-  }
-};
-
-var _emscripten_cancel_main_loop = () => {
-  MainLoop.pause();
-  MainLoop.func = null;
-};
-
 var getHeapMax = () => HEAPU8.length;
 
 var _emscripten_get_heap_max = () => getHeapMax();
@@ -4563,27 +4273,6 @@ var _emscripten_return_address = level => {
   return convertFrameToPC(caller);
 };
 
-var wasmTableMirror = [];
-
-/** @type {WebAssembly.Table} */ var wasmTable;
-
-var getWasmTableEntry = funcPtr => {
-  var func = wasmTableMirror[funcPtr];
-  if (!func) {
-    if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
-    /** @suppress {checkTypes} */ wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
-    if (Asyncify.isAsyncExport(func)) {
-      wasmTableMirror[funcPtr] = func = Asyncify.makeAsyncFunction(func);
-    }
-  }
-  return func;
-};
-
-var _emscripten_set_main_loop = (func, fps, simulateInfiniteLoop) => {
-  var iterFunc = getWasmTableEntry(func);
-  setMainLoop(iterFunc, fps, simulateInfiniteLoop);
-};
-
 var saveInUnwindCache = callstack => {
   callstack.forEach(frame => {
     var pc = convertFrameToPC(frame);
@@ -4634,6 +4323,22 @@ var stringToUTF8OnStack = str => {
   var ret = stackAlloc(size);
   stringToUTF8(str, ret, size);
   return ret;
+};
+
+var wasmTableMirror = [];
+
+/** @type {WebAssembly.Table} */ var wasmTable;
+
+var getWasmTableEntry = funcPtr => {
+  var func = wasmTableMirror[funcPtr];
+  if (!func) {
+    if (funcPtr >= wasmTableMirror.length) wasmTableMirror.length = funcPtr + 1;
+    /** @suppress {checkTypes} */ wasmTableMirror[funcPtr] = func = wasmTable.get(funcPtr);
+    if (Asyncify.isAsyncExport(func)) {
+      wasmTableMirror[funcPtr] = func = Asyncify.makeAsyncFunction(func);
+    }
+  }
+  return func;
 };
 
 var WebGPU = {
@@ -5591,6 +5296,32 @@ var _environ_sizes_get = (penviron_count, penviron_buf_size) => {
   return 0;
 };
 
+var runtimeKeepaliveCounter = 0;
+
+var keepRuntimeAlive = () => noExitRuntime || runtimeKeepaliveCounter > 0;
+
+var _proc_exit = code => {
+  EXITSTATUS = code;
+  if (!keepRuntimeAlive()) {
+    Module["onExit"]?.(code);
+    ABORT = true;
+  }
+  quit_(code, new ExitStatus(code));
+};
+
+/** @suppress {duplicate } */ /** @param {boolean|number=} implicit */ var exitJS = (status, implicit) => {
+  EXITSTATUS = status;
+  checkUnflushedContent();
+  // if exit() was called explicitly, warn the user if the runtime isn't actually being shut down
+  if (keepRuntimeAlive() && !implicit) {
+    var msg = `program exited (with status: ${status}), but keepRuntimeAlive() is set (counter=${runtimeKeepaliveCounter}) due to an async operation, so halting execution but not exiting the runtime or preventing further async execution (you can use emscripten_force_exit, if you want to force a true shutdown)`;
+    err(msg);
+  }
+  _proc_exit(status);
+};
+
+var _exit = exitJS;
+
 function _fd_close(fd) {
   try {
     var stream = SYSCALLS.getStreamFromFD(fd);
@@ -6101,11 +5832,52 @@ var _wgpuTextureCreateView = (texturePtr, descriptor) => {
   return ptr;
 };
 
+var handleException = e => {
+  // Certain exception types we do not treat as errors since they are used for
+  // internal control flow.
+  // 1. ExitStatus, which is thrown by exit()
+  // 2. "unwind", which is thrown by emscripten_unwind_to_js_event_loop() and others
+  //    that wish to return to JS event loop.
+  if (e instanceof ExitStatus || e == "unwind") {
+    return EXITSTATUS;
+  }
+  checkStackCookie();
+  if (e instanceof WebAssembly.RuntimeError) {
+    if (_emscripten_stack_get_current() <= 0) {
+      err("Stack overflow detected.  You can try increasing -sSTACK_SIZE (currently set to 65536)");
+    }
+  }
+  quit_(1, e);
+};
+
 var runAndAbortIfError = func => {
   try {
     return func();
   } catch (e) {
     abort(e);
+  }
+};
+
+var maybeExit = () => {
+  if (!keepRuntimeAlive()) {
+    try {
+      _exit(EXITSTATUS);
+    } catch (e) {
+      handleException(e);
+    }
+  }
+};
+
+var callUserCallback = func => {
+  if (ABORT) {
+    err("user callback triggered after runtime exited or application aborted.  Ignoring.");
+    return;
+  }
+  try {
+    func();
+    maybeExit();
+  } catch (e) {
+    handleException(e);
   }
 };
 
@@ -6193,14 +5965,6 @@ FS.createPreloadedFile = FS_createPreloadedFile;
 
 FS.staticInit();
 
-Module["requestAnimationFrame"] = MainLoop.requestAnimationFrame;
-
-Module["pauseMainLoop"] = MainLoop.pause;
-
-Module["resumeMainLoop"] = MainLoop.resume;
-
-MainLoop.init();
-
 function checkIncomingModuleAPI() {
   ignoredModuleProp("fetchSettings");
 }
@@ -6218,7 +5982,6 @@ var wasmImports = {
   /** @export */ _mmap_js: __mmap_js,
   /** @export */ _munmap_js: __munmap_js,
   /** @export */ clock_time_get: _clock_time_get,
-  /** @export */ emscripten_cancel_main_loop: _emscripten_cancel_main_loop,
   /** @export */ emscripten_get_heap_max: _emscripten_get_heap_max,
   /** @export */ emscripten_get_now: _emscripten_get_now,
   /** @export */ emscripten_has_asyncify: _emscripten_has_asyncify,
@@ -6228,7 +5991,6 @@ var wasmImports = {
   /** @export */ emscripten_pc_get_line: _emscripten_pc_get_line,
   /** @export */ emscripten_resize_heap: _emscripten_resize_heap,
   /** @export */ emscripten_return_address: _emscripten_return_address,
-  /** @export */ emscripten_set_main_loop: _emscripten_set_main_loop,
   /** @export */ emscripten_stack_snapshot: _emscripten_stack_snapshot,
   /** @export */ emscripten_stack_unwind_buffer: _emscripten_stack_unwind_buffer,
   /** @export */ emwgpuAdapterRequestDevice: _emwgpuAdapterRequestDevice,
@@ -6250,6 +6012,7 @@ var wasmImports = {
   /** @export */ fd_seek: _fd_seek,
   /** @export */ fd_write: _fd_write,
   /** @export */ proc_exit: _proc_exit,
+  /** @export */ requestAnimationFrameLoopWithJSPI,
   /** @export */ wgpuCommandEncoderBeginRenderPass: _wgpuCommandEncoderBeginRenderPass,
   /** @export */ wgpuCommandEncoderCopyBufferToBuffer: _wgpuCommandEncoderCopyBufferToBuffer,
   /** @export */ wgpuCommandEncoderCopyTextureToBuffer: _wgpuCommandEncoderCopyTextureToBuffer,
