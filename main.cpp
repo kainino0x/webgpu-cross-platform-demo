@@ -46,7 +46,6 @@ const uint32_t kHeight = 150;
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #include <emscripten/html5.h>
-//#include <emscripten/html5_webgpu.h>
 
 wgpu::Device GetDevice() {
     wgpu::Adapter adapter;
@@ -65,6 +64,7 @@ wgpu::Device GetDevice() {
             adapter = std::move(ad);
         });
     instance.WaitAny(f1, UINT64_MAX);
+    assert(adapter);
 
     wgpu::DeviceDescriptor desc;
     desc.SetUncapturedErrorCallback(
@@ -84,6 +84,7 @@ wgpu::Device GetDevice() {
             device = std::move(dev);
         });
     instance.WaitAny(f2, UINT64_MAX);
+    assert(device);
 
     return device;
 }
