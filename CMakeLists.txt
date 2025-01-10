@@ -97,6 +97,7 @@ if (EMSCRIPTEN)
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
             "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
 
+            "-sEXPORTED_RUNTIME_METHODS=getWasmTableEntry"
             "-sJSPI=1"
             "-sEXIT_RUNTIME=0"
             #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"

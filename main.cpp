@@ -692,6 +692,7 @@ typedef bool (*FrameCallback)();
 // Workaround for JSPI not working in emscripten_set_main_loop. Loosely based on this code:
 // https://github.com/emscripten-core/emscripten/issues/22493#issuecomment-2330275282
 // This code only works with JSPI is enabled.
+// I believe -sEXPORTED_RUNTIME_METHODS=getWasmTableEntry is technically necessary to link this.
 EM_JS(void, requestAnimationFrameLoopWithJSPI, (FrameCallback callback), {
     var wrappedCallback = WebAssembly.promising(getWasmTableEntry(callback));
     async function tick() {
