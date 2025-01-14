@@ -59,6 +59,12 @@ if (DEMO_USE_JSPI)
     add_compile_definitions(DEMO_USE_JSPI=1)
 endif()
 
+option(DEMO_USE_WASM_4GB "Use Wasm 4GB (triggers CAN_ADDRESS_2GB for Memory32 builds)" OFF)
+option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
+if (DEMO_USE_WASM_MEMORY64)
+    add_compile_options("-sMEMORY64=1")
+endif()
+
 if (EMSCRIPTEN)
     add_compile_options(
         "-Wall"
@@ -130,6 +136,12 @@ if (EMSCRIPTEN)
                 "-sASYNCIFY_STACK_SIZE=65536"
                 "-sEXPORTED_RUNTIME_METHODS=ccall"
                 )
+    endif()
+    if (DEMO_USE_WASM_4GB)
+        target_link_options(hello PRIVATE "-sALLOW_MEMORY_GROWTH=1" "-sMAXIMUM_MEMORY=4GB")
+    endif()
+    if (DEMO_USE_WASM_MEMORY64)
+        target_link_options(hello PRIVATE "-sMEMORY64=1")
     endif()
 else()
     target_link_libraries(hello
