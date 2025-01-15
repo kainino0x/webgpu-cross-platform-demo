@@ -44,14 +44,13 @@ add_link_options(
 
 option(DEMO_USE_SANITIZERS "Enable ASan/UBSan" OFF)
 if (DEMO_USE_SANITIZERS)
-    add_compile_options(
-        "-fsanitize=address"
-        "-fsanitize=undefined"
-        )
-    add_link_options(
-        "-fsanitize=address"
-        "-fsanitize=undefined"
-        )
+    # "error: MEMORY64 does not yet work with ASAN"
+    if (NOT DEMO_USE_WASM_MEMORY64)
+        add_compile_options("-fsanitize=address")
+        add_link_options("-fsanitize=address")
+    endif()
+    add_compile_options("-fsanitize=undefined")
+    add_link_options("-fsanitize=undefined")
 endif()
 
 option(DEMO_USE_JSPI "Use JSPI (if off, uses ASYNCIFY=1 instead)" OFF)
