@@ -53,8 +53,8 @@ if (DEMO_USE_SANITIZERS)
     add_link_options("-fsanitize=undefined")
 endif()
 
-option(DEMO_USE_JSPI "Use JSPI (if off, uses ASYNCIFY=1 instead)" OFF)
-if (DEMO_USE_JSPI)
+option(DEMO_USE_ASYNCIFY "Set -sASYNCIFY to 0 (off), 1 (asyncify), or 2 (JSPI)" 1)
+if (DEMO_USE_ASYNCIFY EQUAL 2)
     add_compile_definitions(DEMO_USE_JSPI=1)
 endif()
 
@@ -123,13 +123,13 @@ if (EMSCRIPTEN)
                 "$<$<CONFIG:Debug>:-sSAFE_HEAP=1>" # Incompatible with ASan
                 )
     endif()
-    if (DEMO_USE_JSPI)
+    if (DEMO_USE_ASYNCIFY EQUAL 2)
         target_link_options(hello
             PRIVATE
                 "-sJSPI=1"
                 "-sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry"
                 )
-    else()
+    elseif (DEMO_USE_ASYNCIFY EQUAL 1)
         target_link_options(hello
             PRIVATE
                 "-sASYNCIFY=1"

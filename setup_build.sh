@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=3.1.74 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=617d042d4bb243a36930b020ab6f5c14cd89f824
+DAWN_REVISION=d419d935d22b314552558e85fd6b5da93991cbee
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
