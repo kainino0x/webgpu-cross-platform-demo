@@ -5,27 +5,43 @@ if [ ! -f "build_all.sh" ] ; then
     exit 1
 fi
 
+function usage {
+    echo "Usage:"
+    echo "  $0 --parallel=0"
+    echo "  $0 --parallel=1"
+    exit 1
+}
+
+if [ $# != 1 ] ; then
+    usage
+fi
+
 pids=()
-if [ "$PARALLEL" == "0" ] ; then
+if [ "$1" == "--parallel=0" ] ; then
     function build {
         ./build_helper.sh "$@"
-        echo "<h1><a href="$1/hello.html">$1</a></h1>" >> index.html
+        echo "<li><a href="$1/hello.html">$1</a></h1>" >> index.html
     }
-elif [ "$PARALLEL" == "1" ] ; then
+    function cleanup {
+        true
+    }
+elif [ "$1" == "--parallel=1" ] ; then
     function build {
         ./build_helper.sh "$@" & pids+=($!)
         echo "<li><a href="$1/hello.html">$1</a></li>" >> index.html
     }
     function cleanup {
+        wait "${pids[@]}"
+    }
+
+    function stop {
         kill "${pids[@]}"
+        cleanup
         exit 1
     }
-    trap cleanup SIGHUP SIGINT SIGTERM
+    trap stop SIGHUP SIGINT SIGTERM
 else
-    echo "Usage:"
-    echo "  PARALLEL=0 $0"
-    echo "  PARALLEL=1 $0"
-    exit 1
+    usage
 fi
 
 set -euo pipefail
@@ -61,6 +77,4 @@ for buildtype in Debug Release ; do
     done
 done
 
-if [ "$PARALLEL" == "1" ] ; then
-    wait "${pids[@]}"
-fi
+cleanup

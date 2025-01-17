@@ -526,6 +526,9 @@ void doCopyTestMappedAtCreation(bool useRange) {
         //descriptor.usage = static_cast<wgpu::BufferUsage>(0xffff'ffff); // Uncomment to make createBuffer fail
         descriptor.mappedAtCreation = true;
         src = device.CreateBuffer(&descriptor);
+        // Calls just to check they work
+        src.GetSize();
+        src.GetUsage();
     }
     size_t offset = useRange ? 8 : 0;
     uint32_t* ptr = static_cast<uint32_t*>(useRange ?
@@ -617,6 +620,15 @@ void doRenderTest() {
         descriptor.size = {1, 1, 1};
         descriptor.format = wgpu::TextureFormat::BGRA8Unorm;
         readbackTexture = device.CreateTexture(&descriptor);
+        // Calls just to check they work
+        readbackTexture.GetWidth();
+        readbackTexture.GetHeight();
+        readbackTexture.GetDepthOrArrayLayers();
+        readbackTexture.GetDimension();
+        readbackTexture.GetFormat();
+        readbackTexture.GetMipLevelCount();
+        readbackTexture.GetSampleCount();
+        readbackTexture.GetUsage();
     }
     wgpu::Texture depthTexture;
     {

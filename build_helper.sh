@@ -12,7 +12,6 @@ if [ $# -lt 2 ] ; then
     exit 1
 fi
 
-
 build_dir="$1"
 shift
 cmake_args=("$@")
