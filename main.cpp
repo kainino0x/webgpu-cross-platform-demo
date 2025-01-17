@@ -66,11 +66,18 @@ wgpu::Device GetDevice() {
     instance.WaitAny(f1, UINT64_MAX);
     assert(adapter);
 
+    wgpu::RequiredLimits limits;
+    //limits.limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
     wgpu::DeviceDescriptor desc;
+    desc.requiredLimits = &limits;
     desc.SetUncapturedErrorCallback(
         [](const wgpu::Device&, wgpu::ErrorType errorType, wgpu::StringView message) {
-            printf("%d: %.*s\n", errorType, (int)message.length, message.data);
+            printf("UncapturedError (errorType=%d): %.*s\n", errorType, (int)message.length, message.data);
             assert(false);
+        });
+    desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
+        [](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView message) {
+            printf("DeviceLost (reason=%d): %.*s\n", reason, (int)message.length, message.data);
         });
 
     wgpu::Device device;
@@ -516,6 +523,7 @@ void doCopyTestMappedAtCreation(bool useRange) {
         wgpu::BufferDescriptor descriptor{};
         descriptor.size = size;
         descriptor.usage = wgpu::BufferUsage::CopySrc;
+        //descriptor.usage = static_cast<wgpu::BufferUsage>(0xffff'ffff); // Uncomment to make createBuffer fail
         descriptor.mappedAtCreation = true;
         src = device.CreateBuffer(&descriptor);
     }
@@ -682,6 +690,7 @@ bool frame() {
     // Stop running after a few frames in Emscripten.
     if (frameNum >= 3) {
         printf("Wasm stopping after a few frames, nothing else to do :) (readback tests may still be pending)\n");
+        device.Destroy();
         return false; // Stop the requestAnimationFrame loop
     }
 #elif defined(DEMO_USE_GLFW)
