@@ -5,15 +5,17 @@ const structInfo32 = (
     "defines": {},
     "structs": {
         "WGPUAdapterInfo": {
-            "__size__": 56,
+            "__size__": 64,
             "adapterType": 40,
             "architecture": 12,
             "backendType": 36,
-            "compatibilityMode": 52,
+            "compatibilityMode": 60,
             "description": 28,
             "device": 20,
             "deviceID": 48,
             "nextInChain": 0,
+            "subgroupMaxSize": 56,
+            "subgroupMinSize": 52,
             "vendor": 4,
             "vendorID": 44
         },
@@ -218,18 +220,6 @@ const structInfo32 = (
             "__size__": 4,
             "unused": 0
         },
-        "WGPUImageCopyBuffer": {
-            "__size__": 32,
-            "buffer": 24,
-            "layout": 0
-        },
-        "WGPUImageCopyTexture": {
-            "__size__": 24,
-            "aspect": 20,
-            "mipLevel": 4,
-            "origin": 8,
-            "texture": 0
-        },
         "WGPUInstanceCapabilities": {
             "__size__": 12,
             "nextInChain": 0,
@@ -237,9 +227,8 @@ const structInfo32 = (
             "timedWaitAnyMaxCount": 8
         },
         "WGPUInstanceDescriptor": {
-            "__size__": 28,
+            "__size__": 16,
             "capabilities": 4,
-            "features": 16,
             "nextInChain": 0
         },
         "WGPULimits": {
@@ -514,6 +503,24 @@ const structInfo32 = (
             "suboptimal": 4,
             "texture": 0
         },
+        "WGPUTexelCopyBufferInfo": {
+            "__size__": 24,
+            "buffer": 16,
+            "layout": 0
+        },
+        "WGPUTexelCopyBufferLayout": {
+            "__size__": 16,
+            "bytesPerRow": 8,
+            "offset": 0,
+            "rowsPerImage": 12
+        },
+        "WGPUTexelCopyTextureInfo": {
+            "__size__": 24,
+            "aspect": 20,
+            "mipLevel": 4,
+            "origin": 8,
+            "texture": 0
+        },
         "WGPUTextureBindingLayout": {
             "__size__": 16,
             "multisampled": 12,
@@ -525,13 +532,6 @@ const structInfo32 = (
             "__size__": 12,
             "chain": 0,
             "textureBindingViewDimension": 8
-        },
-        "WGPUTextureDataLayout": {
-            "__size__": 24,
-            "bytesPerRow": 16,
-            "nextInChain": 0,
-            "offset": 8,
-            "rowsPerImage": 20
         },
         "WGPUTextureDescriptor": {
             "__size__": 64,
@@ -561,16 +561,18 @@ const structInfo32 = (
         },
         "WGPUVertexAttribute": {
             "__size__": 24,
-            "format": 0,
+            "format": 4,
+            "nextInChain": 0,
             "offset": 8,
             "shaderLocation": 16
         },
         "WGPUVertexBufferLayout": {
-            "__size__": 24,
-            "arrayStride": 0,
-            "attributeCount": 12,
-            "attributes": 16,
-            "stepMode": 8
+            "__size__": 32,
+            "arrayStride": 8,
+            "attributeCount": 20,
+            "attributes": 24,
+            "nextInChain": 0,
+            "stepMode": 16
         },
         "WGPUVertexState": {
             "__size__": 32,
@@ -591,15 +593,17 @@ const structInfo64 = (
     "defines": {},
     "structs": {
         "WGPUAdapterInfo": {
-            "__size__": 96,
+            "__size__": 104,
             "adapterType": 76,
             "architecture": 24,
             "backendType": 72,
-            "compatibilityMode": 88,
+            "compatibilityMode": 96,
             "description": 56,
             "device": 40,
             "deviceID": 84,
             "nextInChain": 0,
+            "subgroupMaxSize": 92,
+            "subgroupMinSize": 88,
             "vendor": 8,
             "vendorID": 80
         },
@@ -804,18 +808,6 @@ const structInfo64 = (
             "__size__": 4,
             "unused": 0
         },
-        "WGPUImageCopyBuffer": {
-            "__size__": 32,
-            "buffer": 24,
-            "layout": 0
-        },
-        "WGPUImageCopyTexture": {
-            "__size__": 32,
-            "aspect": 24,
-            "mipLevel": 8,
-            "origin": 12,
-            "texture": 0
-        },
         "WGPUInstanceCapabilities": {
             "__size__": 24,
             "nextInChain": 0,
@@ -823,9 +815,8 @@ const structInfo64 = (
             "timedWaitAnyMaxCount": 16
         },
         "WGPUInstanceDescriptor": {
-            "__size__": 56,
+            "__size__": 32,
             "capabilities": 8,
-            "features": 32,
             "nextInChain": 0
         },
         "WGPULimits": {
@@ -1100,6 +1091,24 @@ const structInfo64 = (
             "suboptimal": 8,
             "texture": 0
         },
+        "WGPUTexelCopyBufferInfo": {
+            "__size__": 24,
+            "buffer": 16,
+            "layout": 0
+        },
+        "WGPUTexelCopyBufferLayout": {
+            "__size__": 16,
+            "bytesPerRow": 8,
+            "offset": 0,
+            "rowsPerImage": 12
+        },
+        "WGPUTexelCopyTextureInfo": {
+            "__size__": 32,
+            "aspect": 24,
+            "mipLevel": 8,
+            "origin": 12,
+            "texture": 0
+        },
         "WGPUTextureBindingLayout": {
             "__size__": 24,
             "multisampled": 16,
@@ -1111,13 +1120,6 @@ const structInfo64 = (
             "__size__": 24,
             "chain": 0,
             "textureBindingViewDimension": 16
-        },
-        "WGPUTextureDataLayout": {
-            "__size__": 24,
-            "bytesPerRow": 16,
-            "nextInChain": 0,
-            "offset": 8,
-            "rowsPerImage": 20
         },
         "WGPUTextureDescriptor": {
             "__size__": 80,
@@ -1146,17 +1148,19 @@ const structInfo64 = (
             "usage": 56
         },
         "WGPUVertexAttribute": {
-            "__size__": 24,
-            "format": 0,
-            "offset": 8,
-            "shaderLocation": 16
+            "__size__": 32,
+            "format": 8,
+            "nextInChain": 0,
+            "offset": 16,
+            "shaderLocation": 24
         },
         "WGPUVertexBufferLayout": {
-            "__size__": 32,
-            "arrayStride": 0,
-            "attributeCount": 16,
-            "attributes": 24,
-            "stepMode": 8
+            "__size__": 40,
+            "arrayStride": 8,
+            "attributeCount": 24,
+            "attributes": 32,
+            "nextInChain": 0,
+            "stepMode": 16
         },
         "WGPUVertexState": {
             "__size__": 64,

@@ -10,6 +10,7 @@
             'Packed4x8IntegerDotProduct': 2,
             'UnrestrictedPointerParameters': 3,
             'PointerCompositeAccess': 4,
+            'SizedBindingArray': 5,
         },
         AdapterType: {
             'DiscreteGPU': 1,
@@ -285,6 +286,12 @@
             'Store': 1,
             'Discard': 2,
         },
+        SubgroupMatrixComponentType: {
+            'F32': 1,
+            'F16': 2,
+            'U32': 3,
+            'I32': 4,
+        },
         SurfaceGetCurrentTextureStatus: {
             'Success': 1,
             'Timeout': 2,
@@ -549,6 +556,7 @@
             2: 'packed_4x8_integer_dot_product',
             3: 'unrestricted_pointer_parameters',
             4: 'pointer_composite_access',
+            5: 'sized_binding_array',
         },
         AddressMode: [
             undefined,

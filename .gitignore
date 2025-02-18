@@ -1,6 +1,3 @@
-/out/*/*
-!/out/*/hello.html
-!/out/*/hello.js
-!/out/*/hello.wasm
-!/out/*/hello.wasm.map
+/index.html
+/out/
 /third_party/

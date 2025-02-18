@@ -62,6 +62,7 @@ enum class WGSLLanguageFeatureName : uint32_t {
     Packed4x8IntegerDotProduct = WGPUWGSLLanguageFeatureName_Packed4x8IntegerDotProduct,
     UnrestrictedPointerParameters = WGPUWGSLLanguageFeatureName_UnrestrictedPointerParameters,
     PointerCompositeAccess = WGPUWGSLLanguageFeatureName_PointerCompositeAccess,
+    SizedBindingArray = WGPUWGSLLanguageFeatureName_SizedBindingArray,
 };
 static_assert(sizeof(WGSLLanguageFeatureName) == sizeof(WGPUWGSLLanguageFeatureName), "sizeof mismatch for WGSLLanguageFeatureName");
 static_assert(alignof(WGSLLanguageFeatureName) == alignof(WGPUWGSLLanguageFeatureName), "alignof mismatch for WGSLLanguageFeatureName");
@@ -451,6 +452,15 @@ enum class StoreOp : uint32_t {
 };
 static_assert(sizeof(StoreOp) == sizeof(WGPUStoreOp), "sizeof mismatch for StoreOp");
 static_assert(alignof(StoreOp) == alignof(WGPUStoreOp), "alignof mismatch for StoreOp");
+
+enum class SubgroupMatrixComponentType : uint32_t {
+    F32 = WGPUSubgroupMatrixComponentType_F32,
+    F16 = WGPUSubgroupMatrixComponentType_F16,
+    U32 = WGPUSubgroupMatrixComponentType_U32,
+    I32 = WGPUSubgroupMatrixComponentType_I32,
+};
+static_assert(sizeof(SubgroupMatrixComponentType) == sizeof(WGPUSubgroupMatrixComponentType), "sizeof mismatch for SubgroupMatrixComponentType");
+static_assert(alignof(SubgroupMatrixComponentType) == alignof(WGPUSubgroupMatrixComponentType), "alignof mismatch for SubgroupMatrixComponentType");
 
 enum class SurfaceGetCurrentTextureStatus : uint32_t {
     Success = WGPUSurfaceGetCurrentTextureStatus_Success,
@@ -953,9 +963,9 @@ struct SupportedFeatures;
 struct SurfaceCapabilities;
 struct SurfaceConfiguration;
 struct SurfaceTexture;
+struct TexelCopyBufferLayout;
 struct TextureBindingLayout;
 struct TextureBindingViewDimensionDescriptor;
-struct TextureDataLayout;
 struct VertexAttribute;
 struct AdapterInfo;
 struct BindGroupDescriptor;
@@ -970,8 +980,6 @@ struct ConstantEntry;
 struct DepthStencilState;
 struct EmscriptenSurfaceSourceCanvasHTMLSelector;
 struct FutureWaitInfo;
-struct ImageCopyBuffer;
-struct ImageCopyTexture;
 struct InstanceDescriptor;
 struct PipelineLayoutDescriptor;
 struct QuerySetDescriptor;
@@ -985,6 +993,8 @@ struct ShaderModuleDescriptor;
 struct ShaderSourceWGSL;
 struct SupportedLimits;
 struct SurfaceDescriptor;
+struct TexelCopyBufferInfo;
+struct TexelCopyTextureInfo;
 struct TextureDescriptor;
 struct TextureViewDescriptor;
 struct VertexBufferLayout;
@@ -1268,9 +1278,9 @@ class CommandEncoder : public ObjectBase<CommandEncoder, WGPUCommandEncoder> {
     inline RenderPassEncoder BeginRenderPass(RenderPassDescriptor const * descriptor) const;
     inline void ClearBuffer(Buffer const& buffer, uint64_t offset = 0, uint64_t size = WGPU_WHOLE_SIZE) const;
     inline void CopyBufferToBuffer(Buffer const& source, uint64_t sourceOffset, Buffer const& destination, uint64_t destinationOffset, uint64_t size) const;
-    inline void CopyBufferToTexture(ImageCopyBuffer const * source, ImageCopyTexture const * destination, Extent3D const * copySize) const;
-    inline void CopyTextureToBuffer(ImageCopyTexture const * source, ImageCopyBuffer const * destination, Extent3D const * copySize) const;
-    inline void CopyTextureToTexture(ImageCopyTexture const * source, ImageCopyTexture const * destination, Extent3D const * copySize) const;
+    inline void CopyBufferToTexture(TexelCopyBufferInfo const * source, TexelCopyTextureInfo const * destination, Extent3D const * copySize) const;
+    inline void CopyTextureToBuffer(TexelCopyTextureInfo const * source, TexelCopyBufferInfo const * destination, Extent3D const * copySize) const;
+    inline void CopyTextureToTexture(TexelCopyTextureInfo const * source, TexelCopyTextureInfo const * destination, Extent3D const * copySize) const;
     inline CommandBuffer Finish(CommandBufferDescriptor const * descriptor = nullptr) const;
     inline void InsertDebugMarker(StringView markerLabel) const;
     inline void PopDebugGroup() const;
@@ -1466,7 +1476,7 @@ class Queue : public ObjectBase<Queue, WGPUQueue> {
     inline void SetLabel(StringView label) const;
     inline void Submit(size_t commandCount, CommandBuffer const * commands) const;
     inline void WriteBuffer(Buffer const& buffer, uint64_t bufferOffset, void const * data, size_t size) const;
-    inline void WriteTexture(ImageCopyTexture const * destination, void const * data, size_t dataSize, TextureDataLayout const * dataLayout, Extent3D const * writeSize) const;
+    inline void WriteTexture(TexelCopyTextureInfo const * destination, void const * data, size_t dataSize, TexelCopyBufferLayout const * dataLayout, Extent3D const * writeSize) const;
 
 
   private:
@@ -1986,6 +1996,14 @@ struct SurfaceTexture {
     SurfaceGetCurrentTextureStatus status;
 };
 
+struct TexelCopyBufferLayout {
+    inline operator const WGPUTexelCopyBufferLayout&() const noexcept;
+
+    uint64_t offset = 0;
+    uint32_t bytesPerRow = WGPU_COPY_STRIDE_UNDEFINED;
+    uint32_t rowsPerImage = WGPU_COPY_STRIDE_UNDEFINED;
+};
+
 struct TextureBindingLayout {
     inline operator const WGPUTextureBindingLayout&() const noexcept;
 
@@ -2007,18 +2025,10 @@ struct TextureBindingViewDimensionDescriptor : ChainedStruct {
     alignas(kFirstMemberAlignment) TextureViewDimension textureBindingViewDimension = TextureViewDimension::Undefined;
 };
 
-struct TextureDataLayout {
-    inline operator const WGPUTextureDataLayout&() const noexcept;
-
-    ChainedStruct const * nextInChain = nullptr;
-    uint64_t offset = 0;
-    uint32_t bytesPerRow = WGPU_COPY_STRIDE_UNDEFINED;
-    uint32_t rowsPerImage = WGPU_COPY_STRIDE_UNDEFINED;
-};
-
 struct VertexAttribute {
     inline operator const WGPUVertexAttribute&() const noexcept;
 
+    ChainedStruct const * nextInChain = nullptr;
     VertexFormat format;
     uint64_t offset;
     uint32_t shaderLocation;
@@ -2042,6 +2052,8 @@ struct AdapterInfo {
     AdapterType const adapterType = {};
     uint32_t const vendorID = {};
     uint32_t const deviceID = {};
+    uint32_t const subgroupMinSize = {};
+    uint32_t const subgroupMaxSize = {};
     Bool const compatibilityMode = false;
 
   private:
@@ -2168,28 +2180,11 @@ struct FutureWaitInfo {
     Bool completed = false;
 };
 
-struct ImageCopyBuffer {
-    inline operator const WGPUImageCopyBuffer&() const noexcept;
-
-    TextureDataLayout layout = {};
-    Buffer buffer;
-};
-
-struct ImageCopyTexture {
-    inline operator const WGPUImageCopyTexture&() const noexcept;
-
-    Texture texture;
-    uint32_t mipLevel = 0;
-    Origin3D origin = {};
-    TextureAspect aspect = TextureAspect::All;
-};
-
 struct InstanceDescriptor {
     inline operator const WGPUInstanceDescriptor&() const noexcept;
 
     ChainedStruct const * nextInChain = nullptr;
     InstanceCapabilities capabilities = {};
-    InstanceCapabilities features = {};
 };
 
 struct PipelineLayoutDescriptor {
@@ -2307,6 +2302,22 @@ struct SurfaceDescriptor {
     StringView label = {};
 };
 
+struct TexelCopyBufferInfo {
+    inline operator const WGPUTexelCopyBufferInfo&() const noexcept;
+
+    TexelCopyBufferLayout layout = {};
+    Buffer buffer;
+};
+
+struct TexelCopyTextureInfo {
+    inline operator const WGPUTexelCopyTextureInfo&() const noexcept;
+
+    Texture texture;
+    uint32_t mipLevel = 0;
+    Origin3D origin = {};
+    TextureAspect aspect = TextureAspect::All;
+};
+
 struct TextureDescriptor {
     inline operator const WGPUTextureDescriptor&() const noexcept;
 
@@ -2340,6 +2351,7 @@ struct TextureViewDescriptor {
 struct VertexBufferLayout {
     inline operator const WGPUVertexBufferLayout&() const noexcept;
 
+    ChainedStruct const * nextInChain = nullptr;
     uint64_t arrayStride;
     VertexStepMode stepMode;
     size_t attributeCount;
@@ -3147,6 +3159,21 @@ static_assert(offsetof(SurfaceTexture, suboptimal) == offsetof(WGPUSurfaceTextur
 static_assert(offsetof(SurfaceTexture, status) == offsetof(WGPUSurfaceTexture, status),
         "offsetof mismatch for SurfaceTexture::status");
 
+// TexelCopyBufferLayout implementation
+
+TexelCopyBufferLayout::operator const WGPUTexelCopyBufferLayout&() const noexcept {
+    return *reinterpret_cast<const WGPUTexelCopyBufferLayout*>(this);
+}
+
+static_assert(sizeof(TexelCopyBufferLayout) == sizeof(WGPUTexelCopyBufferLayout), "sizeof mismatch for TexelCopyBufferLayout");
+static_assert(alignof(TexelCopyBufferLayout) == alignof(WGPUTexelCopyBufferLayout), "alignof mismatch for TexelCopyBufferLayout");
+static_assert(offsetof(TexelCopyBufferLayout, offset) == offsetof(WGPUTexelCopyBufferLayout, offset),
+        "offsetof mismatch for TexelCopyBufferLayout::offset");
+static_assert(offsetof(TexelCopyBufferLayout, bytesPerRow) == offsetof(WGPUTexelCopyBufferLayout, bytesPerRow),
+        "offsetof mismatch for TexelCopyBufferLayout::bytesPerRow");
+static_assert(offsetof(TexelCopyBufferLayout, rowsPerImage) == offsetof(WGPUTexelCopyBufferLayout, rowsPerImage),
+        "offsetof mismatch for TexelCopyBufferLayout::rowsPerImage");
+
 // TextureBindingLayout implementation
 
 TextureBindingLayout::operator const WGPUTextureBindingLayout&() const noexcept {
@@ -3184,23 +3211,6 @@ static_assert(alignof(TextureBindingViewDimensionDescriptor) == alignof(WGPUText
 static_assert(offsetof(TextureBindingViewDimensionDescriptor, textureBindingViewDimension) == offsetof(WGPUTextureBindingViewDimensionDescriptor, textureBindingViewDimension),
         "offsetof mismatch for TextureBindingViewDimensionDescriptor::textureBindingViewDimension");
 
-// TextureDataLayout implementation
-
-TextureDataLayout::operator const WGPUTextureDataLayout&() const noexcept {
-    return *reinterpret_cast<const WGPUTextureDataLayout*>(this);
-}
-
-static_assert(sizeof(TextureDataLayout) == sizeof(WGPUTextureDataLayout), "sizeof mismatch for TextureDataLayout");
-static_assert(alignof(TextureDataLayout) == alignof(WGPUTextureDataLayout), "alignof mismatch for TextureDataLayout");
-static_assert(offsetof(TextureDataLayout, nextInChain) == offsetof(WGPUTextureDataLayout, nextInChain),
-        "offsetof mismatch for TextureDataLayout::nextInChain");
-static_assert(offsetof(TextureDataLayout, offset) == offsetof(WGPUTextureDataLayout, offset),
-        "offsetof mismatch for TextureDataLayout::offset");
-static_assert(offsetof(TextureDataLayout, bytesPerRow) == offsetof(WGPUTextureDataLayout, bytesPerRow),
-        "offsetof mismatch for TextureDataLayout::bytesPerRow");
-static_assert(offsetof(TextureDataLayout, rowsPerImage) == offsetof(WGPUTextureDataLayout, rowsPerImage),
-        "offsetof mismatch for TextureDataLayout::rowsPerImage");
-
 // VertexAttribute implementation
 
 VertexAttribute::operator const WGPUVertexAttribute&() const noexcept {
@@ -3209,6 +3219,8 @@ VertexAttribute::operator const WGPUVertexAttribute&() const noexcept {
 
 static_assert(sizeof(VertexAttribute) == sizeof(WGPUVertexAttribute), "sizeof mismatch for VertexAttribute");
 static_assert(alignof(VertexAttribute) == alignof(WGPUVertexAttribute), "alignof mismatch for VertexAttribute");
+static_assert(offsetof(VertexAttribute, nextInChain) == offsetof(WGPUVertexAttribute, nextInChain),
+        "offsetof mismatch for VertexAttribute::nextInChain");
 static_assert(offsetof(VertexAttribute, format) == offsetof(WGPUVertexAttribute, format),
         "offsetof mismatch for VertexAttribute::format");
 static_assert(offsetof(VertexAttribute, offset) == offsetof(WGPUVertexAttribute, offset),
@@ -3231,6 +3243,8 @@ AdapterInfo::AdapterInfo(AdapterInfo&& rhs)
             adapterType(rhs.adapterType),
             vendorID(rhs.vendorID),
             deviceID(rhs.deviceID),
+            subgroupMinSize(rhs.subgroupMinSize),
+            subgroupMaxSize(rhs.subgroupMaxSize),
             compatibilityMode(rhs.compatibilityMode){
     Reset(rhs);
 }
@@ -3248,6 +3262,8 @@ AdapterInfo& AdapterInfo::operator=(AdapterInfo&& rhs) {
     detail::AsNonConstReference(this->adapterType) = std::move(rhs.adapterType);
     detail::AsNonConstReference(this->vendorID) = std::move(rhs.vendorID);
     detail::AsNonConstReference(this->deviceID) = std::move(rhs.deviceID);
+    detail::AsNonConstReference(this->subgroupMinSize) = std::move(rhs.subgroupMinSize);
+    detail::AsNonConstReference(this->subgroupMaxSize) = std::move(rhs.subgroupMaxSize);
     detail::AsNonConstReference(this->compatibilityMode) = std::move(rhs.compatibilityMode);
     Reset(rhs);
     return *this;
@@ -3271,6 +3287,8 @@ void AdapterInfo::Reset(AdapterInfo& value) {
     detail::AsNonConstReference(value.adapterType) = defaultValue.adapterType;
     detail::AsNonConstReference(value.vendorID) = defaultValue.vendorID;
     detail::AsNonConstReference(value.deviceID) = defaultValue.deviceID;
+    detail::AsNonConstReference(value.subgroupMinSize) = defaultValue.subgroupMinSize;
+    detail::AsNonConstReference(value.subgroupMaxSize) = defaultValue.subgroupMaxSize;
     detail::AsNonConstReference(value.compatibilityMode) = defaultValue.compatibilityMode;
 }
 
@@ -3298,6 +3316,10 @@ static_assert(offsetof(AdapterInfo, vendorID) == offsetof(WGPUAdapterInfo, vendo
         "offsetof mismatch for AdapterInfo::vendorID");
 static_assert(offsetof(AdapterInfo, deviceID) == offsetof(WGPUAdapterInfo, deviceID),
         "offsetof mismatch for AdapterInfo::deviceID");
+static_assert(offsetof(AdapterInfo, subgroupMinSize) == offsetof(WGPUAdapterInfo, subgroupMinSize),
+        "offsetof mismatch for AdapterInfo::subgroupMinSize");
+static_assert(offsetof(AdapterInfo, subgroupMaxSize) == offsetof(WGPUAdapterInfo, subgroupMaxSize),
+        "offsetof mismatch for AdapterInfo::subgroupMaxSize");
 static_assert(offsetof(AdapterInfo, compatibilityMode) == offsetof(WGPUAdapterInfo, compatibilityMode),
         "offsetof mismatch for AdapterInfo::compatibilityMode");
 
@@ -3524,36 +3546,6 @@ static_assert(offsetof(FutureWaitInfo, future) == offsetof(WGPUFutureWaitInfo, f
 static_assert(offsetof(FutureWaitInfo, completed) == offsetof(WGPUFutureWaitInfo, completed),
         "offsetof mismatch for FutureWaitInfo::completed");
 
-// ImageCopyBuffer implementation
-
-ImageCopyBuffer::operator const WGPUImageCopyBuffer&() const noexcept {
-    return *reinterpret_cast<const WGPUImageCopyBuffer*>(this);
-}
-
-static_assert(sizeof(ImageCopyBuffer) == sizeof(WGPUImageCopyBuffer), "sizeof mismatch for ImageCopyBuffer");
-static_assert(alignof(ImageCopyBuffer) == alignof(WGPUImageCopyBuffer), "alignof mismatch for ImageCopyBuffer");
-static_assert(offsetof(ImageCopyBuffer, layout) == offsetof(WGPUImageCopyBuffer, layout),
-        "offsetof mismatch for ImageCopyBuffer::layout");
-static_assert(offsetof(ImageCopyBuffer, buffer) == offsetof(WGPUImageCopyBuffer, buffer),
-        "offsetof mismatch for ImageCopyBuffer::buffer");
-
-// ImageCopyTexture implementation
-
-ImageCopyTexture::operator const WGPUImageCopyTexture&() const noexcept {
-    return *reinterpret_cast<const WGPUImageCopyTexture*>(this);
-}
-
-static_assert(sizeof(ImageCopyTexture) == sizeof(WGPUImageCopyTexture), "sizeof mismatch for ImageCopyTexture");
-static_assert(alignof(ImageCopyTexture) == alignof(WGPUImageCopyTexture), "alignof mismatch for ImageCopyTexture");
-static_assert(offsetof(ImageCopyTexture, texture) == offsetof(WGPUImageCopyTexture, texture),
-        "offsetof mismatch for ImageCopyTexture::texture");
-static_assert(offsetof(ImageCopyTexture, mipLevel) == offsetof(WGPUImageCopyTexture, mipLevel),
-        "offsetof mismatch for ImageCopyTexture::mipLevel");
-static_assert(offsetof(ImageCopyTexture, origin) == offsetof(WGPUImageCopyTexture, origin),
-        "offsetof mismatch for ImageCopyTexture::origin");
-static_assert(offsetof(ImageCopyTexture, aspect) == offsetof(WGPUImageCopyTexture, aspect),
-        "offsetof mismatch for ImageCopyTexture::aspect");
-
 // InstanceDescriptor implementation
 
 InstanceDescriptor::operator const WGPUInstanceDescriptor&() const noexcept {
@@ -3566,8 +3558,6 @@ static_assert(offsetof(InstanceDescriptor, nextInChain) == offsetof(WGPUInstance
         "offsetof mismatch for InstanceDescriptor::nextInChain");
 static_assert(offsetof(InstanceDescriptor, capabilities) == offsetof(WGPUInstanceDescriptor, capabilities),
         "offsetof mismatch for InstanceDescriptor::capabilities");
-static_assert(offsetof(InstanceDescriptor, features) == offsetof(WGPUInstanceDescriptor, features),
-        "offsetof mismatch for InstanceDescriptor::features");
 
 // PipelineLayoutDescriptor implementation
 
@@ -3784,6 +3774,36 @@ static_assert(offsetof(SurfaceDescriptor, nextInChain) == offsetof(WGPUSurfaceDe
 static_assert(offsetof(SurfaceDescriptor, label) == offsetof(WGPUSurfaceDescriptor, label),
         "offsetof mismatch for SurfaceDescriptor::label");
 
+// TexelCopyBufferInfo implementation
+
+TexelCopyBufferInfo::operator const WGPUTexelCopyBufferInfo&() const noexcept {
+    return *reinterpret_cast<const WGPUTexelCopyBufferInfo*>(this);
+}
+
+static_assert(sizeof(TexelCopyBufferInfo) == sizeof(WGPUTexelCopyBufferInfo), "sizeof mismatch for TexelCopyBufferInfo");
+static_assert(alignof(TexelCopyBufferInfo) == alignof(WGPUTexelCopyBufferInfo), "alignof mismatch for TexelCopyBufferInfo");
+static_assert(offsetof(TexelCopyBufferInfo, layout) == offsetof(WGPUTexelCopyBufferInfo, layout),
+        "offsetof mismatch for TexelCopyBufferInfo::layout");
+static_assert(offsetof(TexelCopyBufferInfo, buffer) == offsetof(WGPUTexelCopyBufferInfo, buffer),
+        "offsetof mismatch for TexelCopyBufferInfo::buffer");
+
+// TexelCopyTextureInfo implementation
+
+TexelCopyTextureInfo::operator const WGPUTexelCopyTextureInfo&() const noexcept {
+    return *reinterpret_cast<const WGPUTexelCopyTextureInfo*>(this);
+}
+
+static_assert(sizeof(TexelCopyTextureInfo) == sizeof(WGPUTexelCopyTextureInfo), "sizeof mismatch for TexelCopyTextureInfo");
+static_assert(alignof(TexelCopyTextureInfo) == alignof(WGPUTexelCopyTextureInfo), "alignof mismatch for TexelCopyTextureInfo");
+static_assert(offsetof(TexelCopyTextureInfo, texture) == offsetof(WGPUTexelCopyTextureInfo, texture),
+        "offsetof mismatch for TexelCopyTextureInfo::texture");
+static_assert(offsetof(TexelCopyTextureInfo, mipLevel) == offsetof(WGPUTexelCopyTextureInfo, mipLevel),
+        "offsetof mismatch for TexelCopyTextureInfo::mipLevel");
+static_assert(offsetof(TexelCopyTextureInfo, origin) == offsetof(WGPUTexelCopyTextureInfo, origin),
+        "offsetof mismatch for TexelCopyTextureInfo::origin");
+static_assert(offsetof(TexelCopyTextureInfo, aspect) == offsetof(WGPUTexelCopyTextureInfo, aspect),
+        "offsetof mismatch for TexelCopyTextureInfo::aspect");
+
 // TextureDescriptor implementation
 
 TextureDescriptor::operator const WGPUTextureDescriptor&() const noexcept {
@@ -3850,6 +3870,8 @@ VertexBufferLayout::operator const WGPUVertexBufferLayout&() const noexcept {
 
 static_assert(sizeof(VertexBufferLayout) == sizeof(WGPUVertexBufferLayout), "sizeof mismatch for VertexBufferLayout");
 static_assert(alignof(VertexBufferLayout) == alignof(WGPUVertexBufferLayout), "alignof mismatch for VertexBufferLayout");
+static_assert(offsetof(VertexBufferLayout, nextInChain) == offsetof(WGPUVertexBufferLayout, nextInChain),
+        "offsetof mismatch for VertexBufferLayout::nextInChain");
 static_assert(offsetof(VertexBufferLayout, arrayStride) == offsetof(WGPUVertexBufferLayout, arrayStride),
         "offsetof mismatch for VertexBufferLayout::arrayStride");
 static_assert(offsetof(VertexBufferLayout, stepMode) == offsetof(WGPUVertexBufferLayout, stepMode),
@@ -4443,14 +4465,14 @@ void CommandEncoder::ClearBuffer(Buffer const& buffer, uint64_t offset, uint64_t
 void CommandEncoder::CopyBufferToBuffer(Buffer const& source, uint64_t sourceOffset, Buffer const& destination, uint64_t destinationOffset, uint64_t size) const {
     wgpuCommandEncoderCopyBufferToBuffer(Get(), source.Get(), sourceOffset, destination.Get(), destinationOffset, size);
 }
-void CommandEncoder::CopyBufferToTexture(ImageCopyBuffer const * source, ImageCopyTexture const * destination, Extent3D const * copySize) const {
-    wgpuCommandEncoderCopyBufferToTexture(Get(), reinterpret_cast<WGPUImageCopyBuffer const * >(source), reinterpret_cast<WGPUImageCopyTexture const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
+void CommandEncoder::CopyBufferToTexture(TexelCopyBufferInfo const * source, TexelCopyTextureInfo const * destination, Extent3D const * copySize) const {
+    wgpuCommandEncoderCopyBufferToTexture(Get(), reinterpret_cast<WGPUTexelCopyBufferInfo const * >(source), reinterpret_cast<WGPUTexelCopyTextureInfo const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
 }
-void CommandEncoder::CopyTextureToBuffer(ImageCopyTexture const * source, ImageCopyBuffer const * destination, Extent3D const * copySize) const {
-    wgpuCommandEncoderCopyTextureToBuffer(Get(), reinterpret_cast<WGPUImageCopyTexture const * >(source), reinterpret_cast<WGPUImageCopyBuffer const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
+void CommandEncoder::CopyTextureToBuffer(TexelCopyTextureInfo const * source, TexelCopyBufferInfo const * destination, Extent3D const * copySize) const {
+    wgpuCommandEncoderCopyTextureToBuffer(Get(), reinterpret_cast<WGPUTexelCopyTextureInfo const * >(source), reinterpret_cast<WGPUTexelCopyBufferInfo const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
 }
-void CommandEncoder::CopyTextureToTexture(ImageCopyTexture const * source, ImageCopyTexture const * destination, Extent3D const * copySize) const {
-    wgpuCommandEncoderCopyTextureToTexture(Get(), reinterpret_cast<WGPUImageCopyTexture const * >(source), reinterpret_cast<WGPUImageCopyTexture const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
+void CommandEncoder::CopyTextureToTexture(TexelCopyTextureInfo const * source, TexelCopyTextureInfo const * destination, Extent3D const * copySize) const {
+    wgpuCommandEncoderCopyTextureToTexture(Get(), reinterpret_cast<WGPUTexelCopyTextureInfo const * >(source), reinterpret_cast<WGPUTexelCopyTextureInfo const * >(destination), reinterpret_cast<WGPUExtent3D const * >(copySize));
 }
 CommandBuffer CommandEncoder::Finish(CommandBufferDescriptor const * descriptor) const {
     auto result = wgpuCommandEncoderFinish(Get(), reinterpret_cast<WGPUCommandBufferDescriptor const * >(descriptor));
@@ -5063,8 +5085,8 @@ void Queue::Submit(size_t commandCount, CommandBuffer const * commands) const {
 void Queue::WriteBuffer(Buffer const& buffer, uint64_t bufferOffset, void const * data, size_t size) const {
     wgpuQueueWriteBuffer(Get(), buffer.Get(), bufferOffset, reinterpret_cast<void const * >(data), size);
 }
-void Queue::WriteTexture(ImageCopyTexture const * destination, void const * data, size_t dataSize, TextureDataLayout const * dataLayout, Extent3D const * writeSize) const {
-    wgpuQueueWriteTexture(Get(), reinterpret_cast<WGPUImageCopyTexture const * >(destination), reinterpret_cast<void const * >(data), dataSize, reinterpret_cast<WGPUTextureDataLayout const * >(dataLayout), reinterpret_cast<WGPUExtent3D const * >(writeSize));
+void Queue::WriteTexture(TexelCopyTextureInfo const * destination, void const * data, size_t dataSize, TexelCopyBufferLayout const * dataLayout, Extent3D const * writeSize) const {
+    wgpuQueueWriteTexture(Get(), reinterpret_cast<WGPUTexelCopyTextureInfo const * >(destination), reinterpret_cast<void const * >(data), dataSize, reinterpret_cast<WGPUTexelCopyBufferLayout const * >(dataLayout), reinterpret_cast<WGPUExtent3D const * >(writeSize));
 }
 
 
@@ -5481,21 +5503,24 @@ static_assert(alignof(TextureView) == alignof(WGPUTextureView), "alignof mismatc
 
 
 
-// ComputePassTimestampWrites is deprecated.
-// Use PassTimestampWrites instead.
-using ComputePassTimestampWrites = PassTimestampWrites;
+// ImageCopyBuffer is deprecated.
+// Use TexelCopyBufferInfo instead.
+using ImageCopyBuffer = TexelCopyBufferInfo;
+// ImageCopyTexture is deprecated.
+// Use TexelCopyTextureInfo instead.
+using ImageCopyTexture = TexelCopyTextureInfo;
 // RenderPassDescriptorMaxDrawCount is deprecated.
 // Use RenderPassMaxDrawCount instead.
 using RenderPassDescriptorMaxDrawCount = RenderPassMaxDrawCount;
-// RenderPassTimestampWrites is deprecated.
-// Use PassTimestampWrites instead.
-using RenderPassTimestampWrites = PassTimestampWrites;
 // ShaderModuleSPIRVDescriptor is deprecated.
 // Use ShaderSourceSPIRV instead.
 using ShaderModuleSPIRVDescriptor = ShaderSourceSPIRV;
 // ShaderModuleWGSLDescriptor is deprecated.
 // Use ShaderSourceWGSL instead.
 using ShaderModuleWGSLDescriptor = ShaderSourceWGSL;
+// TextureDataLayout is deprecated.
+// Use TexelCopyBufferLayout instead.
+using TextureDataLayout = TexelCopyBufferLayout;
 
 // Free Functions
 static inline Instance CreateInstance(InstanceDescriptor const * descriptor = nullptr) {

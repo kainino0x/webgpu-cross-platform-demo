@@ -79,8 +79,13 @@ endif()
 add_executable(hello
     "main.cpp"
     )
+target_compile_definitions(hello
+    PRIVATE
+        DEMO_USE_ASYNCIFY=${DEMO_USE_ASYNCIFY}
+    )
 
 if (EMSCRIPTEN)
+    # TODO: build against dawn as a subproject so dawn can set the weird flags and stuff? and we don't have to build dawn?
     add_library(webgpu_layer
         "third_party/dawn/third_party/emdawnwebgpu/webgpu.cpp"
         )
