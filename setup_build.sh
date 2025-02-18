@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=3.1.74 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=d419d935d22b314552558e85fd6b5da93991cbee
+DAWN_REVISION=c469d593acab75beec208370ee2276f6ad523bd2
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -76,3 +76,5 @@ emcc --clear-cache
         ../..
     ninja emdawnwebgpu_headers_gen emdawnwebgpu_js_gen webgpu_generated_struct_info_js
 )
+
+ln -f third_party/dawn/out/wasm/gen/src/emdawnwebgpu/{include/webgpu/webgpu{,_cpp}.h,library_webgpu_{enum_tables,generated_{sig,struct}_info}.js} dawn_gen_snapshots/

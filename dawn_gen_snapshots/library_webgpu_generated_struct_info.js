@@ -84,13 +84,6 @@ const structInfo32 = (
             "size": 24,
             "usage": 16
         },
-        "WGPUBufferMapCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
-        },
         "WGPUChainedStruct": {
             "__size__": 8,
             "next": 0,
@@ -126,13 +119,6 @@ const structInfo32 = (
             "messages": 8,
             "nextInChain": 0
         },
-        "WGPUCompilationInfoCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
-        },
         "WGPUCompilationMessage": {
             "__size__": 72,
             "length": 40,
@@ -151,12 +137,6 @@ const structInfo32 = (
             "label": 4,
             "nextInChain": 0,
             "timestampWrites": 12
-        },
-        "WGPUComputePassTimestampWrites": {
-            "__size__": 12,
-            "beginningOfPassWriteIndex": 4,
-            "endOfPassWriteIndex": 8,
-            "querySet": 0
         },
         "WGPUComputePipelineDescriptor": {
             "__size__": 40,
@@ -179,20 +159,6 @@ const structInfo32 = (
             "nextInChain": 0,
             "value": 16
         },
-        "WGPUCreateComputePipelineAsyncCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
-        },
-        "WGPUCreateRenderPipelineAsyncCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
-        },
         "WGPUDepthStencilState": {
             "__size__": 68,
             "depthBias": 56,
@@ -210,20 +176,18 @@ const structInfo32 = (
         "WGPUDeviceDescriptor": {
             "__size__": 72,
             "defaultQueue": 24,
-            "deviceLostCallbackInfo2": 36,
+            "deviceLostCallbackInfo": 36,
             "label": 4,
             "nextInChain": 0,
             "requiredFeatureCount": 12,
             "requiredFeatures": 16,
             "requiredLimits": 20,
-            "uncapturedErrorCallbackInfo2": 56
+            "uncapturedErrorCallbackInfo": 56
         },
-        "WGPUDeviceLostCallbackInfo": {
+        "WGPUEmscriptenSurfaceSourceCanvasHTMLSelector": {
             "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
+            "chain": 0,
+            "selector": 8
         },
         "WGPUExtent3D": {
             "__size__": 12,
@@ -250,7 +214,7 @@ const structInfo32 = (
             "completed": 8,
             "future": 0
         },
-        "WGPUINTERNAL__HAVE_EMDAWNWEBGPU_HEADER": {
+        "WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER": {
             "__size__": 4,
             "unused": 0
         },
@@ -266,16 +230,17 @@ const structInfo32 = (
             "origin": 8,
             "texture": 0
         },
-        "WGPUInstanceDescriptor": {
-            "__size__": 16,
-            "features": 4,
-            "nextInChain": 0
-        },
-        "WGPUInstanceFeatures": {
+        "WGPUInstanceCapabilities": {
             "__size__": 12,
             "nextInChain": 0,
             "timedWaitAnyEnable": 4,
             "timedWaitAnyMaxCount": 8
+        },
+        "WGPUInstanceDescriptor": {
+            "__size__": 28,
+            "capabilities": 4,
+            "features": 16,
+            "nextInChain": 0
         },
         "WGPULimits": {
             "__size__": 160,
@@ -329,6 +294,13 @@ const structInfo32 = (
             "y": 4,
             "z": 8
         },
+        "WGPUPassTimestampWrites": {
+            "__size__": 16,
+            "beginningOfPassWriteIndex": 8,
+            "endOfPassWriteIndex": 12,
+            "nextInChain": 0,
+            "querySet": 4
+        },
         "WGPUPipelineLayoutDescriptor": {
             "__size__": 24,
             "bindGroupLayoutCount": 12,
@@ -336,14 +308,6 @@ const structInfo32 = (
             "immediateDataRangeByteSize": 20,
             "label": 4,
             "nextInChain": 0
-        },
-        "WGPUPopErrorScopeCallbackInfo": {
-            "__size__": 20,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "oldCallback": 12,
-            "userdata": 16
         },
         "WGPUPrimitiveState": {
             "__size__": 24,
@@ -365,13 +329,6 @@ const structInfo32 = (
             "__size__": 12,
             "label": 4,
             "nextInChain": 0
-        },
-        "WGPUQueueWorkDoneCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
         },
         "WGPURenderBundleDescriptor": {
             "__size__": 12,
@@ -400,16 +357,17 @@ const structInfo32 = (
             "view": 4
         },
         "WGPURenderPassDepthStencilAttachment": {
-            "__size__": 36,
-            "depthClearValue": 12,
-            "depthLoadOp": 4,
-            "depthReadOnly": 16,
-            "depthStoreOp": 8,
-            "stencilClearValue": 28,
-            "stencilLoadOp": 20,
-            "stencilReadOnly": 32,
-            "stencilStoreOp": 24,
-            "view": 0
+            "__size__": 40,
+            "depthClearValue": 16,
+            "depthLoadOp": 8,
+            "depthReadOnly": 20,
+            "depthStoreOp": 12,
+            "nextInChain": 0,
+            "stencilClearValue": 32,
+            "stencilLoadOp": 24,
+            "stencilReadOnly": 36,
+            "stencilStoreOp": 28,
+            "view": 4
         },
         "WGPURenderPassDescriptor": {
             "__size__": 32,
@@ -426,12 +384,6 @@ const structInfo32 = (
             "chain": 0,
             "maxDrawCount": 8
         },
-        "WGPURenderPassTimestampWrites": {
-            "__size__": 12,
-            "beginningOfPassWriteIndex": 4,
-            "endOfPassWriteIndex": 8,
-            "querySet": 0
-        },
         "WGPURenderPipelineDescriptor": {
             "__size__": 96,
             "depthStencil": 72,
@@ -443,13 +395,6 @@ const structInfo32 = (
             "primitive": 48,
             "vertex": 16
         },
-        "WGPURequestAdapterCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
-        },
         "WGPURequestAdapterOptions": {
             "__size__": 24,
             "backendType": 16,
@@ -458,13 +403,6 @@ const structInfo32 = (
             "forceFallbackAdapter": 20,
             "nextInChain": 0,
             "powerPreference": 12
-        },
-        "WGPURequestDeviceCallbackInfo": {
-            "__size__": 16,
-            "callback": 8,
-            "mode": 4,
-            "nextInChain": 0,
-            "userdata": 12
         },
         "WGPURequiredLimits": {
             "__size__": 168,
@@ -536,6 +474,11 @@ const structInfo32 = (
             "limits": 8,
             "nextInChain": 0
         },
+        "WGPUSupportedWGSLLanguageFeatures": {
+            "__size__": 8,
+            "featureCount": 0,
+            "features": 4
+        },
         "WGPUSurfaceCapabilities": {
             "__size__": 40,
             "alphaModeCount": 32,
@@ -564,11 +507,6 @@ const structInfo32 = (
             "__size__": 12,
             "label": 4,
             "nextInChain": 0
-        },
-        "WGPUSurfaceSourceCanvasHTMLSelector_Emscripten": {
-            "__size__": 16,
-            "chain": 0,
-            "selector": 8
         },
         "WGPUSurfaceTexture": {
             "__size__": 12,
@@ -620,12 +558,6 @@ const structInfo32 = (
             "mipLevelCount": 24,
             "nextInChain": 0,
             "usage": 40
-        },
-        "WGPUUncapturedErrorCallbackInfo": {
-            "__size__": 12,
-            "callback": 4,
-            "nextInChain": 0,
-            "userdata": 8
         },
         "WGPUVertexAttribute": {
             "__size__": 24,
@@ -738,13 +670,6 @@ const structInfo64 = (
             "size": 32,
             "usage": 24
         },
-        "WGPUBufferMapCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
-        },
         "WGPUChainedStruct": {
             "__size__": 16,
             "next": 0,
@@ -780,13 +705,6 @@ const structInfo64 = (
             "messages": 16,
             "nextInChain": 0
         },
-        "WGPUCompilationInfoCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
-        },
         "WGPUCompilationMessage": {
             "__size__": 88,
             "length": 56,
@@ -805,12 +723,6 @@ const structInfo64 = (
             "label": 8,
             "nextInChain": 0,
             "timestampWrites": 24
-        },
-        "WGPUComputePassTimestampWrites": {
-            "__size__": 16,
-            "beginningOfPassWriteIndex": 8,
-            "endOfPassWriteIndex": 12,
-            "querySet": 0
         },
         "WGPUComputePipelineDescriptor": {
             "__size__": 80,
@@ -833,20 +745,6 @@ const structInfo64 = (
             "nextInChain": 0,
             "value": 24
         },
-        "WGPUCreateComputePipelineAsyncCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
-        },
-        "WGPUCreateRenderPipelineAsyncCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
-        },
         "WGPUDepthStencilState": {
             "__size__": 72,
             "depthBias": 60,
@@ -864,20 +762,18 @@ const structInfo64 = (
         "WGPUDeviceDescriptor": {
             "__size__": 144,
             "defaultQueue": 48,
-            "deviceLostCallbackInfo2": 72,
+            "deviceLostCallbackInfo": 72,
             "label": 8,
             "nextInChain": 0,
             "requiredFeatureCount": 24,
             "requiredFeatures": 32,
             "requiredLimits": 40,
-            "uncapturedErrorCallbackInfo2": 112
+            "uncapturedErrorCallbackInfo": 112
         },
-        "WGPUDeviceLostCallbackInfo": {
+        "WGPUEmscriptenSurfaceSourceCanvasHTMLSelector": {
             "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
+            "chain": 0,
+            "selector": 16
         },
         "WGPUExtent3D": {
             "__size__": 12,
@@ -904,7 +800,7 @@ const structInfo64 = (
             "completed": 8,
             "future": 0
         },
-        "WGPUINTERNAL__HAVE_EMDAWNWEBGPU_HEADER": {
+        "WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER": {
             "__size__": 4,
             "unused": 0
         },
@@ -920,16 +816,17 @@ const structInfo64 = (
             "origin": 12,
             "texture": 0
         },
-        "WGPUInstanceDescriptor": {
-            "__size__": 32,
-            "features": 8,
-            "nextInChain": 0
-        },
-        "WGPUInstanceFeatures": {
+        "WGPUInstanceCapabilities": {
             "__size__": 24,
             "nextInChain": 0,
             "timedWaitAnyEnable": 8,
             "timedWaitAnyMaxCount": 16
+        },
+        "WGPUInstanceDescriptor": {
+            "__size__": 56,
+            "capabilities": 8,
+            "features": 32,
+            "nextInChain": 0
         },
         "WGPULimits": {
             "__size__": 160,
@@ -983,6 +880,13 @@ const structInfo64 = (
             "y": 4,
             "z": 8
         },
+        "WGPUPassTimestampWrites": {
+            "__size__": 24,
+            "beginningOfPassWriteIndex": 16,
+            "endOfPassWriteIndex": 20,
+            "nextInChain": 0,
+            "querySet": 8
+        },
         "WGPUPipelineLayoutDescriptor": {
             "__size__": 48,
             "bindGroupLayoutCount": 24,
@@ -990,14 +894,6 @@ const structInfo64 = (
             "immediateDataRangeByteSize": 40,
             "label": 8,
             "nextInChain": 0
-        },
-        "WGPUPopErrorScopeCallbackInfo": {
-            "__size__": 40,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "oldCallback": 24,
-            "userdata": 32
         },
         "WGPUPrimitiveState": {
             "__size__": 32,
@@ -1019,13 +915,6 @@ const structInfo64 = (
             "__size__": 24,
             "label": 8,
             "nextInChain": 0
-        },
-        "WGPUQueueWorkDoneCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
         },
         "WGPURenderBundleDescriptor": {
             "__size__": 24,
@@ -1054,16 +943,17 @@ const structInfo64 = (
             "view": 8
         },
         "WGPURenderPassDepthStencilAttachment": {
-            "__size__": 40,
-            "depthClearValue": 16,
-            "depthLoadOp": 8,
-            "depthReadOnly": 20,
-            "depthStoreOp": 12,
-            "stencilClearValue": 32,
-            "stencilLoadOp": 24,
-            "stencilReadOnly": 36,
-            "stencilStoreOp": 28,
-            "view": 0
+            "__size__": 48,
+            "depthClearValue": 24,
+            "depthLoadOp": 16,
+            "depthReadOnly": 28,
+            "depthStoreOp": 20,
+            "nextInChain": 0,
+            "stencilClearValue": 40,
+            "stencilLoadOp": 32,
+            "stencilReadOnly": 44,
+            "stencilStoreOp": 36,
+            "view": 8
         },
         "WGPURenderPassDescriptor": {
             "__size__": 64,
@@ -1080,12 +970,6 @@ const structInfo64 = (
             "chain": 0,
             "maxDrawCount": 16
         },
-        "WGPURenderPassTimestampWrites": {
-            "__size__": 16,
-            "beginningOfPassWriteIndex": 8,
-            "endOfPassWriteIndex": 12,
-            "querySet": 0
-        },
         "WGPURenderPipelineDescriptor": {
             "__size__": 168,
             "depthStencil": 128,
@@ -1097,13 +981,6 @@ const structInfo64 = (
             "primitive": 96,
             "vertex": 32
         },
-        "WGPURequestAdapterCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
-        },
         "WGPURequestAdapterOptions": {
             "__size__": 32,
             "backendType": 24,
@@ -1112,13 +989,6 @@ const structInfo64 = (
             "forceFallbackAdapter": 28,
             "nextInChain": 0,
             "powerPreference": 20
-        },
-        "WGPURequestDeviceCallbackInfo": {
-            "__size__": 32,
-            "callback": 16,
-            "mode": 8,
-            "nextInChain": 0,
-            "userdata": 24
         },
         "WGPURequiredLimits": {
             "__size__": 168,
@@ -1190,6 +1060,11 @@ const structInfo64 = (
             "limits": 8,
             "nextInChain": 0
         },
+        "WGPUSupportedWGSLLanguageFeatures": {
+            "__size__": 16,
+            "featureCount": 0,
+            "features": 8
+        },
         "WGPUSurfaceCapabilities": {
             "__size__": 64,
             "alphaModeCount": 48,
@@ -1218,11 +1093,6 @@ const structInfo64 = (
             "__size__": 24,
             "label": 8,
             "nextInChain": 0
-        },
-        "WGPUSurfaceSourceCanvasHTMLSelector_Emscripten": {
-            "__size__": 32,
-            "chain": 0,
-            "selector": 16
         },
         "WGPUSurfaceTexture": {
             "__size__": 16,
@@ -1275,12 +1145,6 @@ const structInfo64 = (
             "nextInChain": 0,
             "usage": 56
         },
-        "WGPUUncapturedErrorCallbackInfo": {
-            "__size__": 24,
-            "callback": 8,
-            "nextInChain": 0,
-            "userdata": 16
-        },
         "WGPUVertexAttribute": {
             "__size__": 24,
             "format": 0,
@@ -1310,10 +1174,10 @@ const structInfo64 = (
 
 // Double check that the struct info was generated from the right header.
 // (The include directory option of gen_struct_info.py affects this.)
-if (!('WGPUINTERNAL__HAVE_EMDAWNWEBGPU_HEADER' in structInfo32.structs)) {
+if (!('WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER' in structInfo32.structs)) {
     throw new Error('struct_info32 generation error - need webgpu.h from Dawn, got it from Emscripten');
 }
-if (!('WGPUINTERNAL__HAVE_EMDAWNWEBGPU_HEADER' in structInfo64.structs)) {
+if (!('WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER' in structInfo64.structs)) {
     throw new Error('struct_info64 generation error - need webgpu.h from Dawn, got it from Emscripten');
 }
 

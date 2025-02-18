@@ -737,7 +737,7 @@ void run() {
     printf("Starting main loop...\n");
 #ifdef __EMSCRIPTEN__
     {
-        wgpu::SurfaceDescriptorFromCanvasHTMLSelector canvasDesc{};
+        wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc{};
         canvasDesc.selector = "#canvas";
 
         wgpu::SurfaceDescriptor surfDesc{};
@@ -795,7 +795,9 @@ void run() {
 
 int main() {
     printf("Initializing...\n");
-    instance = wgpu::CreateInstance();
+    wgpu::InstanceDescriptor desc;
+    desc.capabilities.timedWaitAnyEnable = true;
+    instance = wgpu::CreateInstance(&desc);
     device = GetDevice();
     run();
 

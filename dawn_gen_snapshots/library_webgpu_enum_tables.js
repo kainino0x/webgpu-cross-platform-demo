@@ -5,7 +5,7 @@
     // These will not appear in the final build result, so we can just dump
     // every enum here without affecting binary size.
     globalThis.WEBGPU_ENUM_CONSTANT_TABLES = {
-        WGSLFeatureName: {
+        WGSLLanguageFeatureName: {
             'ReadonlyAndReadwriteStorageTextures': 1,
             'Packed4x8IntegerDotProduct': 2,
             'UnrestrictedPointerParameters': 3,
@@ -93,9 +93,6 @@
         CompilationInfoRequestStatus: {
             'Success': 1,
             'InstanceDropped': 2,
-            'Error': 3,
-            'DeviceLost': 4,
-            'Unknown': 5,
         },
         CompilationMessageType: {
             'Error': 1,
@@ -114,9 +111,6 @@
             'InstanceDropped': 2,
             'ValidationError': 3,
             'InternalError': 4,
-            'DeviceLost': 5,
-            'DeviceDestroyed': 6,
-            'Unknown': 7,
         },
         CullMode: {
             'Undefined': 0,
@@ -141,7 +135,6 @@
             'OutOfMemory': 3,
             'Internal': 4,
             'Unknown': 5,
-            'DeviceLost': 6,
         },
         FeatureLevel: {
             'Undefined': 0,
@@ -189,7 +182,6 @@
             'InstanceDropped': 2,
             'Error': 3,
             'Aborted': 4,
-            'Unknown': 5,
         },
         MipmapFilterMode: {
             'Undefined': 0,
@@ -204,6 +196,7 @@
         PopErrorScopeStatus: {
             'Success': 1,
             'InstanceDropped': 2,
+            'EmptyStack': 3,
         },
         PowerPreference: {
             'Undefined': 0,
@@ -232,20 +225,17 @@
             'Success': 1,
             'InstanceDropped': 2,
             'Error': 3,
-            'Unknown': 4,
         },
         RequestAdapterStatus: {
             'Success': 1,
             'InstanceDropped': 2,
             'Unavailable': 3,
             'Error': 4,
-            'Unknown': 5,
         },
         RequestDeviceStatus: {
             'Success': 1,
             'InstanceDropped': 2,
             'Error': 3,
-            'Unknown': 4,
         },
         SType: {
             'ShaderSourceSPIRV': 1,
@@ -259,7 +249,7 @@
             'SurfaceSourceXCBWindow': 9,
             'AdapterPropertiesSubgroups': 10,
             'TextureBindingViewDimensionDescriptor': 131072,
-            'SurfaceSourceCanvasHTMLSelector_Emscripten': 262144,
+            'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
         },
         SamplerBindingType: {
             'BindingNotUsed': 0,
@@ -483,10 +473,7 @@
         WaitStatus: {
             'Success': 1,
             'TimedOut': 2,
-            'UnsupportedTimeout': 3,
-            'UnsupportedCount': 4,
-            'UnsupportedMixedSources': 5,
-            'Unknown': 6,
+            'Error': 3,
         },
         BufferUsage: {
             'None': 0,
@@ -557,7 +544,7 @@
     // Maps from enum number to enum string.
     // These appear in the final build result so should be kept minimal.
     globalThis.WEBGPU_INT_TO_STRING_TABLES = `
-        WGSLFeatureName: {
+        WGSLLanguageFeatureName: {
             1: 'readonly_and_readwrite_storage_textures',
             2: 'packed_4x8_integer_dot_product',
             3: 'unrestricted_pointer_parameters',
@@ -623,9 +610,6 @@
         CompilationInfoRequestStatus: {
             1: 'success',
             2: 'instance-dropped',
-            3: 'error',
-            4: 'device-lost',
-            5: 'unknown',
         },
         CompositeAlphaMode: [
             undefined,
