@@ -111,7 +111,7 @@ if (EMSCRIPTEN)
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_struct_info.js"
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_sig_info.js"
             "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
-            "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emscripten/src/closure-externs/webgpu-externs.js"
+            "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emsdk/upstream/emscripten/src/closure-externs/webgpu-externs.js"
 
             "-sEXIT_RUNTIME=0"
             #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"

@@ -27,27 +27,6 @@ THIRD_PARTY=$PWD
     ./emsdk activate $EMSCRIPTEN_RELEASE
 )
 
-(
-    # Copy of Emscripten used only for gen_struct_info.py
-    if [ ! -e emscripten ] ; then
-        mkdir emscripten
-        cd emscripten
-        git init
-        git remote add origin https://github.com/emscripten-core/emscripten.git
-    else
-        cd emscripten
-    fi
-    git checkout --detach $EMSCRIPTEN_RELEASE -- || ( git fetch --tags --depth 1 origin $EMSCRIPTEN_RELEASE && git checkout --detach FETCH_HEAD )
-
-    cat >.emscripten << EOF
-LLVM_ROOT = '${THIRD_PARTY}/emsdk/upstream/bin'
-BINARYEN_ROOT = '${THIRD_PARTY}/emsdk/upstream'
-NODE_JS = '${THIRD_PARTY}/emsdk/node/${NODE_RELEASE}/bin/node'
-JAVA = 'java'
-EOF
-    ./bootstrap
-)
-
 source emsdk/emsdk_env.sh
 emcc --clear-cache
 
