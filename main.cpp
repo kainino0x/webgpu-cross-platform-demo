@@ -449,7 +449,21 @@ void init() {
         descriptor.fragment = &fragmentState;
         descriptor.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
         descriptor.depthStencil = &depthStencilState;
-        pipeline = device.CreateRenderPipeline(&descriptor);
+
+        // Just test the bindings; we are only going to actually use the async one below.
+        wgpu::RenderPipeline unused = device.CreateRenderPipeline(&descriptor);
+        assert(unused);
+
+        wgpu::Future f = device.CreateRenderPipelineAsync(&descriptor, wgpu::CallbackMode::WaitAnyOnly,
+            [](wgpu::CreatePipelineAsyncStatus status, wgpu::RenderPipeline pl, wgpu::StringView message) {
+                if (message.length) {
+                    printf("CreateRenderPipelineAsync: %.*s\n", (int)message.length, message.data);
+                }
+                assert(status == wgpu::CreatePipelineAsyncStatus::Success);
+                pipeline = std::move(pl);
+            });
+        instance.WaitAny(f, UINT64_MAX);
+        assert(pipeline);
     }
 }
 
