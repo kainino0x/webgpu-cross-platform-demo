@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=4.0.3 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=fecd0eb9a3cb9a672f9c17f6149aed6ae4d10c68
+DAWN_REVISION=aee4ecdc1827c2904a4d64b87af6071086c4a552
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -44,16 +44,6 @@ emcc --clear-cache
     # Set up the repo for a build, needed both for cmake and gn builds
     cp scripts/standalone.gclient .gclient
     gclient sync -D
-
-    # Use a gn build to generate the WebGPU bindings for Emscripten
-    mkdir -p out/wasm
-    cd out/wasm
-    # TODO: It should be unnecessary to build this with emscripten; can just build normally but dawn's CMake disables some of the targets if we do that
-    source ../../../emsdk/emsdk_env.sh
-    emcmake cmake -GNinja \
-        -DDAWN_EMSCRIPTEN_TOOLCHAIN="${THIRD_PARTY}/emsdk/upstream/emscripten" \
-        ../..
-    ninja emdawnwebgpu_headers_gen emdawnwebgpu_js_gen webgpu_generated_struct_info_js
 )
 
 ln -f dawn/out/wasm/gen/src/emdawnwebgpu/{include/webgpu/webgpu{,_cpp}.h,library_webgpu_{enum_tables,generated_{sig,struct}_info}.js} ../dawn_gen_snapshots/

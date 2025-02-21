@@ -2,17 +2,22 @@ cmake_minimum_required(VERSION 3.13)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(hello)
+
+#
+# Set all global stuff
+#
+
 set(CMAKE_CXX_STANDARD 20)
 
 if (NOT EMSCRIPTEN)
-    # Turning off OpenGL for Dawn
-    set(DAWN_ENABLE_PIC        ON CACHE BOOL "Position-Independent-Code")
-    set(DAWN_ENABLE_DESKTOP_GL OFF CACHE BOOL "OpenGL backend")
-    set(DAWN_ENABLE_OPENGLES   OFF CACHE BOOL "OpenGL ES backend")
-    set(DAWN_BUILD_SAMPLES     OFF CACHE BOOL "Dawn examples")
-    set(TINT_BUILD_SAMPLES     OFF CACHE BOOL "Tint examples")
-    set(TINT_BUILD_TESTS       OFF CACHE BOOL "Tint tests")
-    set(TINT_BUILD_GLSL_WRITER OFF CACHE BOOL "OpenGL SL writer")
+    # Set Dawn's config variables before including Dawn.
+    set(DAWN_ENABLE_PIC        ON  CACHE INTERNAL "")
+    set(DAWN_ENABLE_DESKTOP_GL OFF CACHE INTERNAL "")
+    set(DAWN_ENABLE_OPENGLES   OFF CACHE INTERNAL "")
+    set(DAWN_BUILD_SAMPLES     OFF CACHE INTERNAL "")
+    set(TINT_BUILD_SAMPLES     OFF CACHE INTERNAL "")
+    set(TINT_BUILD_TESTS       OFF CACHE INTERNAL "")
+    set(TINT_BUILD_GLSL_WRITER OFF CACHE INTERNAL "")
 
     # Use GLFW for native window support
     if (NOT DEFINED DEMO_USE_GLFW)
@@ -29,8 +34,6 @@ if (NOT EMSCRIPTEN)
             set(DAWN_USE_X11 OFF CACHE BOOL "Dawn use X11")
         endif()
     endif()
-
-    add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
 endif()
 
 add_compile_options(
@@ -71,10 +74,17 @@ if (EMSCRIPTEN)
         "-Wextra"
         #"-Weverything"
         )
-    include_directories(BEFORE
-        "third_party/dawn/out/wasm/gen/src/emdawnwebgpu/include"
-        )
 endif()
+
+#
+# Include Dawn after setting all global settings
+#
+
+add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
+
+#
+# Set up target
+#
 
 add_executable(hello
     "main.cpp"
@@ -85,12 +95,10 @@ target_compile_definitions(hello
     )
 
 if (EMSCRIPTEN)
-    # TODO: build against dawn as a subproject so dawn can set the weird flags and stuff? and we don't have to build dawn?
-    add_library(webgpu_layer
-        "third_party/dawn/third_party/emdawnwebgpu/webgpu.cpp"
-        )
     target_link_libraries(hello
-        webgpu_layer
+        # Depending on this will build all the necessary files in Dawn and
+        # set all the appropriate link flags to point at them.
+        emdawnwebgpu_cpp
         )
 
     set_target_properties(hello PROPERTIES
@@ -103,15 +111,6 @@ if (EMSCRIPTEN)
             #"$<$<CONFIG:Debug>:-gsource-map>"
             # Use this to adjust the source map's relative URLs to source files.
             #"$<$<CONFIG:Debug>:--source-map-base=./>"
-
-            # We are using Dawn-generated bindings, not built-in ones
-            "-sUSE_WEBGPU=0"
-            # The JS libraries needed for bindings
-            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_enum_tables.js"
-            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_struct_info.js"
-            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/out/wasm/gen/src/emdawnwebgpu/library_webgpu_generated_sig_info.js"
-            "--js-library=${CMAKE_SOURCE_DIR}/third_party/dawn/third_party/emdawnwebgpu/library_webgpu.js"
-            "--closure-args=--externs=${CMAKE_SOURCE_DIR}/third_party/emsdk/upstream/emscripten/src/closure-externs/webgpu-externs.js"
 
             "-sEXIT_RUNTIME=0"
             #"$<$<CONFIG:Debug>:-sEXIT_RUNTIME=1>"
