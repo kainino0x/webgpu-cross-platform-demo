@@ -4,6 +4,22 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 project(hello)
 
 #
+# Configurable options
+#
+
+# Options for all builds
+option(DEMO_USE_SANITIZERS "Enable ASan/UBSan" OFF)
+
+# Options for native build (ignored otherwise)
+option(DEMO_USE_GLFW "Demo use glfw for native window platform" ON)
+
+# Options for Emscripten build (ignored otherwise)
+option(DEMO_USE_ASYNCIFY "Set -sASYNCIFY to 0 (off), 1 (asyncify), or 2 (JSPI)" 1)
+option(DEMO_USE_WASM_4GB "Use Wasm 4GB (triggers CAN_ADDRESS_2GB for Memory32 builds)" OFF)
+option(DEMO_USE_WASM_BIGINT "Set -sWASM_BIGINT=1" OFF)
+option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
+
+#
 # Set all global stuff
 #
 
@@ -18,11 +34,6 @@ if (NOT EMSCRIPTEN)
     set(TINT_BUILD_SAMPLES     OFF CACHE INTERNAL "")
     set(TINT_BUILD_TESTS       OFF CACHE INTERNAL "")
     set(TINT_BUILD_GLSL_WRITER OFF CACHE INTERNAL "")
-
-    # Use GLFW for native window support
-    if (NOT DEFINED DEMO_USE_GLFW)
-        option(DEMO_USE_GLFW "Demo use glfw for native window platform" ON)
-    endif()
 
     if (DEMO_USE_GLFW)
         message("Demo use glfw for native window platform is turned on. If glfw is not found try `apt-get install libglfw3-dev` or `brew install glfw`")
@@ -45,27 +56,14 @@ add_link_options(
     "$<$<CONFIG:Release>:-flto>"
     )
 
-option(DEMO_USE_SANITIZERS "Enable ASan/UBSan" OFF)
 if (DEMO_USE_SANITIZERS)
     # "error: MEMORY64 does not yet work with ASAN"
-    if (NOT DEMO_USE_WASM_MEMORY64)
+    if (EMSCRIPTEN AND NOT DEMO_USE_WASM_MEMORY64)
         add_compile_options("-fsanitize=address")
         add_link_options("-fsanitize=address")
     endif()
     add_compile_options("-fsanitize=undefined")
     add_link_options("-fsanitize=undefined")
-endif()
-
-option(DEMO_USE_ASYNCIFY "Set -sASYNCIFY to 0 (off), 1 (asyncify), or 2 (JSPI)" 1)
-if (DEMO_USE_ASYNCIFY EQUAL 2)
-    add_compile_definitions(DEMO_USE_JSPI=1)
-endif()
-
-option(DEMO_USE_WASM_4GB "Use Wasm 4GB (triggers CAN_ADDRESS_2GB for Memory32 builds)" OFF)
-option(DEMO_USE_WASM_BIGINT "Set -sWASM_BIGINT=1" OFF)
-option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
-if (DEMO_USE_WASM_MEMORY64)
-    add_compile_options("-sMEMORY64=1")
 endif()
 
 if (EMSCRIPTEN)
@@ -74,6 +72,13 @@ if (EMSCRIPTEN)
         "-Wextra"
         #"-Weverything"
         )
+
+    if (DEMO_USE_WASM_MEMORY64)
+        add_compile_options("-sMEMORY64=1")
+    endif()
+    if (DEMO_USE_ASYNCIFY EQUAL 2)
+        add_compile_definitions(DEMO_USE_JSPI=1)
+    endif()
 endif()
 
 #
@@ -89,12 +94,13 @@ add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
 add_executable(hello
     "main.cpp"
     )
-target_compile_definitions(hello
-    PRIVATE
-        DEMO_USE_ASYNCIFY=${DEMO_USE_ASYNCIFY}
-    )
 
 if (EMSCRIPTEN)
+    target_compile_definitions(hello
+        PRIVATE
+            DEMO_USE_ASYNCIFY=${DEMO_USE_ASYNCIFY}
+        )
+
     target_link_libraries(hello
         # Depending on this will build all the necessary files in Dawn and
         # set all the appropriate link flags to point at them.
