@@ -714,8 +714,9 @@ bool frame() {
 
 #if defined(__EMSCRIPTEN__)
     // Stop running after a few frames in Emscripten.
-    if (frameNum >= 3) {
-        printf("Wasm stopping after a few frames, nothing else to do :) (readback tests may still be pending)\n");
+    if (frameNum >= 10) {
+        printf("Wasm stopping after a few frames, nothing else to render!\n");
+        printf("Assuming readback tests are done (may not actually be true); destroying device to clean up.\n");
         device.Destroy();
         return false; // Stop the requestAnimationFrame loop
     }
