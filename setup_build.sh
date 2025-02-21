@@ -44,6 +44,20 @@ emcc --clear-cache
     # Set up the repo for a build, needed both for cmake and gn builds
     cp scripts/standalone.gclient .gclient
     gclient sync -D
+
+    # Generate the WebGPU bindings for Emscripten.
+    # NOTE: These are NOT actually used by the out/*/ builds. Those are using
+    #   Dawn as a cmake subproject so they each build the bindings independently.
+    #   This build is just kept to generate dawn_gen_snapshots/*, and as an early
+    #   check on the build configuration.
+    # TODO: In the future we'll probably make Dawn produce a packageable set of
+    #   bindings (including a CMakeLists.txt); once we do that, the out/*/ builds
+    #   should use it.
+    mkdir -p out/wasm
+    cd out/wasm
+    source ../../../emsdk/emsdk_env.sh
+    emcmake cmake ../..
+    make emdawnwebgpu_headers_gen emdawnwebgpu_js_gen webgpu_generated_struct_info_js
+    cp gen/src/emdawnwebgpu/{include/webgpu/webgpu{,_cpp}.h,library_webgpu_{enum_tables,generated_{sig,struct}_info}.js} ../../../../dawn_gen_snapshots/
 )
 
-ln -f dawn/out/wasm/gen/src/emdawnwebgpu/{include/webgpu/webgpu{,_cpp}.h,library_webgpu_{enum_tables,generated_{sig,struct}_info}.js} ../dawn_gen_snapshots/
