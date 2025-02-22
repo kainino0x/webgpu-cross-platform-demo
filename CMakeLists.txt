@@ -158,11 +158,8 @@ if (EMSCRIPTEN)
     endif()
 else()
     target_link_libraries(hello
-        dawn_headers
-        dawncpp_headers
-        dawncpp
-        dawn_native
-        dawn_proc
+        webgpu_cpp
+        webgpu_dawn
         )
     if (DEMO_USE_GLFW)
         target_sources(hello PRIVATE "window.h")

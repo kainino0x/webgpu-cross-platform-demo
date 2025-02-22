@@ -29,13 +29,15 @@
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
-#include <memory>
 #include <cstring>
+#include <iostream>
+#include <memory>
 
 static wgpu::Instance instance;
 static wgpu::Device device;
 static wgpu::Queue queue;
 static wgpu::RenderPipeline pipeline;
+static int testsStarted = 0;
 static int testsCompleted = 0;
 
 wgpu::Surface surface;
@@ -47,7 +49,7 @@ const uint32_t kHeight = 150;
 #include <emscripten.h>
 #include <emscripten/html5.h>
 
-wgpu::Device GetDevice() {
+wgpu::Device GetDevice(wgpu::DeviceDescriptor* descriptor) {
     wgpu::RequestAdapterWebXROptions xrOptions = {};
     wgpu::RequestAdapterOptions options = {};
     options.nextInChain = &xrOptions;
@@ -70,20 +72,6 @@ wgpu::Device GetDevice() {
     instance.WaitAny(f1, UINT64_MAX);
     assert(adapter);
 
-    wgpu::RequiredLimits limits;
-    //limits.limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
-    wgpu::DeviceDescriptor desc;
-    desc.requiredLimits = &limits;
-    desc.SetUncapturedErrorCallback(
-        [](const wgpu::Device&, wgpu::ErrorType errorType, wgpu::StringView message) {
-            printf("UncapturedError (errorType=%d): %.*s\n", errorType, (int)message.length, message.data);
-            assert(false);
-        });
-    desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
-        [](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView message) {
-            printf("DeviceLost (reason=%d): %.*s\n", reason, (int)message.length, message.data);
-        });
-
     wgpu::Device device;
     wgpu::Future f2 = adapter.RequestDevice(&desc, wgpu::CallbackMode::WaitAnyOnly,
         [&](wgpu::RequestDeviceStatus status, wgpu::Device dev, wgpu::StringView message) {
@@ -102,8 +90,6 @@ wgpu::Device GetDevice() {
 #else  // __EMSCRIPTEN__
 #include <dawn/dawn_proc.h>
 #include <dawn/native/DawnNative.h>
-
-static std::unique_ptr<dawn::native::Instance> instance;
 
 #ifdef DEMO_USE_GLFW
 
@@ -319,6 +305,8 @@ int GetBackendPriority(wgpu::BackendType t) {
         case wgpu::BackendType::OpenGL:
         case wgpu::BackendType::OpenGLES:
             return 10;
+        case wgpu::BackendType::Undefined:
+            assert(false);
     }
     return 100;
 }
@@ -333,7 +321,8 @@ const char* BackendTypeName(wgpu::BackendType t)
         case wgpu::BackendType::Metal: return "Metal";
         case wgpu::BackendType::Vulkan: return "Vulkan";
         case wgpu::BackendType::OpenGL: return "OpenGL";
-        case wgpu::BackendType::OpenGLES: return "OpenGL ES";
+        case wgpu::BackendType::OpenGLES: return "OpenGLES";
+        case wgpu::BackendType::Undefined: assert(false);
     }
     return "?";
 }
@@ -341,32 +330,31 @@ const char* BackendTypeName(wgpu::BackendType t)
 const char* AdapterTypeName(wgpu::AdapterType t)
 {
     switch (t) {
-        case wgpu::AdapterType::DiscreteGPU: return "Discrete GPU";
-        case wgpu::AdapterType::IntegratedGPU: return "Integrated GPU";
+        case wgpu::AdapterType::DiscreteGPU: return "DiscreteGPU";
+        case wgpu::AdapterType::IntegratedGPU: return "IntegratedGPU";
         case wgpu::AdapterType::CPU: return "CPU";
         case wgpu::AdapterType::Unknown: return "Unknown";
     }
     return "?";
 }
 
-void GetDevice(void (*callback)(wgpu::Device)) {
-    instance = std::make_unique<dawn::native::Instance>();
-    instance->DiscoverDefaultAdapters();
+wgpu::Device GetDevice(wgpu::DeviceDescriptor* descriptor) {
+    auto nativeInstance = dawn::native::Instance(reinterpret_cast<dawn::native::InstanceBase*>(instance.Get()));
 
-    auto adapters = instance->GetAdapters();
+    auto adapters = nativeInstance.EnumerateAdapters();
 
     // Sort adapters by adapterType, 
     std::sort(adapters.begin(), adapters.end(), [](const dawn::native::Adapter& a, const dawn::native::Adapter& b){
-        wgpu::AdapterProperties pa, pb;
-        a.GetProperties(&pa);
-        b.GetProperties(&pb);
+        wgpu::AdapterInfo aInfo, bInfo;
+        wgpu::Adapter(a.Get()).GetInfo(&aInfo);
+        wgpu::Adapter(b.Get()).GetInfo(&bInfo);
         
-        if (pa.adapterType != pb.adapterType) {
+        if (aInfo.adapterType != bInfo.adapterType) {
             // Put GPU adapter (D3D, Vulkan, Metal) at front and CPU adapter at back.
-            return pa.adapterType < pb.adapterType;
+            return aInfo.adapterType < bInfo.adapterType;
         }
 
-        return GetBackendPriority(pa.backendType) < GetBackendPriority(pb.backendType);
+        return GetBackendPriority(aInfo.backendType) < GetBackendPriority(bInfo.backendType);
     });
     // Simply pick the first adapter in the sorted list.
     dawn::native::Adapter backendAdapter = adapters[0];
@@ -374,21 +362,20 @@ void GetDevice(void (*callback)(wgpu::Device)) {
     printf("Available adapters sorted by their Adapter type, with GPU adapters listed at front and preferred:\n\n");
     printf(" [Selected] -> ");
     for (auto&& a : adapters) {
-        wgpu::AdapterProperties p;
-        a.GetProperties(&p);
-        printf(
-            "* %s (%s)\n"
-            "    deviceID=%u, vendorID=0x%x, BackendType::%s, AdapterType::%s\n",
-        p.name, p.driverDescription, p.deviceID, p.vendorID,
-        BackendTypeName(p.backendType), AdapterTypeName(p.adapterType));
+        wgpu::AdapterInfo info;
+        wgpu::Adapter(a.Get()).GetInfo(&info);
+        std::cout
+            << "* " << std::string_view(info.vendor)
+            << " " << std::string_view(info.device)
+            << " (" << std::string_view(info.description) << ")" << std::endl;
+        printf("    deviceID=0x%x, vendorID=0x%x, BackendType::%s, AdapterType::%s\n",
+            info.deviceID, info.vendorID,
+            BackendTypeName(info.backendType), AdapterTypeName(info.adapterType));
     }
     printf("\n\n");
 
-    wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice());
-    DawnProcTable procs = dawn::native::GetProcs();
-
-    dawnProcSetProcs(&procs);
-    callback(device);
+    wgpu::Device device = wgpu::Device::Acquire(backendAdapter.CreateDevice(descriptor));
+    return device;
 }
 #endif  // __EMSCRIPTEN__
 
@@ -444,6 +431,7 @@ void init() {
 
         wgpu::DepthStencilState depthStencilState{};
         depthStencilState.format = wgpu::TextureFormat::Depth32Float;
+        depthStencilState.depthWriteEnabled = true;
         depthStencilState.depthCompare = wgpu::CompareFunction::Always;
 
         wgpu::RenderPipelineDescriptor descriptor{};
@@ -510,6 +498,7 @@ void render(wgpu::TextureView view, wgpu::TextureView depthStencilView) {
 
 void issueContentsCheck(const char* functionName,
         wgpu::Buffer readbackBuffer, uint32_t expectData) {
+    testsStarted++;
     wgpu::Future f = readbackBuffer.MapAsync(
         wgpu::MapMode::Read, 0, 4,
         wgpu::CallbackMode::WaitAnyOnly,
@@ -711,9 +700,11 @@ void doRenderTest() {
 }
 
 // Export `frame` so it can be used with `ccall`, below.
+#ifdef __EMSCRIPTEN__
 extern "C" {
 EMSCRIPTEN_KEEPALIVE bool frame();
 }
+#endif
 
 static int frameNum = 0;
 bool frame() {
@@ -741,9 +732,9 @@ bool frame() {
 
 #if defined(__EMSCRIPTEN__)
     // Stop running after a few frames in Emscripten.
-    if (frameNum >= 10) {
-        printf("Wasm stopping after a few frames, nothing else to render!\n");
-        printf("Assuming readback tests are done (may not actually be true); destroying device to clean up.\n");
+    if (frameNum >= 10 && testsCompleted == testsStarted) {
+        printf("Several frames rendered and no pending tests remaining!\n");
+        printf("Stopping main loop and destroying device to clean up.\n");
         device.Destroy();
         return false; // Stop the requestAnimationFrame loop
     }
@@ -777,7 +768,7 @@ void run() {
     }
 
     printf("Starting main loop...\n");
-#ifdef __EMSCRIPTEN__
+#if defined(__EMSCRIPTEN__)
     {
         wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvasDesc{};
         canvasDesc.selector = "#canvas";
@@ -805,14 +796,14 @@ void run() {
     // - JSPI: -sDEFAULT_LIBRARY_FUNCS_TO_INCLUDE=$getWasmTableEntry
     // - Asyncify: -sEXPORTED_RUNTIME_METHODS=ccall
     EM_ASM({
-#if DEMO_USE_JSPI // -sJSPI=1 (aka -sASYNCIFY=2)
+#    if DEMO_USE_JSPI // -sJSPI=1 (aka -sASYNCIFY=2)
         var callback = WebAssembly.promising(getWasmTableEntry($0));
-#else // -sASYNCIFY=1
+#    else // -sASYNCIFY=1
         // ccall seems to be the only thing in Emscripten which lets us turn an
         // Asyncified Wasm function into a JS function returning a Promise.
         // It can only call exported functions.
         var callback = () => globalThis['Module']['ccall']("frame", "boolean", [], [], {async: true});
-#endif // DEMO_USE_JSPI
+#    endif // DEMO_USE_JSPI
         async function tick() {
             // Start the frame callback. 'await' means we won't call
             // requestAnimationFrame again until it completes.
@@ -830,11 +821,13 @@ void run() {
         bool keepLooping = frame();
         if (!keepLooping) break;
     }
-#else
-    while (testsCompleted < kNumTests) {
+#else // defined(__EMSCRIPTEN__)
+    while (testsCompleted < testsStarted) {
         device.Tick();
     }
+    printf("No pending tests remaining and no window to display to!\n");
 #endif
+    printf("Stopping main loop and destroying device to clean up.\n");
 }
 
 int main() {
@@ -842,7 +835,24 @@ int main() {
     wgpu::InstanceDescriptor desc;
     desc.capabilities.timedWaitAnyEnable = true;
     instance = wgpu::CreateInstance(&desc);
-    device = GetDevice();
+
+    {
+        wgpu::RequiredLimits limits;
+        //limits.limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
+        wgpu::DeviceDescriptor desc;
+        desc.requiredLimits = &limits;
+        desc.SetUncapturedErrorCallback(
+            [](const wgpu::Device&, wgpu::ErrorType errorType, wgpu::StringView message) {
+                printf("UncapturedError (errorType=%d): %.*s\n", errorType, (int)message.length, message.data);
+                assert(false);
+            });
+        desc.SetDeviceLostCallback(wgpu::CallbackMode::AllowSpontaneous,
+            [](const wgpu::Device&, wgpu::DeviceLostReason reason, wgpu::StringView message) {
+                printf("DeviceLost (reason=%d): %.*s\n", reason, (int)message.length, message.data);
+            });
+        device = GetDevice(&desc);
+    }
+
     run();
 
 #ifdef __EMSCRIPTEN__
