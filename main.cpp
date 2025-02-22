@@ -518,16 +518,30 @@ void issueContentsCheck(const char* functionName,
                 printf("issueContentsCheck MapAsync: %.*s\n", (int)message.length, message.data);
             }
             assert(status == wgpu::MapAsyncStatus::Success);
-            const void* ptr = readbackBuffer.GetConstMappedRange();
 
-            printf("%s: readback -> %p%s\n",
-                functionName, ptr, ptr ? "" : " <------- FAILED");
-            assert(ptr != nullptr);
+            static constexpr bool kUseReadMappedRange = true;
+
+            std::vector<char> ptrData;
+            const void* ptr;
+            if constexpr (kUseReadMappedRange) {
+                ptrData.resize(4);
+                ptr = ptrData.data();
+                wgpu::Status status = readbackBuffer.ReadMappedRange(0, ptrData.data(), 4);
+                printf("%s: ReadMappedRange -> %u%s\n",
+                    functionName, status, status == wgpu::Status::Success ? "" : " <------- FAILED");
+                assert(status == wgpu::Status::Success);
+            } else {
+                ptr = readbackBuffer.GetConstMappedRange();
+                printf("%s: GetConstMappedRange -> %p%s\n",
+                    functionName, ptr, ptr ? "" : " <------- FAILED");
+                assert(ptr != nullptr);
+            }
+
             uint32_t readback = static_cast<const uint32_t*>(ptr)[0];
             printf("  got %08x, expected %08x%s\n",
                 readback, expectData, readback == expectData ? "" : " <------- FAILED");
-            readbackBuffer.Unmap();
 
+            readbackBuffer.Unmap();
             testsCompleted++;
         });
     instance.WaitAny(f, UINT64_MAX);
@@ -535,6 +549,7 @@ void issueContentsCheck(const char* functionName,
 
 void doCopyTestMappedAtCreation(bool useRange) {
     static constexpr uint32_t kValue = 0x05060708;
+    size_t offset = useRange ? 8 : 0;
     size_t size = useRange ? 12 : 4;
     wgpu::Buffer src;
     {
@@ -548,14 +563,22 @@ void doCopyTestMappedAtCreation(bool useRange) {
         src.GetSize();
         src.GetUsage();
     }
-    size_t offset = useRange ? 8 : 0;
-    uint32_t* ptr = static_cast<uint32_t*>(useRange ?
-            src.GetMappedRange(offset, 4) :
-            src.GetMappedRange());
-    printf("%s: getMappedRange -> %p%s\n", __FUNCTION__,
-            ptr, ptr ? "" : " <------- FAILED");
-    assert(ptr != nullptr);
-    *ptr = kValue;
+
+    static constexpr bool kUseWriteMappedRange = true;
+    if constexpr (kUseWriteMappedRange) {
+        wgpu::Status status = src.WriteMappedRange(offset, &kValue, 4);
+        printf("%s: WriteMappedRange -> %u%s\n", __FUNCTION__,
+                status, status == wgpu::Status::Success ? "" : " <------- FAILED");
+        assert(status == wgpu::Status::Success);
+    } else {
+        uint32_t* ptr = static_cast<uint32_t*>(useRange ?
+                src.GetMappedRange(offset, 4) :
+                src.GetMappedRange());
+        printf("%s: GetMappedRange -> %p%s\n", __FUNCTION__,
+                ptr, ptr ? "" : " <------- FAILED");
+        assert(ptr != nullptr);
+        *ptr = kValue;
+    }
     src.Unmap();
 
     wgpu::Buffer dst;
