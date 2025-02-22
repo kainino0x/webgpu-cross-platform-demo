@@ -48,8 +48,12 @@ const uint32_t kHeight = 150;
 #include <emscripten/html5.h>
 
 wgpu::Device GetDevice() {
+    wgpu::RequestAdapterWebXROptions xrOptions = {};
+    wgpu::RequestAdapterOptions options = {};
+    options.nextInChain = &xrOptions;
+
     wgpu::Adapter adapter;
-    wgpu::Future f1 = instance.RequestAdapter(nullptr, wgpu::CallbackMode::WaitAnyOnly,
+    wgpu::Future f1 = instance.RequestAdapter(&options, wgpu::CallbackMode::WaitAnyOnly,
         [&](wgpu::RequestAdapterStatus status, wgpu::Adapter ad, wgpu::StringView message) {
             if (message.length) {
                 printf("RequestAdapter: %.*s\n", (int)message.length, message.data);
@@ -759,7 +763,9 @@ void run() {
         surfDesc.nextInChain = &canvasDesc;
         surface = instance.CreateSurface(&surfDesc);
 
+        wgpu::SurfaceColorManagement colorManagement{};
         wgpu::SurfaceConfiguration configuration{};
+        configuration.nextInChain = &colorManagement;
         configuration.device = device;
         configuration.usage = wgpu::TextureUsage::RenderAttachment;
         configuration.format = wgpu::TextureFormat::BGRA8Unorm;
