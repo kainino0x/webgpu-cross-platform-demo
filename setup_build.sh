@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=4.0.3 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=6bf03358ebd9719de7e3dd876f373aef43375602
+DAWN_REVISION=122e5412a20206cb3f45a62f80b6350c9f21b729
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -50,6 +50,8 @@ emcc --clear-cache
     cd out/wasm
     source ../../../emsdk/emsdk_env.sh
     emcmake cmake ../..
+    make clean
+    rm -f emdawnwebgpu_pkg
     make -j4 emdawnwebgpu_pkg
     rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg_snapshot/
 )

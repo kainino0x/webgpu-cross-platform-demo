@@ -5,15 +5,40 @@
  */
 
 /*
- * Dawn's fork of Emscripten's WebGPU bindings. This will be contributed back to
- * Emscripten after reaching approximately webgpu.h "1.0".
+ * Dawn's fork of Emscripten's WebGPU bindings.
  *
  * IMPORTANT: See //src/emdawnwebgpu/README.md for info on how to use this.
+ * - It must be linked in the correct order with other files.
+ * - It must sit next to the struct_info json files.
  */
 
 {{{
-  if (USE_WEBGPU || !__HAVE_EMDAWNWEBGPU_STRUCT_INFO || !__HAVE_EMDAWNWEBGPU_ENUM_TABLES || !__HAVE_EMDAWNWEBGPU_SIG_INFO) {
-    throw new Error("To use Dawn's library_webgpu.js, disable -sUSE_WEBGPU and first include Dawn's library_webgpu_struct_info.js and library_webgpu_enum_tables.js (before library_webgpu.js)");
+  if (USE_WEBGPU || !__HAVE_EMDAWNWEBGPU_ENUM_TABLES || !__HAVE_EMDAWNWEBGPU_SIG_INFO) {
+    throw new Error("To use emdawnwebgpu's library_webgpu.js, disable -sUSE_WEBGPU and first include Dawn's library_webgpu_enum_tables.js and library_webgpu_generated_sig_info.js (before library_webgpu.js)");
+  }
+
+  // Load struct info for webgpu.h.
+  {
+    // Clear out all of the old struct info from Emscripten's built-in copy.
+    // (We do this rather than just overwrite, because many structs have been renamed.
+    // We want to make sure we don't accidentally refer to structs that don't exist anymore.)
+    for (const k of Object.keys(C_STRUCTS)) {
+        if (k.startsWith('WGPU')) {
+            delete C_STRUCTS[k];
+        }
+    }
+
+    // Load data from the JSON files into C_STRUCTS.
+    const jsonFile = MEMORY64 ?
+      'webgpu_generated_struct_info64.json' :
+      'webgpu_generated_struct_info32.json';
+    loadStructInfo(__dirname + '/' + jsonFile);
+
+    // Double check that the struct info was generated from the right header.
+    // (The include directory option of gen_struct_info.py affects this.)
+    if (!('WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER' in C_STRUCTS)) {
+        throw new Error(`${jsonFile} generation error - need webgpu.h from Dawn, got it from Emscripten`);
+    }
   }
 
   // Helper functions for code generation
