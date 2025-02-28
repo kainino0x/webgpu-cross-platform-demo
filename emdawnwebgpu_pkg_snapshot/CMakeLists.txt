@@ -49,7 +49,6 @@ target_link_options(emdawnwebgpu_config INTERFACE
     "-sUSE_WEBGPU=0"
     # The JS libraries needed for bindings
     "--js-library=${PROJECT_SOURCE_DIR}/library_webgpu_enum_tables.js"
-    "--js-library=${PROJECT_SOURCE_DIR}/library_webgpu_generated_struct_info.js"
     "--js-library=${PROJECT_SOURCE_DIR}/library_webgpu_generated_sig_info.js"
     "--js-library=${PROJECT_SOURCE_DIR}/library_webgpu.js"
     "--closure-args=--externs=${PROJECT_SOURCE_DIR}/webgpu-externs.js"

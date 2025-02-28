@@ -16,10 +16,31 @@ if [ $# != 1 ] ; then
     usage
 fi
 
+project_dir="$PWD"
+emsdk="$project_dir/third_party/dawn/third_party/emsdk"
+emscripten="$emsdk/upstream/emscripten"
+
+# Dawn sets up $emsdk/.emscripten to point to a copy of LLVM that's missing a file. Use the default
+# one instead. If you use a normal copy of emsdk to build, then you don't have to worry about this.
+export EM_CONFIG="$emsdk/.emscripten.emsdk_original"
+
+# build_one BUILD_DIR CMAKE_FLAGS...
+function build_one {
+    build_dir="$1"
+    shift
+    cmake_args=("$@")
+
+    mkdir -p "$build_dir"
+    cd "$build_dir"
+    "$emscripten/emcmake" cmake "$project_dir" "${cmake_args[@]}"
+    make clean
+    make -j2
+}
+
 pids=()
 if [ "$1" == "--parallel=0" ] ; then
     function build {
-        ./build_helper.sh "$@"
+        build_one "$@"
         echo "<li><a href="$1/hello.html">$1</a></h1>" >> index.html
     }
     function cleanup {
@@ -27,7 +48,7 @@ if [ "$1" == "--parallel=0" ] ; then
     }
 elif [ "$1" == "--parallel=1" ] ; then
     function build {
-        ./build_helper.sh "$@" & pids+=($!)
+        build_one "$@" & pids+=($!)
         echo "<li><a href="$1/hello.html">$1</a></li>" >> index.html
     }
     function cleanup {

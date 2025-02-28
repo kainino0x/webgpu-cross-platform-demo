@@ -1,58 +1,37 @@
 #!/bin/bash
 set -euo pipefail
 
-THIRD_PARTY="$(dirname "$0")"/third_party
+dawn_revision=a83c16ba042361f2a6dd0a0210d3ecbb32f0d727
 
-EMSCRIPTEN_RELEASE=4.0.3 # This the emsdk tag, the emscripten tag, and the emsdk install target
-NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
+third_party="$(dirname "$0")"/third_party
+mkdir -p "$third_party"
+cd "$third_party"
+third_party=$PWD
 
-DAWN_REVISION=122e5412a20206cb3f45a62f80b6350c9f21b729
+if [ ! -e dawn ] ; then
+    mkdir dawn
+    cd dawn
+    git init
+    git remote add origin https://dawn.googlesource.com/dawn
+else
+    cd dawn
+fi
+git checkout --detach $dawn_revision -- || ( git fetch --tags --depth 1 origin $dawn_revision && git checkout --detach FETCH_HEAD )
 
-mkdir -p "$THIRD_PARTY"
-cd "$THIRD_PARTY"
-THIRD_PARTY=$PWD
+# Set up the repo for a build, needed regardless of native vs. wasm or gn vs. cmake.
+cp scripts/standalone-with-wasm.gclient .gclient
+gclient sync -D
 
-(
-    if [ ! -e emsdk ] ; then
-        mkdir emsdk
-        cd emsdk
-        git init
-        git remote add origin https://github.com/emscripten-core/emsdk.git
-    else
-        cd emsdk
-    fi
-    git checkout --detach $EMSCRIPTEN_RELEASE -- || ( git fetch --tags --depth 1 origin $EMSCRIPTEN_RELEASE && git checkout --detach FETCH_HEAD )
+# Dawn provides a copy of emsdk already. Note you don't have to use this specific one,
+# we just use it because it's already set up.
+emscripten="$third_party/dawn/third_party/emsdk/upstream/emscripten"
 
-    ./emsdk install $EMSCRIPTEN_RELEASE
-    ./emsdk activate $EMSCRIPTEN_RELEASE
-)
+# Generate the WebGPU bindings for Emscripten.
+rm -rf out/wasm
+mkdir -p out/wasm
+cd out/wasm
 
-source emsdk/emsdk_env.sh
-emcc --clear-cache
-
-(
-    if [ ! -e dawn ] ; then
-        mkdir dawn
-        cd dawn
-        git init
-        git remote add origin https://dawn.googlesource.com/dawn
-    else
-        cd dawn
-    fi
-    git checkout --detach $DAWN_REVISION -- || ( git fetch --tags --depth 1 origin $DAWN_REVISION && git checkout --detach FETCH_HEAD )
-
-    # Set up the repo for a build, needed both for cmake and gn builds
-    cp scripts/standalone.gclient .gclient
-    gclient sync -D
-
-    # Generate the WebGPU bindings for Emscripten.
-    mkdir -p out/wasm
-    cd out/wasm
-    source ../../../emsdk/emsdk_env.sh
-    emcmake cmake ../..
-    make clean
-    rm -f emdawnwebgpu_pkg
-    make -j4 emdawnwebgpu_pkg
-    rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg_snapshot/
-)
-
+"$emscripten/emcmake" cmake ../..
+make clean
+make -j4 emdawnwebgpu_pkg
+rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg_snapshot/

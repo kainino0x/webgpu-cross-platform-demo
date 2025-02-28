@@ -23,7 +23,8 @@ but that is a goal.
 Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
 This setup step is always required for native builds.
-For web builds, it is only needed if you need to rebuild `emdawnwebgpu_pkg_snapshot`.
+For web builds, it is only strictly needed if you need to rebuild `emdawnwebgpu_pkg_snapshot` (but
+without it, you'll need to build manually with your own emsdk, because `build_all.sh` uses Dawn's).
 
 ```sh
 ./setup_build.sh
