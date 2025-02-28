@@ -73,7 +73,7 @@ wgpu::Device GetDevice(wgpu::DeviceDescriptor* descriptor) {
     assert(adapter);
 
     wgpu::Device device;
-    wgpu::Future f2 = adapter.RequestDevice(&desc, wgpu::CallbackMode::WaitAnyOnly,
+    wgpu::Future f2 = adapter.RequestDevice(descriptor, wgpu::CallbackMode::WaitAnyOnly,
         [&](wgpu::RequestDeviceStatus status, wgpu::Device dev, wgpu::StringView message) {
             if (message.length) {
                 printf("RequestDevice: %.*s\n", (int)message.length, message.data);
@@ -682,10 +682,10 @@ void doRenderTest() {
     wgpu::CommandBuffer commands;
     {
         wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
-        wgpu::ImageCopyTexture src{};
+        wgpu::TexelCopyTextureInfo src{};
         src.texture = readbackTexture;
         src.origin = {0, 0, 0};
-        wgpu::ImageCopyBuffer dst{};
+        wgpu::TexelCopyBufferInfo dst{};
         dst.buffer = readbackBuffer;
         dst.layout.bytesPerRow = 256;
         wgpu::Extent3D extent = {1, 1, 1};
@@ -837,8 +837,8 @@ int main() {
     instance = wgpu::CreateInstance(&desc);
 
     {
-        wgpu::RequiredLimits limits;
-        //limits.limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
+        wgpu::Limits limits;
+        //limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
         wgpu::DeviceDescriptor desc;
         desc.requiredLimits = &limits;
         desc.SetUncapturedErrorCallback(

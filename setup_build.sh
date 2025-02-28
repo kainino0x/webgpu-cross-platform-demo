@@ -6,7 +6,7 @@ THIRD_PARTY="$(dirname "$0")"/third_party
 EMSCRIPTEN_RELEASE=4.0.3 # This the emsdk tag, the emscripten tag, and the emsdk install target
 NODE_RELEASE=20.18.0_64bit # Must match the Node release used in this Emscripten release
 
-DAWN_REVISION=aee4ecdc1827c2904a4d64b87af6071086c4a552
+DAWN_REVISION=6bf03358ebd9719de7e3dd876f373aef43375602
 
 mkdir -p "$THIRD_PARTY"
 cd "$THIRD_PARTY"
@@ -46,18 +46,11 @@ emcc --clear-cache
     gclient sync -D
 
     # Generate the WebGPU bindings for Emscripten.
-    # NOTE: These are NOT actually used by the out/*/ builds. Those are using
-    #   Dawn as a cmake subproject so they each build the bindings independently.
-    #   This build is just kept to generate dawn_gen_snapshots/*, and as an early
-    #   check on the build configuration.
-    # TODO: In the future we'll probably make Dawn produce a packageable set of
-    #   bindings (including a CMakeLists.txt); once we do that, the out/*/ builds
-    #   should use it.
     mkdir -p out/wasm
     cd out/wasm
     source ../../../emsdk/emsdk_env.sh
     emcmake cmake ../..
-    make emdawnwebgpu_headers_gen emdawnwebgpu_js_gen webgpu_generated_struct_info_js
-    cp gen/src/emdawnwebgpu/{include/webgpu/webgpu{,_cpp}.h,library_webgpu_{enum_tables,generated_{sig,struct}_info}.js} ../../../../dawn_gen_snapshots/
+    make -j4 emdawnwebgpu_pkg
+    rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg_snapshot/
 )
 

@@ -25,28 +25,6 @@ option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 
-if (NOT EMSCRIPTEN)
-    # Set Dawn's config variables before including Dawn.
-    set(DAWN_ENABLE_PIC        ON  CACHE INTERNAL "")
-    set(DAWN_ENABLE_DESKTOP_GL OFF CACHE INTERNAL "")
-    set(DAWN_ENABLE_OPENGLES   OFF CACHE INTERNAL "")
-    set(DAWN_BUILD_SAMPLES     OFF CACHE INTERNAL "")
-    set(TINT_BUILD_SAMPLES     OFF CACHE INTERNAL "")
-    set(TINT_BUILD_TESTS       OFF CACHE INTERNAL "")
-    set(TINT_BUILD_GLSL_WRITER OFF CACHE INTERNAL "")
-
-    if (DEMO_USE_GLFW)
-        message("Demo use glfw for native window platform is turned on. If glfw is not found try `apt-get install libglfw3-dev` or `brew install glfw`")
-        set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/modules)
-        find_package(glfw3 REQUIRED)
-        if (UNIX AND NOT APPLE)
-            set(DAWN_USE_X11 ON CACHE BOOL "Dawn use X11")
-        else()
-            set(DAWN_USE_X11 OFF CACHE BOOL "Dawn use X11")
-        endif()
-    endif()
-endif()
-
 add_compile_options(
     "-fno-exceptions"
     "$<$<CONFIG:Release>:-flto>"
@@ -82,10 +60,34 @@ if (EMSCRIPTEN)
 endif()
 
 #
-# Include Dawn after setting all global settings
+# Include Dawn or emdawnwebgpu after setting all global settings
 #
 
-add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
+if (EMSCRIPTEN)
+    add_subdirectory("emdawnwebgpu_pkg_snapshot" EXCLUDE_FROM_ALL)
+else()
+    # Set Dawn's config variables before including Dawn.
+    set(DAWN_ENABLE_PIC        ON  CACHE INTERNAL "")
+    set(DAWN_ENABLE_DESKTOP_GL OFF CACHE INTERNAL "")
+    set(DAWN_ENABLE_OPENGLES   OFF CACHE INTERNAL "")
+    set(DAWN_BUILD_SAMPLES     OFF CACHE INTERNAL "")
+    set(TINT_BUILD_SAMPLES     OFF CACHE INTERNAL "")
+    set(TINT_BUILD_TESTS       OFF CACHE INTERNAL "")
+    set(TINT_BUILD_GLSL_WRITER OFF CACHE INTERNAL "")
+
+    if (DEMO_USE_GLFW)
+        message("Demo use glfw for native window platform is turned on. If glfw is not found try `apt-get install libglfw3-dev` or `brew install glfw`")
+        set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake/modules)
+        find_package(glfw3 REQUIRED)
+        if (UNIX AND NOT APPLE)
+            set(DAWN_USE_X11 ON CACHE BOOL "Dawn use X11")
+        else()
+            set(DAWN_USE_X11 OFF CACHE BOOL "Dawn use X11")
+        endif()
+    endif()
+
+    add_subdirectory("third_party/dawn" EXCLUDE_FROM_ALL)
+endif()
 
 #
 # Set up target

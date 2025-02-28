@@ -256,16 +256,23 @@ enum class FeatureName : uint32_t {
     Depth32FloatStencil8 = WGPUFeatureName_Depth32FloatStencil8,
     TimestampQuery = WGPUFeatureName_TimestampQuery,
     TextureCompressionBC = WGPUFeatureName_TextureCompressionBC,
+    TextureCompressionBCSliced3D = WGPUFeatureName_TextureCompressionBCSliced3D,
     TextureCompressionETC2 = WGPUFeatureName_TextureCompressionETC2,
     TextureCompressionASTC = WGPUFeatureName_TextureCompressionASTC,
+    TextureCompressionASTCSliced3D = WGPUFeatureName_TextureCompressionASTCSliced3D,
     IndirectFirstInstance = WGPUFeatureName_IndirectFirstInstance,
     ShaderF16 = WGPUFeatureName_ShaderF16,
     RG11B10UfloatRenderable = WGPUFeatureName_RG11B10UfloatRenderable,
     BGRA8UnormStorage = WGPUFeatureName_BGRA8UnormStorage,
     Float32Filterable = WGPUFeatureName_Float32Filterable,
     Float32Blendable = WGPUFeatureName_Float32Blendable,
+    ClipDistances = WGPUFeatureName_ClipDistances,
+    DualSourceBlending = WGPUFeatureName_DualSourceBlending,
     Subgroups = WGPUFeatureName_Subgroups,
     SubgroupsF16 = WGPUFeatureName_SubgroupsF16,
+    Unorm16TextureFormats = WGPUFeatureName_Unorm16TextureFormats,
+    Snorm16TextureFormats = WGPUFeatureName_Snorm16TextureFormats,
+    MultiDrawIndirect = WGPUFeatureName_MultiDrawIndirect,
 };
 static_assert(sizeof(FeatureName) == sizeof(WGPUFeatureName), "sizeof mismatch for FeatureName");
 static_assert(alignof(FeatureName) == alignof(WGPUFeatureName), "alignof mismatch for FeatureName");
@@ -335,6 +342,13 @@ enum class PowerPreference : uint32_t {
 static_assert(sizeof(PowerPreference) == sizeof(WGPUPowerPreference), "sizeof mismatch for PowerPreference");
 static_assert(alignof(PowerPreference) == alignof(WGPUPowerPreference), "alignof mismatch for PowerPreference");
 
+enum class PredefinedColorSpace : uint32_t {
+    SRGB = WGPUPredefinedColorSpace_SRGB,
+    DisplayP3 = WGPUPredefinedColorSpace_DisplayP3,
+};
+static_assert(sizeof(PredefinedColorSpace) == sizeof(WGPUPredefinedColorSpace), "sizeof mismatch for PredefinedColorSpace");
+static_assert(alignof(PredefinedColorSpace) == alignof(WGPUPredefinedColorSpace), "alignof mismatch for PredefinedColorSpace");
+
 enum class PresentMode : uint32_t {
     Fifo = WGPUPresentMode_Fifo,
     FifoRelaxed = WGPUPresentMode_FifoRelaxed,
@@ -397,6 +411,8 @@ enum class SType : uint32_t {
     SurfaceSourceWaylandSurface = WGPUSType_SurfaceSourceWaylandSurface,
     SurfaceSourceAndroidNativeWindow = WGPUSType_SurfaceSourceAndroidNativeWindow,
     SurfaceSourceXCBWindow = WGPUSType_SurfaceSourceXCBWindow,
+    SurfaceColorManagement = WGPUSType_SurfaceColorManagement,
+    RequestAdapterWebXROptions = WGPUSType_RequestAdapterWebXROptions,
     AdapterPropertiesSubgroups = WGPUSType_AdapterPropertiesSubgroups,
     TextureBindingViewDimensionDescriptor = WGPUSType_TextureBindingViewDimensionDescriptor,
     EmscriptenSurfaceSourceCanvasHTMLSelector = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector,
@@ -616,6 +632,13 @@ enum class TextureViewDimension : uint32_t {
 };
 static_assert(sizeof(TextureViewDimension) == sizeof(WGPUTextureViewDimension), "sizeof mismatch for TextureViewDimension");
 static_assert(alignof(TextureViewDimension) == alignof(WGPUTextureViewDimension), "alignof mismatch for TextureViewDimension");
+
+enum class ToneMappingMode : uint32_t {
+    Standard = WGPUToneMappingMode_Standard,
+    Extended = WGPUToneMappingMode_Extended,
+};
+static_assert(sizeof(ToneMappingMode) == sizeof(WGPUToneMappingMode), "sizeof mismatch for ToneMappingMode");
+static_assert(alignof(ToneMappingMode) == alignof(WGPUToneMappingMode), "alignof mismatch for ToneMappingMode");
 
 enum class VertexFormat : uint32_t {
     Uint8 = WGPUVertexFormat_Uint8,
@@ -952,6 +975,7 @@ struct PassTimestampWrites;
 struct PrimitiveState;
 struct RenderPassDepthStencilAttachment;
 struct RenderPassMaxDrawCount;
+struct RequestAdapterWebXROptions;
 struct RequestAdapterOptions;
 struct SamplerBindingLayout;
 struct ShaderSourceSPIRV;
@@ -961,6 +985,7 @@ struct StringView;
 struct SupportedWGSLLanguageFeatures;
 struct SupportedFeatures;
 struct SurfaceCapabilities;
+struct SurfaceColorManagement;
 struct SurfaceConfiguration;
 struct SurfaceTexture;
 struct TexelCopyBufferLayout;
@@ -987,11 +1012,9 @@ struct QueueDescriptor;
 struct RenderBundleDescriptor;
 struct RenderBundleEncoderDescriptor;
 struct RenderPassColorAttachment;
-struct RequiredLimits;
 struct SamplerDescriptor;
 struct ShaderModuleDescriptor;
 struct ShaderSourceWGSL;
-struct SupportedLimits;
 struct SurfaceDescriptor;
 struct TexelCopyBufferInfo;
 struct TexelCopyTextureInfo;
@@ -1176,7 +1199,7 @@ class Adapter : public ObjectBase<Adapter, WGPUAdapter> {
 
     inline void GetFeatures(SupportedFeatures * features) const;
     inline ConvertibleStatus GetInfo(AdapterInfo * info) const;
-    inline ConvertibleStatus GetLimits(SupportedLimits * limits) const;
+    inline ConvertibleStatus GetLimits(Limits * limits) const;
     inline Bool HasFeature(FeatureName feature) const;
     template <typename F, typename T,
               typename Cb = RequestDeviceCallback<T>,
@@ -1245,8 +1268,10 @@ class Buffer : public ObjectBase<Buffer, WGPUBuffer> {
               typename CbChar = std::function<void(MapAsyncStatus status, const char* message)>,
               typename = std::enable_if_t<std::is_convertible_v<L, Cb> || std::is_convertible_v<L, CbChar>>>
     Future MapAsync(MapMode mode, size_t offset, size_t size, CallbackMode callbackMode,L callback) const;
+    inline ConvertibleStatus ReadMappedRange(size_t offset, void * data, size_t size) const;
     inline void SetLabel(StringView label) const;
     inline void Unmap() const;
+    inline ConvertibleStatus WriteMappedRange(size_t offset, void const * data, size_t size) const;
 
 
   private:
@@ -1375,7 +1400,7 @@ class Device : public ObjectBase<Device, WGPUDevice> {
     inline void Destroy() const;
     inline ConvertibleStatus GetAdapterInfo(AdapterInfo * adapterInfo) const;
     inline void GetFeatures(SupportedFeatures * features) const;
-    inline ConvertibleStatus GetLimits(SupportedLimits * limits) const;
+    inline ConvertibleStatus GetLimits(Limits * limits) const;
     inline Future GetLostFuture() const;
     inline Queue GetQueue() const;
     inline Bool HasFeature(FeatureName feature) const;
@@ -1760,7 +1785,7 @@ struct Future {
 struct InstanceCapabilities {
     inline operator const WGPUInstanceCapabilities&() const noexcept;
 
-    ChainedStruct const * nextInChain = nullptr;
+    ChainedStructOut  * nextInChain = nullptr;
     Bool timedWaitAnyEnable = false;
     size_t timedWaitAnyMaxCount = 0;
 };
@@ -1768,6 +1793,7 @@ struct InstanceCapabilities {
 struct Limits {
     inline operator const WGPULimits&() const noexcept;
 
+    ChainedStructOut  * nextInChain = nullptr;
     uint32_t maxTextureDimension1D = WGPU_LIMIT_U32_UNDEFINED;
     uint32_t maxTextureDimension2D = WGPU_LIMIT_U32_UNDEFINED;
     uint32_t maxTextureDimension3D = WGPU_LIMIT_U32_UNDEFINED;
@@ -1868,6 +1894,18 @@ struct RenderPassMaxDrawCount : ChainedStruct {
 
     static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(uint64_t ));
     alignas(kFirstMemberAlignment) uint64_t maxDrawCount = 50000000;
+};
+
+// Can be chained in RequestAdapterOptions
+struct RequestAdapterWebXROptions : ChainedStruct {
+    inline RequestAdapterWebXROptions();
+
+    struct Init;
+    inline RequestAdapterWebXROptions(Init&& init);
+    inline operator const WGPURequestAdapterWebXROptions&() const noexcept;
+
+    static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(Bool ));
+    alignas(kFirstMemberAlignment) Bool xrCompatible;
 };
 
 struct RequestAdapterOptions {
@@ -1974,6 +2012,19 @@ struct SurfaceCapabilities {
   private:
     inline void FreeMembers();
     static inline void Reset(SurfaceCapabilities& value);
+};
+
+// Can be chained in SurfaceDescriptor
+struct SurfaceColorManagement : ChainedStruct {
+    inline SurfaceColorManagement();
+
+    struct Init;
+    inline SurfaceColorManagement(Init&& init);
+    inline operator const WGPUSurfaceColorManagement&() const noexcept;
+
+    static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(PredefinedColorSpace ));
+    alignas(kFirstMemberAlignment) PredefinedColorSpace colorSpace;
+    ToneMappingMode toneMappingMode;
 };
 
 struct SurfaceConfiguration {
@@ -2248,13 +2299,6 @@ struct RenderPassColorAttachment {
     Color clearValue = {};
 };
 
-struct RequiredLimits {
-    inline operator const WGPURequiredLimits&() const noexcept;
-
-    ChainedStruct const * nextInChain = nullptr;
-    Limits limits = {};
-};
-
 struct SamplerDescriptor {
     inline operator const WGPUSamplerDescriptor&() const noexcept;
 
@@ -2289,13 +2333,6 @@ struct ShaderSourceWGSL : ChainedStruct {
 
     static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(StringView ));
     alignas(kFirstMemberAlignment) StringView code = {};
-};
-
-struct SupportedLimits {
-    inline operator const WGPUSupportedLimits&() const noexcept;
-
-    ChainedStructOut  * nextInChain = nullptr;
-    Limits limits = {};
 };
 
 struct SurfaceDescriptor {
@@ -2462,7 +2499,7 @@ struct DeviceDescriptor {
     StringView label = {};
     size_t requiredFeatureCount = 0;
     FeatureName const * requiredFeatures = nullptr;
-    RequiredLimits const * requiredLimits = nullptr;
+    Limits const * requiredLimits = nullptr;
     QueueDescriptor defaultQueue = {};
     WGPUDeviceLostCallbackInfo deviceLostCallbackInfo = WGPU_DEVICE_LOST_CALLBACK_INFO_INIT;
     WGPUUncapturedErrorCallbackInfo uncapturedErrorCallbackInfo = WGPU_UNCAPTURED_ERROR_CALLBACK_INFO_INIT;
@@ -2663,6 +2700,8 @@ Limits::operator const WGPULimits&() const noexcept {
 
 static_assert(sizeof(Limits) == sizeof(WGPULimits), "sizeof mismatch for Limits");
 static_assert(alignof(Limits) == alignof(WGPULimits), "alignof mismatch for Limits");
+static_assert(offsetof(Limits, nextInChain) == offsetof(WGPULimits, nextInChain),
+        "offsetof mismatch for Limits::nextInChain");
 static_assert(offsetof(Limits, maxTextureDimension1D) == offsetof(WGPULimits, maxTextureDimension1D),
         "offsetof mismatch for Limits::maxTextureDimension1D");
 static_assert(offsetof(Limits, maxTextureDimension2D) == offsetof(WGPULimits, maxTextureDimension2D),
@@ -2854,6 +2893,26 @@ static_assert(sizeof(RenderPassMaxDrawCount) == sizeof(WGPURenderPassMaxDrawCoun
 static_assert(alignof(RenderPassMaxDrawCount) == alignof(WGPURenderPassMaxDrawCount), "alignof mismatch for RenderPassMaxDrawCount");
 static_assert(offsetof(RenderPassMaxDrawCount, maxDrawCount) == offsetof(WGPURenderPassMaxDrawCount, maxDrawCount),
         "offsetof mismatch for RenderPassMaxDrawCount::maxDrawCount");
+
+// RequestAdapterWebXROptions implementation
+RequestAdapterWebXROptions::RequestAdapterWebXROptions()
+  : ChainedStruct { nullptr, SType::RequestAdapterWebXROptions } {}
+struct RequestAdapterWebXROptions::Init {
+    ChainedStruct * const nextInChain;
+    Bool xrCompatible;
+};
+RequestAdapterWebXROptions::RequestAdapterWebXROptions(RequestAdapterWebXROptions::Init&& init)
+  : ChainedStruct { init.nextInChain, SType::RequestAdapterWebXROptions }, 
+    xrCompatible(std::move(init.xrCompatible)){}
+
+RequestAdapterWebXROptions::operator const WGPURequestAdapterWebXROptions&() const noexcept {
+    return *reinterpret_cast<const WGPURequestAdapterWebXROptions*>(this);
+}
+
+static_assert(sizeof(RequestAdapterWebXROptions) == sizeof(WGPURequestAdapterWebXROptions), "sizeof mismatch for RequestAdapterWebXROptions");
+static_assert(alignof(RequestAdapterWebXROptions) == alignof(WGPURequestAdapterWebXROptions), "alignof mismatch for RequestAdapterWebXROptions");
+static_assert(offsetof(RequestAdapterWebXROptions, xrCompatible) == offsetof(WGPURequestAdapterWebXROptions, xrCompatible),
+        "offsetof mismatch for RequestAdapterWebXROptions::xrCompatible");
 
 // RequestAdapterOptions implementation
 
@@ -3117,6 +3176,30 @@ static_assert(offsetof(SurfaceCapabilities, alphaModeCount) == offsetof(WGPUSurf
         "offsetof mismatch for SurfaceCapabilities::alphaModeCount");
 static_assert(offsetof(SurfaceCapabilities, alphaModes) == offsetof(WGPUSurfaceCapabilities, alphaModes),
         "offsetof mismatch for SurfaceCapabilities::alphaModes");
+
+// SurfaceColorManagement implementation
+SurfaceColorManagement::SurfaceColorManagement()
+  : ChainedStruct { nullptr, SType::SurfaceColorManagement } {}
+struct SurfaceColorManagement::Init {
+    ChainedStruct * const nextInChain;
+    PredefinedColorSpace colorSpace;
+    ToneMappingMode toneMappingMode;
+};
+SurfaceColorManagement::SurfaceColorManagement(SurfaceColorManagement::Init&& init)
+  : ChainedStruct { init.nextInChain, SType::SurfaceColorManagement }, 
+    colorSpace(std::move(init.colorSpace)), 
+    toneMappingMode(std::move(init.toneMappingMode)){}
+
+SurfaceColorManagement::operator const WGPUSurfaceColorManagement&() const noexcept {
+    return *reinterpret_cast<const WGPUSurfaceColorManagement*>(this);
+}
+
+static_assert(sizeof(SurfaceColorManagement) == sizeof(WGPUSurfaceColorManagement), "sizeof mismatch for SurfaceColorManagement");
+static_assert(alignof(SurfaceColorManagement) == alignof(WGPUSurfaceColorManagement), "alignof mismatch for SurfaceColorManagement");
+static_assert(offsetof(SurfaceColorManagement, colorSpace) == offsetof(WGPUSurfaceColorManagement, colorSpace),
+        "offsetof mismatch for SurfaceColorManagement::colorSpace");
+static_assert(offsetof(SurfaceColorManagement, toneMappingMode) == offsetof(WGPUSurfaceColorManagement, toneMappingMode),
+        "offsetof mismatch for SurfaceColorManagement::toneMappingMode");
 
 // SurfaceConfiguration implementation
 
@@ -3672,19 +3755,6 @@ static_assert(offsetof(RenderPassColorAttachment, storeOp) == offsetof(WGPURende
 static_assert(offsetof(RenderPassColorAttachment, clearValue) == offsetof(WGPURenderPassColorAttachment, clearValue),
         "offsetof mismatch for RenderPassColorAttachment::clearValue");
 
-// RequiredLimits implementation
-
-RequiredLimits::operator const WGPURequiredLimits&() const noexcept {
-    return *reinterpret_cast<const WGPURequiredLimits*>(this);
-}
-
-static_assert(sizeof(RequiredLimits) == sizeof(WGPURequiredLimits), "sizeof mismatch for RequiredLimits");
-static_assert(alignof(RequiredLimits) == alignof(WGPURequiredLimits), "alignof mismatch for RequiredLimits");
-static_assert(offsetof(RequiredLimits, nextInChain) == offsetof(WGPURequiredLimits, nextInChain),
-        "offsetof mismatch for RequiredLimits::nextInChain");
-static_assert(offsetof(RequiredLimits, limits) == offsetof(WGPURequiredLimits, limits),
-        "offsetof mismatch for RequiredLimits::limits");
-
 // SamplerDescriptor implementation
 
 SamplerDescriptor::operator const WGPUSamplerDescriptor&() const noexcept {
@@ -3750,19 +3820,6 @@ static_assert(sizeof(ShaderSourceWGSL) == sizeof(WGPUShaderSourceWGSL), "sizeof 
 static_assert(alignof(ShaderSourceWGSL) == alignof(WGPUShaderSourceWGSL), "alignof mismatch for ShaderSourceWGSL");
 static_assert(offsetof(ShaderSourceWGSL, code) == offsetof(WGPUShaderSourceWGSL, code),
         "offsetof mismatch for ShaderSourceWGSL::code");
-
-// SupportedLimits implementation
-
-SupportedLimits::operator const WGPUSupportedLimits&() const noexcept {
-    return *reinterpret_cast<const WGPUSupportedLimits*>(this);
-}
-
-static_assert(sizeof(SupportedLimits) == sizeof(WGPUSupportedLimits), "sizeof mismatch for SupportedLimits");
-static_assert(alignof(SupportedLimits) == alignof(WGPUSupportedLimits), "alignof mismatch for SupportedLimits");
-static_assert(offsetof(SupportedLimits, nextInChain) == offsetof(WGPUSupportedLimits, nextInChain),
-        "offsetof mismatch for SupportedLimits::nextInChain");
-static_assert(offsetof(SupportedLimits, limits) == offsetof(WGPUSupportedLimits, limits),
-        "offsetof mismatch for SupportedLimits::limits");
 
 // SurfaceDescriptor implementation
 
@@ -4093,7 +4150,7 @@ struct DeviceDescriptor::Init {
     StringView label = {};
     size_t requiredFeatureCount = 0;
     FeatureName const * requiredFeatures = nullptr;
-    RequiredLimits const * requiredLimits = nullptr;
+    Limits const * requiredLimits = nullptr;
     QueueDescriptor defaultQueue = {};
 };
 
@@ -4201,8 +4258,8 @@ ConvertibleStatus Adapter::GetInfo(AdapterInfo * info) const {
     auto result = wgpuAdapterGetInfo(Get(), reinterpret_cast<WGPUAdapterInfo * >(info));
     return static_cast<Status>(result);
 }
-ConvertibleStatus Adapter::GetLimits(SupportedLimits * limits) const {
-    auto result = wgpuAdapterGetLimits(Get(), reinterpret_cast<WGPUSupportedLimits * >(limits));
+ConvertibleStatus Adapter::GetLimits(Limits * limits) const {
+    auto result = wgpuAdapterGetLimits(Get(), reinterpret_cast<WGPULimits * >(limits));
     return static_cast<Status>(result);
 }
 Bool Adapter::HasFeature(FeatureName feature) const {
@@ -4411,11 +4468,19 @@ Future Buffer::MapAsync(MapMode mode, size_t offset, size_t size, CallbackMode c
             result.id
         };
 }
+ConvertibleStatus Buffer::ReadMappedRange(size_t offset, void * data, size_t size) const {
+    auto result = wgpuBufferReadMappedRange(Get(), offset, reinterpret_cast<void * >(data), size);
+    return static_cast<Status>(result);
+}
 void Buffer::SetLabel(StringView label) const {
     wgpuBufferSetLabel(Get(), *reinterpret_cast<WGPUStringView const*>(&label));
 }
 void Buffer::Unmap() const {
     wgpuBufferUnmap(Get());
+}
+ConvertibleStatus Buffer::WriteMappedRange(size_t offset, void const * data, size_t size) const {
+    auto result = wgpuBufferWriteMappedRange(Get(), offset, reinterpret_cast<void const * >(data), size);
+    return static_cast<Status>(result);
 }
 
 
@@ -4772,8 +4837,8 @@ void Device::GetFeatures(SupportedFeatures * features) const {
     *features = SupportedFeatures();
     wgpuDeviceGetFeatures(Get(), reinterpret_cast<WGPUSupportedFeatures * >(features));
 }
-ConvertibleStatus Device::GetLimits(SupportedLimits * limits) const {
-    auto result = wgpuDeviceGetLimits(Get(), reinterpret_cast<WGPUSupportedLimits * >(limits));
+ConvertibleStatus Device::GetLimits(Limits * limits) const {
+    auto result = wgpuDeviceGetLimits(Get(), reinterpret_cast<WGPULimits * >(limits));
     return static_cast<Status>(result);
 }
 Future Device::GetLostFuture() const {
@@ -5515,12 +5580,6 @@ static_assert(alignof(TextureView) == alignof(WGPUTextureView), "alignof mismatc
 
 
 
-// ImageCopyBuffer is deprecated.
-// Use TexelCopyBufferInfo instead.
-using ImageCopyBuffer = TexelCopyBufferInfo;
-// ImageCopyTexture is deprecated.
-// Use TexelCopyTextureInfo instead.
-using ImageCopyTexture = TexelCopyTextureInfo;
 // RenderPassDescriptorMaxDrawCount is deprecated.
 // Use RenderPassMaxDrawCount instead.
 using RenderPassDescriptorMaxDrawCount = RenderPassMaxDrawCount;
@@ -5530,9 +5589,6 @@ using ShaderModuleSPIRVDescriptor = ShaderSourceSPIRV;
 // ShaderModuleWGSLDescriptor is deprecated.
 // Use ShaderSourceWGSL instead.
 using ShaderModuleWGSLDescriptor = ShaderSourceWGSL;
-// TextureDataLayout is deprecated.
-// Use TexelCopyBufferLayout instead.
-using TextureDataLayout = TexelCopyBufferLayout;
 
 // Free Functions
 static inline Instance CreateInstance(InstanceDescriptor const * descriptor = nullptr) {

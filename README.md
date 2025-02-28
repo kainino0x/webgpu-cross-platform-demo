@@ -22,7 +22,8 @@ but that is a goal.
 
 Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
 
-This step is required for both native and web builds:
+This setup step is always required for native builds.
+For web builds, it is only needed if you need to rebuild `emdawnwebgpu_pkg_snapshot`.
 
 ```sh
 ./setup_build.sh
@@ -90,9 +91,7 @@ cmake ../.. -DDEMO_USE_GLFW=OFF
 This has been mainly tested with Chrome Canary on Mac, but should work on
 Chrome/Edge/Firefox on any platform with support (modulo compatibility differences due to
 pre-release spec changes).
-Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
 
 ```sh
-./build_webdbg.sh
-./build_webrel.sh
+./build_all.sh --parallel=0
 ```
