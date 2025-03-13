@@ -27,7 +27,7 @@ For web builds, it is only strictly needed if you need to rebuild `emdawnwebgpu_
 without it, you'll need to build manually with your own emsdk, because `build_all.sh` uses Dawn's).
 
 ```sh
-./setup_build.sh
+./setup_build.sh --checkout=1
 ```
 
 ### Native build

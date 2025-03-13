@@ -54,7 +54,7 @@ WGPUTextureFormat emwgpuGetPreferredFormat();
 
 // Device functions, i.e. creation functions to create JS backing objects given
 // a pre-allocated handle, and destruction implementations.
-void emwgpuDeviceCreateBuffer(WGPUDevice device,
+bool emwgpuDeviceCreateBuffer(WGPUDevice device,
                               const WGPUBufferDescriptor* descriptor,
                               WGPUBuffer buffer);
 void emwgpuDeviceCreateShaderModule(
@@ -1793,7 +1793,10 @@ void wgpuBufferUnmap(WGPUBuffer buffer) {
 WGPUBuffer wgpuDeviceCreateBuffer(WGPUDevice device,
                                   const WGPUBufferDescriptor* descriptor) {
   WGPUBuffer buffer = new WGPUBufferImpl(device, descriptor->mappedAtCreation);
-  emwgpuDeviceCreateBuffer(device, descriptor, buffer);
+  if (!emwgpuDeviceCreateBuffer(device, descriptor, buffer)) {
+    delete buffer;
+    return nullptr;
+  }
   return buffer;
 }
 
