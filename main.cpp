@@ -395,6 +395,16 @@ static const char shaderCode[] = R"(
 void init() {
     queue = device.GetQueue();
 
+    // Test of OOM with mappedAtCreation.
+    {
+        wgpu::BufferDescriptor descriptor{};
+        descriptor.usage = wgpu::BufferUsage::CopyDst;
+        descriptor.size = 0x1000'0000'0000ULL;
+        descriptor.mappedAtCreation = true;
+        wgpu::Buffer bufferTooLarge = device.CreateBuffer(&descriptor);
+        assert(bufferTooLarge == nullptr);
+    }
+
     wgpu::ShaderModule shaderModule{};
     {
         wgpu::ShaderModuleWGSLDescriptor wgslDesc{};
