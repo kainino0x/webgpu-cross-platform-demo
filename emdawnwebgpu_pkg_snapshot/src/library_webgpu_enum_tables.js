@@ -93,7 +93,7 @@
         },
         CompilationInfoRequestStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
         },
         CompilationMessageType: {
             'Error': 1,
@@ -109,7 +109,7 @@
         },
         CreatePipelineAsyncStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
             'ValidationError': 3,
             'InternalError': 4,
         },
@@ -122,7 +122,7 @@
         DeviceLostReason: {
             'Unknown': 1,
             'Destroyed': 2,
-            'InstanceDropped': 3,
+            'CallbackCancelled': 3,
             'FailedCreation': 4,
         },
         ErrorFilter: {
@@ -160,6 +160,7 @@
             'ClipDistances': 15,
             'DualSourceBlending': 16,
             'Subgroups': 17,
+            'CoreFeaturesAndLimits': 18,
             'SubgroupsF16': 327688,
             'Unorm16TextureFormats': 327693,
             'Snorm16TextureFormats': 327694,
@@ -187,7 +188,7 @@
         },
         MapAsyncStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
             'Error': 3,
             'Aborted': 4,
         },
@@ -203,8 +204,8 @@
         },
         PopErrorScopeStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
-            'EmptyStack': 3,
+            'CallbackCancelled': 2,
+            'Error': 3,
         },
         PowerPreference: {
             'Undefined': 0,
@@ -216,6 +217,7 @@
             'DisplayP3': 2,
         },
         PresentMode: {
+            'Undefined': 0,
             'Fifo': 1,
             'FifoRelaxed': 2,
             'Immediate': 3,
@@ -235,18 +237,18 @@
         },
         QueueWorkDoneStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
             'Error': 3,
         },
         RequestAdapterStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
             'Unavailable': 3,
             'Error': 4,
         },
         RequestDeviceStatus: {
             'Success': 1,
-            'InstanceDropped': 2,
+            'CallbackCancelled': 2,
             'Error': 3,
         },
         SType: {
@@ -264,6 +266,7 @@
             'AdapterPropertiesSubgroups': 12,
             'TextureBindingViewDimensionDescriptor': 131072,
             'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
+            'DawnCompilationMessageUtf16': 327743,
         },
         SamplerBindingType: {
             'BindingNotUsed': 0,
@@ -306,13 +309,12 @@
             'I32': 4,
         },
         SurfaceGetCurrentTextureStatus: {
-            'Success': 1,
-            'Timeout': 2,
-            'Outdated': 3,
-            'Lost': 4,
-            'OutOfMemory': 5,
-            'DeviceLost': 6,
-            'Error': 7,
+            'SuccessOptimal': 1,
+            'SuccessSuboptimal': 2,
+            'Timeout': 3,
+            'Outdated': 4,
+            'Lost': 5,
+            'Error': 6,
         },
         TextureAspect: {
             'Undefined': 0,
@@ -634,7 +636,7 @@
         ],
         CompilationInfoRequestStatus: {
             1: 'success',
-            2: 'instance-dropped',
+            2: 'callback-cancelled',
         },
         CompositeAlphaMode: [
             undefined,
@@ -677,6 +679,7 @@
             15: 'clip-distances',
             16: 'dual-source-blending',
             17: 'subgroups',
+            18: 'core-features-and-limits',
             327688: 'subgroups-f16',
             327693: 'chromium-experimental-unorm16-texture-formats',
             327694: 'chromium-experimental-snorm16-texture-formats',
@@ -768,13 +771,12 @@
             'discard',
         ],
         SurfaceGetCurrentTextureStatus: {
-            1: 'success',
-            2: 'timeout',
-            3: 'outdated',
-            4: 'lost',
-            5: 'out-of-memory',
-            6: 'device-lost',
-            7: 'error',
+            1: 'success-optimal',
+            2: 'success-suboptimal',
+            3: 'timeout',
+            4: 'outdated',
+            5: 'lost',
+            6: 'error',
         },
         TextureAspect: [
             undefined,

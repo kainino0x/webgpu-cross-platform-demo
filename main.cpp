@@ -730,7 +730,7 @@ bool frame() {
 
     wgpu::SurfaceTexture surfaceTexture;
     surface.GetCurrentTexture(&surfaceTexture);
-    assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::Success);
+    assert(surfaceTexture.status == wgpu::SurfaceGetCurrentTextureStatus::SuccessOptimal);
     wgpu::TextureView backbuffer = surfaceTexture.texture.CreateView();
 
     if (frameNum == 2) {

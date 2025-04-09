@@ -46,6 +46,8 @@ endif()
 
 if (EMSCRIPTEN)
     add_compile_options(
+        # We use this as both a compile flag and a link flag. Here, it sets the include path.
+        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/port.py"
         "-Wall"
         "-Wextra"
         #"-Weverything"
@@ -60,12 +62,10 @@ if (EMSCRIPTEN)
 endif()
 
 #
-# Include Dawn or emdawnwebgpu after setting all global settings
+# Include Dawn after setting all global settings
 #
 
-if (EMSCRIPTEN)
-    add_subdirectory("emdawnwebgpu_pkg_snapshot" EXCLUDE_FROM_ALL)
-else()
+if (NOT EMSCRIPTEN)
     # Set Dawn's config variables before including Dawn.
     set(DAWN_ENABLE_PIC        ON  CACHE INTERNAL "")
     set(DAWN_ENABLE_DESKTOP_GL OFF CACHE INTERNAL "")
@@ -103,16 +103,14 @@ if (EMSCRIPTEN)
             DEMO_USE_ASYNCIFY=${DEMO_USE_ASYNCIFY}
         )
 
-    target_link_libraries(hello
-        # Depending on this will build all the necessary files in Dawn and
-        # set all the appropriate link flags to point at them.
-        emdawnwebgpu_cpp
-        )
-
     set_target_properties(hello PROPERTIES
         SUFFIX ".html")
     target_link_options(hello
         PRIVATE
+            # We use this as both a compile flag and a link flag. Here, it links emdawnwebgpu.
+            "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/port.py"
+            "--closure-args=--externs=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/src/webgpu-externs.js"
+
             # DWARF symbols are enabled by default (-g). To use, follow:
             # https://developer.chrome.com/blog/wasm-debugging-2020/
             # Or, switch to -gsource-map for more basic debugging.

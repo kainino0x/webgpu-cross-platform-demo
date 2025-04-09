@@ -321,8 +321,8 @@ namespace wgpu {
       case CompilationInfoRequestStatus::Success:
         o << "CompilationInfoRequestStatus::Success";
         break;
-      case CompilationInfoRequestStatus::InstanceDropped:
-        o << "CompilationInfoRequestStatus::InstanceDropped";
+      case CompilationInfoRequestStatus::CallbackCancelled:
+        o << "CompilationInfoRequestStatus::CallbackCancelled";
         break;
           default:
             o << "CompilationInfoRequestStatus::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<CompilationInfoRequestStatus>::type>(value);
@@ -375,8 +375,8 @@ namespace wgpu {
       case CreatePipelineAsyncStatus::Success:
         o << "CreatePipelineAsyncStatus::Success";
         break;
-      case CreatePipelineAsyncStatus::InstanceDropped:
-        o << "CreatePipelineAsyncStatus::InstanceDropped";
+      case CreatePipelineAsyncStatus::CallbackCancelled:
+        o << "CreatePipelineAsyncStatus::CallbackCancelled";
         break;
       case CreatePipelineAsyncStatus::ValidationError:
         o << "CreatePipelineAsyncStatus::ValidationError";
@@ -418,8 +418,8 @@ namespace wgpu {
       case DeviceLostReason::Destroyed:
         o << "DeviceLostReason::Destroyed";
         break;
-      case DeviceLostReason::InstanceDropped:
-        o << "DeviceLostReason::InstanceDropped";
+      case DeviceLostReason::CallbackCancelled:
+        o << "DeviceLostReason::CallbackCancelled";
         break;
       case DeviceLostReason::FailedCreation:
         o << "DeviceLostReason::FailedCreation";
@@ -540,6 +540,9 @@ namespace wgpu {
       case FeatureName::Subgroups:
         o << "FeatureName::Subgroups";
         break;
+      case FeatureName::CoreFeaturesAndLimits:
+        o << "FeatureName::CoreFeaturesAndLimits";
+        break;
       case FeatureName::SubgroupsF16:
         o << "FeatureName::SubgroupsF16";
         break;
@@ -631,8 +634,8 @@ namespace wgpu {
       case MapAsyncStatus::Success:
         o << "MapAsyncStatus::Success";
         break;
-      case MapAsyncStatus::InstanceDropped:
-        o << "MapAsyncStatus::InstanceDropped";
+      case MapAsyncStatus::CallbackCancelled:
+        o << "MapAsyncStatus::CallbackCancelled";
         break;
       case MapAsyncStatus::Error:
         o << "MapAsyncStatus::Error";
@@ -668,11 +671,11 @@ namespace wgpu {
       case PopErrorScopeStatus::Success:
         o << "PopErrorScopeStatus::Success";
         break;
-      case PopErrorScopeStatus::InstanceDropped:
-        o << "PopErrorScopeStatus::InstanceDropped";
+      case PopErrorScopeStatus::CallbackCancelled:
+        o << "PopErrorScopeStatus::CallbackCancelled";
         break;
-      case PopErrorScopeStatus::EmptyStack:
-        o << "PopErrorScopeStatus::EmptyStack";
+      case PopErrorScopeStatus::Error:
+        o << "PopErrorScopeStatus::Error";
         break;
           default:
             o << "PopErrorScopeStatus::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<PopErrorScopeStatus>::type>(value);
@@ -713,6 +716,9 @@ namespace wgpu {
   template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, PresentMode value) {
       switch (value) {
+      case PresentMode::Undefined:
+        o << "PresentMode::Undefined";
+        break;
       case PresentMode::Fifo:
         o << "PresentMode::Fifo";
         break;
@@ -776,8 +782,8 @@ namespace wgpu {
       case QueueWorkDoneStatus::Success:
         o << "QueueWorkDoneStatus::Success";
         break;
-      case QueueWorkDoneStatus::InstanceDropped:
-        o << "QueueWorkDoneStatus::InstanceDropped";
+      case QueueWorkDoneStatus::CallbackCancelled:
+        o << "QueueWorkDoneStatus::CallbackCancelled";
         break;
       case QueueWorkDoneStatus::Error:
         o << "QueueWorkDoneStatus::Error";
@@ -793,8 +799,8 @@ namespace wgpu {
       case RequestAdapterStatus::Success:
         o << "RequestAdapterStatus::Success";
         break;
-      case RequestAdapterStatus::InstanceDropped:
-        o << "RequestAdapterStatus::InstanceDropped";
+      case RequestAdapterStatus::CallbackCancelled:
+        o << "RequestAdapterStatus::CallbackCancelled";
         break;
       case RequestAdapterStatus::Unavailable:
         o << "RequestAdapterStatus::Unavailable";
@@ -813,8 +819,8 @@ namespace wgpu {
       case RequestDeviceStatus::Success:
         o << "RequestDeviceStatus::Success";
         break;
-      case RequestDeviceStatus::InstanceDropped:
-        o << "RequestDeviceStatus::InstanceDropped";
+      case RequestDeviceStatus::CallbackCancelled:
+        o << "RequestDeviceStatus::CallbackCancelled";
         break;
       case RequestDeviceStatus::Error:
         o << "RequestDeviceStatus::Error";
@@ -868,6 +874,9 @@ namespace wgpu {
         break;
       case SType::EmscriptenSurfaceSourceCanvasHTMLSelector:
         o << "SType::EmscriptenSurfaceSourceCanvasHTMLSelector";
+        break;
+      case SType::DawnCompilationMessageUtf16:
+        o << "SType::DawnCompilationMessageUtf16";
         break;
           default:
             o << "SType::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<SType>::type>(value);
@@ -1009,8 +1018,11 @@ namespace wgpu {
   template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, SurfaceGetCurrentTextureStatus value) {
       switch (value) {
-      case SurfaceGetCurrentTextureStatus::Success:
-        o << "SurfaceGetCurrentTextureStatus::Success";
+      case SurfaceGetCurrentTextureStatus::SuccessOptimal:
+        o << "SurfaceGetCurrentTextureStatus::SuccessOptimal";
+        break;
+      case SurfaceGetCurrentTextureStatus::SuccessSuboptimal:
+        o << "SurfaceGetCurrentTextureStatus::SuccessSuboptimal";
         break;
       case SurfaceGetCurrentTextureStatus::Timeout:
         o << "SurfaceGetCurrentTextureStatus::Timeout";
@@ -1020,12 +1032,6 @@ namespace wgpu {
         break;
       case SurfaceGetCurrentTextureStatus::Lost:
         o << "SurfaceGetCurrentTextureStatus::Lost";
-        break;
-      case SurfaceGetCurrentTextureStatus::OutOfMemory:
-        o << "SurfaceGetCurrentTextureStatus::OutOfMemory";
-        break;
-      case SurfaceGetCurrentTextureStatus::DeviceLost:
-        o << "SurfaceGetCurrentTextureStatus::DeviceLost";
         break;
       case SurfaceGetCurrentTextureStatus::Error:
         o << "SurfaceGetCurrentTextureStatus::Error";

@@ -5,40 +5,15 @@
  */
 
 /*
- * Dawn's fork of Emscripten's WebGPU bindings.
+ * Dawn's fork of Emscripten's WebGPU bindings. This will be contributed back to
+ * Emscripten after reaching approximately webgpu.h "1.0".
  *
  * IMPORTANT: See //src/emdawnwebgpu/README.md for info on how to use this.
- * - It must be linked in the correct order with other files.
- * - It must sit next to the struct_info json files.
  */
 
 {{{
-  if (USE_WEBGPU || !__HAVE_EMDAWNWEBGPU_ENUM_TABLES || !__HAVE_EMDAWNWEBGPU_SIG_INFO) {
-    throw new Error("To use emdawnwebgpu's library_webgpu.js, disable -sUSE_WEBGPU and first include Dawn's library_webgpu_enum_tables.js and library_webgpu_generated_sig_info.js (before library_webgpu.js)");
-  }
-
-  // Load struct info for webgpu.h.
-  {
-    // Clear out all of the old struct info from Emscripten's built-in copy.
-    // (We do this rather than just overwrite, because many structs have been renamed.
-    // We want to make sure we don't accidentally refer to structs that don't exist anymore.)
-    for (const k of Object.keys(C_STRUCTS)) {
-        if (k.startsWith('WGPU')) {
-            delete C_STRUCTS[k];
-        }
-    }
-
-    // Load data from the JSON files into C_STRUCTS.
-    const jsonFile = MEMORY64 ?
-      'webgpu_generated_struct_info64.json' :
-      'webgpu_generated_struct_info32.json';
-    loadStructInfo(__dirname + '/' + jsonFile);
-
-    // Double check that the struct info was generated from the right header.
-    // (The include directory option of gen_struct_info.py affects this.)
-    if (!('WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER' in C_STRUCTS)) {
-        throw new Error(`${jsonFile} generation error - need webgpu.h from Dawn, got it from Emscripten`);
-    }
+  if (USE_WEBGPU || !__HAVE_EMDAWNWEBGPU_STRUCT_INFO || !__HAVE_EMDAWNWEBGPU_ENUM_TABLES || !__HAVE_EMDAWNWEBGPU_SIG_INFO) {
+    throw new Error("To use Dawn's library_webgpu.js, disable -sUSE_WEBGPU and first include Dawn's library_webgpu_struct_info.js and library_webgpu_enum_tables.js (before library_webgpu.js)");
   }
 
   // Helper functions for code generation
@@ -69,7 +44,7 @@
     makeGetU64: function(struct, offset) {
       var l = makeGetValue(struct, offset, 'u32');
       var h = makeGetValue(`(${struct} + 4)`, offset, 'u32')
-      return `${h} * 0x100000000 + ${l}`
+      return `(${h} * 0x100000000 + ${l})`
     },
     makeCheck: function(str) {
       if (!ASSERTIONS) return '';
@@ -167,10 +142,16 @@ var LibraryWebGPU = {
     {{{ gpu.makeImportJsObject('BindGroupLayout') }}}
     importJsBuffer__deps: ['emwgpuCreateBuffer'],
     importJsBuffer: (buffer, parentPtr = 0) => {
-      // At the moment, only allow importing unmapped buffers.
-      assert(buffer.mappedState == "unmapped");
-      var bufferPtr = _emwgpuCreateBuffer(parentPtr);
+      // At the moment, we do not allow importing pending buffers.
+      assert(buffer.mapState != "pending");
+      var mapState = buffer.mapState == "mapped" ?
+        {{{ gpu.BufferMapState.Mapped }}} :
+        {{{ gpu.BufferMapState.Unmapped }}};
+      var bufferPtr = _emwgpuCreateBuffer(parentPtr, mapState);
       WebGPU.Internals.jsObjectInsert(bufferPtr, buffer);
+      if (buffer.mapState == "mapped") {
+        WebGPU.Internals.bufferOnUnmaps[bufferPtr] = [];
+      }
       return bufferPtr;
     },
     {{{ gpu.makeImportJsObject('CommandBuffer') }}}
@@ -585,7 +566,6 @@ var LibraryWebGPU = {
       setLimitValueU64('maxBufferSize', {{{ C_STRUCTS.WGPULimits.maxBufferSize }}});
       setLimitValueU32('maxVertexAttributes', {{{ C_STRUCTS.WGPULimits.maxVertexAttributes }}});
       setLimitValueU32('maxVertexBufferArrayStride', {{{ C_STRUCTS.WGPULimits.maxVertexBufferArrayStride }}});
-      setLimitValueU32('maxInterStageShaderComponents', {{{ C_STRUCTS.WGPULimits.maxInterStageShaderComponents }}});
       setLimitValueU32('maxInterStageShaderVariables', {{{ C_STRUCTS.WGPULimits.maxInterStageShaderVariables }}});
       setLimitValueU32('maxColorAttachments', {{{ C_STRUCTS.WGPULimits.maxColorAttachments }}});
       setLimitValueU32('maxColorAttachmentBytesPerSample', {{{ C_STRUCTS.WGPULimits.maxColorAttachmentBytesPerSample }}});
@@ -749,7 +729,7 @@ var LibraryWebGPU = {
     strPtr += descriptionLen;
 
     {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.backendType, gpu.BackendType.WebGPU, 'i32') }}};
-    var adapterType = adapter.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
+    var adapterType = adapter.info.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
     {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.adapterType, 'adapterType', 'i32') }}};
     {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.vendorID, '0', 'i32') }}};
     {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.deviceID, '0', 'i32') }}};
@@ -824,7 +804,6 @@ var LibraryWebGPU = {
         setLimitU64IfDefined("maxBufferSize", {{{ C_STRUCTS.WGPULimits.maxBufferSize }}});
         setLimitU32IfDefined("maxVertexAttributes", {{{ C_STRUCTS.WGPULimits.maxVertexAttributes }}});
         setLimitU32IfDefined("maxVertexBufferArrayStride", {{{ C_STRUCTS.WGPULimits.maxVertexBufferArrayStride }}});
-        setLimitU32IfDefined("maxInterStageShaderComponents", {{{ C_STRUCTS.WGPULimits.maxInterStageShaderComponents }}});
         setLimitU32IfDefined("maxInterStageShaderVariables", {{{ C_STRUCTS.WGPULimits.maxInterStageShaderVariables }}});
         setLimitU32IfDefined("maxColorAttachments", {{{ C_STRUCTS.WGPULimits.maxColorAttachments }}});
         setLimitU32IfDefined("maxColorAttachmentBytesPerSample", {{{ C_STRUCTS.WGPULimits.maxColorAttachmentBytesPerSample }}});
@@ -1883,8 +1862,7 @@ var LibraryWebGPU = {
     strPtr += descriptionLen;
 
     {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.backendType, gpu.BackendType.WebGPU, 'i32') }}};
-    // TODO: Set the adapter type from adapter.isFallbackAdapter (not easily available here).
-    var adapterType = {{{ gpu.AdapterType.Unknown }}};
+    var adapterType = device.adapterInfo.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
     {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.adapterType, 'adapterType', 'i32') }}};
     {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.vendorID, '0', 'i32') }}};
     {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.deviceID, '0', 'i32') }}};
@@ -2412,22 +2390,28 @@ var LibraryWebGPU = {
 
       // Allocate and fill out each CompilationMessage.
       var compilationMessagesPtr = _malloc({{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * compilationInfo.messages.length);
+      var utf16sPtr = _malloc({{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * compilationInfo.messages.length);
       for (var i = 0; i < compilationInfo.messages.length; ++i) {
         var compilationMessage = compilationInfo.messages[i];
         var compilationMessagePtr = compilationMessagesPtr + {{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * i;
+        var utf16Ptr = utf16sPtr + {{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * i;
 
         // Write out the values to the CompilationMessage.
         WebGPU.setStringView(compilationMessagePtr + {{{ C_STRUCTS.WGPUCompilationMessage.message }}}, messagesPtr, messageLengths[i]);
+        // TODO: Convert JavaScript's UTF-16-code-unit offsets to UTF-8-code-unit offsets.
+        // https://github.com/webgpu-native/webgpu-headers/issues/246
+        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.nextInChain, 'utf16Ptr', '*') }}};
         {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.type, 'WebGPU.Int_CompilationMessageType[compilationMessage.type]', 'i32') }}};
         {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.lineNum, 'compilationMessage.lineNum', 'i64') }}};
         {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.linePos, 'compilationMessage.linePos', 'i64') }}};
         {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.offset, 'compilationMessage.offset', 'i64') }}};
         {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.length, 'compilationMessage.length', 'i64') }}};
-        // TODO: Convert JavaScript's UTF-16-code-unit offsets to UTF-8-code-unit offsets.
-        // https://github.com/webgpu-native/webgpu-headers/issues/246
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.utf16LinePos, 'compilationMessage.linePos', 'i64') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.utf16Offset, 'compilationMessage.offset', 'i64') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.utf16Length, 'compilationMessage.length', 'i64') }}};
+
+        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.next, '0', '*') }}};
+        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.sType, gpu.SType.DawnCompilationMessageUtf16, 'i32') }}};
+        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.linePos, 'compilationMessage.linePos', 'i64') }}};
+        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.offset, 'compilationMessage.offset', 'i64') }}};
+        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.length, 'compilationMessage.length', 'i64') }}};
 
         // Write the string out to the allocated buffer. Note we have to add 1
         // to the length of the string to ensure enough space for the null
@@ -2523,18 +2507,15 @@ var LibraryWebGPU = {
       var texturePtr = _emwgpuCreateTexture({{{ gpu.NULLPTR }}});
       WebGPU.Internals.jsObjectInsert(texturePtr, context.getCurrentTexture());
       {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.texture, 'texturePtr', '*') }}};
-      {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.suboptimal, '0', 'i32') }}};
       {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.status,
-        gpu.SurfaceGetCurrentTextureStatus.Success, 'i32') }}};
+        gpu.SurfaceGetCurrentTextureStatus.SuccessOptimal, 'i32') }}};
     } catch (ex) {
 #if ASSERTIONS
       err(`wgpuSurfaceGetCurrentTexture() failed: ${ex}`);
 #endif
       {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.texture, '0', '*') }}};
-      {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.suboptimal, '0', 'i32') }}};
-      // TODO(https://github.com/webgpu-native/webgpu-headers/issues/291): What should the status be here?
       {{{ makeSetValue('surfaceTexturePtr', C_STRUCTS.WGPUSurfaceTexture.status,
-        gpu.SurfaceGetCurrentTextureStatus.DeviceLost, 'i32') }}};
+        gpu.SurfaceGetCurrentTextureStatus.Error, 'i32') }}};
     }
   },
 

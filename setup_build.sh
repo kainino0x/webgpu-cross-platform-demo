@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-dawn_revision=a83c16ba042361f2a6dd0a0210d3ecbb32f0d727
+dawn_revision=d086f035b41d1070fe785d0e9c76cd57eda011f6
 
 function usage {
     echo "Usage:"
