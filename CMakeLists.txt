@@ -14,7 +14,7 @@ option(DEMO_USE_SANITIZERS "Enable ASan/UBSan" OFF)
 option(DEMO_USE_GLFW "Demo use glfw for native window platform" ON)
 
 # Options for Emscripten build (ignored otherwise)
-option(DEMO_USE_ASYNCIFY "Set -sASYNCIFY to 0 (off), 1 (asyncify), or 2 (JSPI)" 1)
+set(DEMO_USE_ASYNCIFY 1 CACHE STRING "Set -sASYNCIFY to 0 (off), 1 (classic Asyncify), or 2 (JSPI)")
 option(DEMO_USE_WASM_4GB "Use Wasm 4GB (triggers CAN_ADDRESS_2GB for Memory32 builds)" OFF)
 option(DEMO_USE_WASM_BIGINT "Set -sWASM_BIGINT=1" OFF)
 option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
