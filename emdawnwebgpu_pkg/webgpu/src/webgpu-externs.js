@@ -1,4 +1,9 @@
 /*
+ * Copyright 2025 The Emscripten Authors.  All rights reserved.
+ * Emscripten is available under two separate licenses, the MIT license and the
+ * University of Illinois/NCSA Open Source License.  Both these licenses can be
+ * found in the LICENSE file.
+ *
  * WebGPU globals
  * Generated using https://github.com/kainino0x/webidl-to-closure-externs
  * against the spec's WebIDL: https://gpuweb.github.io/gpuweb/webgpu.idl

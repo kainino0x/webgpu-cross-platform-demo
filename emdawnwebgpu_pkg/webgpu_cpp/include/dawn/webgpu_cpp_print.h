@@ -543,9 +543,6 @@ namespace wgpu {
       case FeatureName::CoreFeaturesAndLimits:
         o << "FeatureName::CoreFeaturesAndLimits";
         break;
-      case FeatureName::SubgroupsF16:
-        o << "FeatureName::SubgroupsF16";
-        break;
       case FeatureName::Unorm16TextureFormats:
         o << "FeatureName::Unorm16TextureFormats";
         break;

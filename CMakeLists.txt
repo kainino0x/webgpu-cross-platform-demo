@@ -46,8 +46,9 @@ endif()
 
 if (EMSCRIPTEN)
     add_compile_options(
-        # We use this as both a compile flag and a link flag. Here, it sets the include path.
-        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/port.py"
+        # Use ports at compile time, to set include paths.
+        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
+        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu_cpp.port.py"
         "-Wall"
         "-Wextra"
         #"-Weverything"
@@ -107,9 +108,9 @@ if (EMSCRIPTEN)
         SUFFIX ".html")
     target_link_options(hello
         PRIVATE
-            # We use this as both a compile flag and a link flag. Here, it links emdawnwebgpu.
-            "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/port.py"
-            "--closure-args=--externs=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg_snapshot/src/webgpu-externs.js"
+            # Link to the webgpu.h implementation.
+            "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
+            "--closure-args=--externs=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/webgpu/src/webgpu-externs.js"
 
             # DWARF symbols are enabled by default (-g). To use, follow:
             # https://developer.chrome.com/blog/wasm-debugging-2020/

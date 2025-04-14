@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-dawn_revision=d086f035b41d1070fe785d0e9c76cd57eda011f6
+dawn_revision=d0390759952b054e6d608ace7818f3651fb0fe28
 
 function usage {
     echo "Usage:"
@@ -55,4 +55,4 @@ cd out/wasm
 "$emscripten/emcmake" cmake ../..
 make clean
 make -j4 emdawnwebgpu_pkg
-rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg_snapshot/
+rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg/

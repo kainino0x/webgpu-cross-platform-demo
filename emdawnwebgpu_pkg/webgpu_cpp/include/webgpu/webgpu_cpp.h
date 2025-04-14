@@ -272,7 +272,6 @@ enum class FeatureName : uint32_t {
     DualSourceBlending = WGPUFeatureName_DualSourceBlending,
     Subgroups = WGPUFeatureName_Subgroups,
     CoreFeaturesAndLimits = WGPUFeatureName_CoreFeaturesAndLimits,
-    SubgroupsF16 = WGPUFeatureName_SubgroupsF16,
     Unorm16TextureFormats = WGPUFeatureName_Unorm16TextureFormats,
     Snorm16TextureFormats = WGPUFeatureName_Snorm16TextureFormats,
     MultiDrawIndirect = WGPUFeatureName_MultiDrawIndirect,

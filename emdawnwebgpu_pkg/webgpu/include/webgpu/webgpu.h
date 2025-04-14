@@ -380,10 +380,9 @@ typedef enum WGPUFeatureName {
     WGPUFeatureName_DualSourceBlending = 0x00000010,
     WGPUFeatureName_Subgroups = 0x00000011,
     WGPUFeatureName_CoreFeaturesAndLimits = 0x00000012,
-    WGPUFeatureName_SubgroupsF16 = 0x00050008,
-    WGPUFeatureName_Unorm16TextureFormats = 0x0005000D,
-    WGPUFeatureName_Snorm16TextureFormats = 0x0005000E,
-    WGPUFeatureName_MultiDrawIndirect = 0x00050035,
+    WGPUFeatureName_Unorm16TextureFormats = 0x0005000C,
+    WGPUFeatureName_Snorm16TextureFormats = 0x0005000D,
+    WGPUFeatureName_MultiDrawIndirect = 0x00050034,
     WGPUFeatureName_Force32 = 0x7FFFFFFF
 } WGPUFeatureName WGPU_ENUM_ATTRIBUTE;
 typedef enum WGPUFilterMode {
