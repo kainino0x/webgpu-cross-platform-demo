@@ -37,6 +37,8 @@ static wgpu::Instance instance;
 static wgpu::Device device;
 static wgpu::Queue queue;
 static wgpu::RenderPipeline pipeline;
+static constexpr uint32_t kBindGroupOffset = 256;
+static wgpu::BindGroup bindgroup;
 static int testsStarted = 0;
 static int testsCompleted = 0;
 
@@ -380,6 +382,8 @@ wgpu::Device GetDevice(wgpu::DeviceDescriptor* descriptor) {
 #endif  // __EMSCRIPTEN__
 
 static const char shaderCode[] = R"(
+    @binding(0) @group(0) var<uniform> uColor : vec4f;
+
     @vertex
     fn main_v(@builtin(vertex_index) idx: u32) -> @builtin(position) vec4<f32> {
         var pos = array<vec2<f32>, 3>(
@@ -388,7 +392,7 @@ static const char shaderCode[] = R"(
     }
     @fragment
     fn main_f() -> @location(0) vec4<f32> {
-        return vec4<f32>(0.0, 0.502, 1.0, 1.0); // 0x80/0xff ~= 0.502
+        return uColor;
     }
 )";
 
@@ -415,20 +419,52 @@ void init() {
         shaderModule = device.CreateShaderModule(&descriptor);
     }
 
+    wgpu::BindGroupLayout bgl;
     {
-        wgpu::BindGroupLayoutDescriptor bglDesc{};
-        auto bgl = device.CreateBindGroupLayout(&bglDesc);
-        wgpu::BindGroupDescriptor desc{};
-        desc.layout = bgl;
-        desc.entryCount = 0;
-        desc.entries = nullptr;
-        device.CreateBindGroup(&desc);
+        wgpu::BindGroupLayoutEntry bglEntry{
+            .binding = 0,
+            .visibility = wgpu::ShaderStage::Fragment,
+            .buffer = {
+                .type = wgpu::BufferBindingType::Uniform,
+                .hasDynamicOffset = true,
+            },
+        };
+        wgpu::BindGroupLayoutDescriptor bglDesc{
+            .entryCount = 1,
+            .entries = &bglEntry,
+        };
+        bgl = device.CreateBindGroupLayout(&bglDesc);
+
+        static constexpr std::array<float, 4> kColor{0.0, 0.502, 1.0, 1.0}; // 0x80/0xff ~= 0.502
+        wgpu::BufferDescriptor uniformBufferDesc{
+            .usage = wgpu::BufferUsage::Uniform,
+            .size = kBindGroupOffset + sizeof(kColor),
+            .mappedAtCreation = true,
+        };
+        wgpu::Buffer uniformBuffer = device.CreateBuffer(&uniformBufferDesc);
+        {
+            float* mapped = reinterpret_cast<float*>(uniformBuffer.GetMappedRange(kBindGroupOffset));
+            memcpy(mapped, kColor.data(), sizeof(kColor));
+            uniformBuffer.Unmap();
+        }
+
+        wgpu::BindGroupEntry bgEntry{
+            .binding = 0,
+            .buffer = uniformBuffer,
+            .size = sizeof(kColor),
+        };
+        wgpu::BindGroupDescriptor bgDesc{
+            .layout = bgl,
+            .entryCount = 1,
+            .entries = &bgEntry,
+        };
+        bindgroup = device.CreateBindGroup(&bgDesc);
     }
 
     {
         wgpu::PipelineLayoutDescriptor pl{};
-        pl.bindGroupLayoutCount = 0;
-        pl.bindGroupLayouts = nullptr;
+        pl.bindGroupLayoutCount = 1;
+        pl.bindGroupLayouts = &bgl;
 
         wgpu::ColorTargetState colorTargetState{};
         colorTargetState.format = wgpu::TextureFormat::BGRA8Unorm;
@@ -497,6 +533,7 @@ void render(wgpu::TextureView view, wgpu::TextureView depthStencilView) {
         {
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
             pass.SetPipeline(pipeline);
+            pass.SetBindGroup(0, bindgroup, 1, &kBindGroupOffset);
             pass.Draw(3);
             pass.End();
         }
