@@ -47,8 +47,7 @@ endif()
 if (EMSCRIPTEN)
     add_compile_options(
         # Use ports at compile time, to set include paths.
-        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
-        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu_cpp.port.py"
+        "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py:cpp_bindings=true"
         "-Wall"
         "-Wextra"
         #"-Weverything"
