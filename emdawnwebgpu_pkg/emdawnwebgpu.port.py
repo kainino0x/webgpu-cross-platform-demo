@@ -34,17 +34,22 @@ import os
 import zlib
 from typing import Union, Dict, Optional
 
-# User options, e.g. --use-port=path/to/emdawnwebgpu.port.py:cpp_bindings=false
+LICENSE = 'mixed licenses, see license files'
+
+# User options, e.g. --use-port=path/to/emdawnwebgpu.port.py:cpp_bindings=false:g=3:O=0
 OPTIONS = {
     'cpp_bindings':
-    'Add the include path for <webgpu/webgpu_cpp.h> C++ bindings. Enabled by default.',
+    'Add the include path for <webgpu/webgpu_cpp.h> C++ bindings. Default: true.',
+    'opt_level':
+    "Optimization (-O) level for the bindings' Wasm layer. Default: inherit from link flags.",
 }
-
 _VALID_OPTION_VALUES = {
     'cpp_bindings': ['true', 'false'],
+    'opt_level': ['inherit', '0', '1', '2', '3', 'g', 's', 'z'],
 }
 _opts: Dict[str, Union[Optional[str], bool]] = {
     'cpp_bindings': True,
+    'opt_level': 'inherit',
 }
 
 
@@ -98,26 +103,20 @@ def process_args(ports):
 # Hooks that affect linker invocations
 
 
-# Derive the compile flags for webgpu.cpp based on the linker flags of the
-# invocation that called --use-port.
+# If not explicitly set, derive the -O flag for webgpu.cpp based on the settings
+# of the linker invocation that has --use-port.
+# (Emscripten automatically handles LTO, PIC, and wasm64 options.)
 def _compute_flags(settings):
-    debug = f'-g{settings.DEBUG_LEVEL}'
+    value = _opts['opt_level']
+    if value == 'inherit':
+        if settings.SHRINK_LEVEL == 2:
+            value = 'z'
+        elif settings.SHRINK_LEVEL == 1:
+            value = 's'
+        else:
+            value = settings.OPT_LEVEL
 
-    if settings.SHRINK_LEVEL == 2:
-        opt = '-Oz'
-    elif settings.SHRINK_LEVEL == 1:
-        opt = '-Os'
-    else:
-        opt = f'-O{settings.OPT_LEVEL}'
-
-    if settings.LTO == 'full':
-        lto = ['-flto=full']
-    elif settings.LTO == 'thin':
-        lto = ['-flto=thin']
-    else:
-        lto = []
-
-    return [debug, opt] + lto
+    return [f'-O{value}']
 
 
 # Create a unique lib name for this version of the port and compile flags.
@@ -162,9 +161,8 @@ def get(ports, settings, shared):
         # include path via process_args(). The only thing we cache is the
         # compiled webgpu.cpp (which also includes webgpu/webgpu.h).
         includes = [_c_include_dir]
-        flags = ['-std=c++17', '-fno-exceptions'] + computed_flags
-        # TODO(crbug.com/371024051): Need to support -O and -g options.
-        # Is there a way to inherit these from the linker invocation?
+        # Always use -g. The linker can remove debug symbols in release builds.
+        flags = ['-g', '-std=c++17', '-fno-exceptions'] + computed_flags
 
         # IMPORTANT: Keep `_files_affecting_port_build` in sync with this.
         ports.build_port(

@@ -22,7 +22,14 @@ And to link the implementation, pass these emcc link flags:
     --use-port=path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py
     --closure-args=--externs=path/to/emdawnwebgpu_pkg/webgpu/src/webgpu-externs.js
 
-## C++ bindings
+## Port options
+
+Options can be set by appending `:key1=value:key2=value` to `--use-port`.
+For information about port options, run:
+
+    emcc --use-port=path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:help
+
+### C++ bindings
 
 By default, C++ bindings are provided in the include path. Note that unlike
 `webgpu.h`, these are not intended to be fully stable. If you don't want these
@@ -30,3 +37,11 @@ for any reason (you have custom bindings, you're using a pinned snapshot of
 `webgpu_cpp.h`, etc.), you can set the option `cpp_bindings=false`:
 
     --use-port=path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:cpp_bindings=false
+
+## Embuilder
+
+If your build process needs a separate step to build the port before linking,
+use Emscripten's `embuilder` (with `opt_level` set explicitly):
+
+    embuilder build path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:opt_level=2
+    embuilder build path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:opt_level=z
