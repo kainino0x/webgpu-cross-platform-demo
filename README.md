@@ -34,8 +34,9 @@ without it, you'll need to build manually with your own emsdk, because `build_al
 The web build has been mainly tested with Chrome Canary on Mac, but it should
 work on any conformant browser and supported platform.
 
-Once you have an [Emscripten SDK](https://emscripten.org/docs/tools_reference/emsdk.html),
-you can simply build it using `emcmake`:
+Once you have an [Emscripten SDK](https://emscripten.org/docs/tools_reference/emsdk.html), you can
+simply build it using `emcmake`. This will use the snapshot of `emdawnwebgpu` in this repository.
+You can also get newer releases of `emdawnwebgpu` from <https://github.com/google/dawn/releases>.
 
 ```sh
 mkdir out/web
