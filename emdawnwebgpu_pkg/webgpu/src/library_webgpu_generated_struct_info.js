@@ -59,6 +59,11 @@ const structInfo32 = (
             "texture": 48,
             "visibility": 8
         },
+        "WGPUBindGroupLayoutEntryArraySize": {
+            "__size__": 12,
+            "arraySize": 8,
+            "chain": 0
+        },
         "WGPUBlendComponent": {
             "__size__": 12,
             "dstFactor": 8,
@@ -650,6 +655,11 @@ const structInfo64 = (
             "storageTexture": 88,
             "texture": 64,
             "visibility": 16
+        },
+        "WGPUBindGroupLayoutEntryArraySize": {
+            "__size__": 24,
+            "arraySize": 16,
+            "chain": 0
         },
         "WGPUBlendComponent": {
             "__size__": 12,

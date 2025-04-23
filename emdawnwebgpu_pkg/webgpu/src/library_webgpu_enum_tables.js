@@ -263,6 +263,7 @@
             'SurfaceColorManagement': 10,
             'RequestAdapterWebXROptions': 11,
             'AdapterPropertiesSubgroups': 12,
+            'BindGroupLayoutEntryArraySize': 13,
             'TextureBindingViewDimensionDescriptor': 131072,
             'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
             'DawnCompilationMessageUtf16': 327743,

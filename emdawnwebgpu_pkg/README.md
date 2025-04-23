@@ -43,5 +43,5 @@ for any reason (you have custom bindings, you're using a pinned snapshot of
 If your build process needs a separate step to build the port before linking,
 use Emscripten's `embuilder` (with `opt_level` set explicitly):
 
+    embuilder build path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:opt_level=0
     embuilder build path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:opt_level=2
-    embuilder build path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py:opt_level=z

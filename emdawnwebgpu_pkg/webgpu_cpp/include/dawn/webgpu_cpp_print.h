@@ -866,6 +866,9 @@ namespace wgpu {
       case SType::AdapterPropertiesSubgroups:
         o << "SType::AdapterPropertiesSubgroups";
         break;
+      case SType::BindGroupLayoutEntryArraySize:
+        o << "SType::BindGroupLayoutEntryArraySize";
+        break;
       case SType::TextureBindingViewDimensionDescriptor:
         o << "SType::TextureBindingViewDimensionDescriptor";
         break;

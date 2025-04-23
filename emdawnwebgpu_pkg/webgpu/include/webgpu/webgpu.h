@@ -134,6 +134,7 @@ typedef struct WGPUTextureViewImpl* WGPUTextureView WGPU_OBJECT_ATTRIBUTE;
 struct WGPUINTERNAL_HAVE_EMDAWNWEBGPU_HEADER;
 struct WGPUAdapterPropertiesSubgroups;
 struct WGPUBindGroupEntry;
+struct WGPUBindGroupLayoutEntryArraySize;
 struct WGPUBlendComponent;
 struct WGPUBufferBindingLayout;
 struct WGPUColor;
@@ -499,6 +500,7 @@ typedef enum WGPUSType {
     WGPUSType_SurfaceColorManagement = 0x0000000A,
     WGPUSType_RequestAdapterWebXROptions = 0x0000000B,
     WGPUSType_AdapterPropertiesSubgroups = 0x0000000C,
+    WGPUSType_BindGroupLayoutEntryArraySize = 0x0000000D,
     WGPUSType_TextureBindingViewDimensionDescriptor = 0x00020000,
     WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector = 0x00040000,
     WGPUSType_DawnCompilationMessageUtf16 = 0x0005003F,
@@ -1012,6 +1014,20 @@ typedef struct WGPUBindGroupEntry {
     /*.size=*/WGPU_WHOLE_SIZE _wgpu_COMMA \
     /*.sampler=*/NULL _wgpu_COMMA \
     /*.textureView=*/NULL _wgpu_COMMA \
+})
+
+// Can be chained in WGPUBindGroupLayoutEntry
+typedef struct WGPUBindGroupLayoutEntryArraySize {
+    WGPUChainedStruct chain;
+    uint32_t arraySize;
+} WGPUBindGroupLayoutEntryArraySize WGPU_STRUCTURE_ATTRIBUTE;
+
+#define WGPU_BIND_GROUP_LAYOUT_ENTRY_ARRAY_SIZE_INIT _wgpu_MAKE_INIT_STRUCT(WGPUBindGroupLayoutEntryArraySize, { \
+    /*.chain=*/_wgpu_MAKE_INIT_STRUCT(WGPUChainedStruct, { \
+        /*.next=*/NULL _wgpu_COMMA \
+        /*.sType=*/WGPUSType_BindGroupLayoutEntryArraySize _wgpu_COMMA \
+    }) _wgpu_COMMA \
+    /*.arraySize=*/0 _wgpu_COMMA \
 })
 
 typedef struct WGPUBlendComponent {

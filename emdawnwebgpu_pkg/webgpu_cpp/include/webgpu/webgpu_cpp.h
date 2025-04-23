@@ -417,6 +417,7 @@ enum class SType : uint32_t {
     SurfaceColorManagement = WGPUSType_SurfaceColorManagement,
     RequestAdapterWebXROptions = WGPUSType_RequestAdapterWebXROptions,
     AdapterPropertiesSubgroups = WGPUSType_AdapterPropertiesSubgroups,
+    BindGroupLayoutEntryArraySize = WGPUSType_BindGroupLayoutEntryArraySize,
     TextureBindingViewDimensionDescriptor = WGPUSType_TextureBindingViewDimensionDescriptor,
     EmscriptenSurfaceSourceCanvasHTMLSelector = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector,
     DawnCompilationMessageUtf16 = WGPUSType_DawnCompilationMessageUtf16,
@@ -965,6 +966,7 @@ class TextureView;
 struct INTERNAL_HAVE_EMDAWNWEBGPU_HEADER;
 struct AdapterPropertiesSubgroups;
 struct BindGroupEntry;
+struct BindGroupLayoutEntryArraySize;
 struct BlendComponent;
 struct BufferBindingLayout;
 struct Color;
@@ -1744,6 +1746,18 @@ struct BindGroupEntry {
     uint64_t size = kWholeSize;
     Sampler sampler = nullptr;
     TextureView textureView = nullptr;
+};
+
+// Can be chained in BindGroupLayoutEntry
+struct BindGroupLayoutEntryArraySize : ChainedStruct {
+    inline BindGroupLayoutEntryArraySize();
+
+    struct Init;
+    inline BindGroupLayoutEntryArraySize(Init&& init);
+    inline operator const WGPUBindGroupLayoutEntryArraySize&() const noexcept;
+
+    static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(uint32_t ));
+    alignas(kFirstMemberAlignment) uint32_t arraySize = 0;
 };
 
 struct BlendComponent {
@@ -2614,6 +2628,26 @@ static_assert(offsetof(BindGroupEntry, sampler) == offsetof(WGPUBindGroupEntry, 
         "offsetof mismatch for BindGroupEntry::sampler");
 static_assert(offsetof(BindGroupEntry, textureView) == offsetof(WGPUBindGroupEntry, textureView),
         "offsetof mismatch for BindGroupEntry::textureView");
+
+// BindGroupLayoutEntryArraySize implementation
+BindGroupLayoutEntryArraySize::BindGroupLayoutEntryArraySize()
+  : ChainedStruct { nullptr, SType::BindGroupLayoutEntryArraySize } {}
+struct BindGroupLayoutEntryArraySize::Init {
+    ChainedStruct * const nextInChain;
+    uint32_t arraySize = 0;
+};
+BindGroupLayoutEntryArraySize::BindGroupLayoutEntryArraySize(BindGroupLayoutEntryArraySize::Init&& init)
+  : ChainedStruct { init.nextInChain, SType::BindGroupLayoutEntryArraySize }, 
+    arraySize(std::move(init.arraySize)){}
+
+BindGroupLayoutEntryArraySize::operator const WGPUBindGroupLayoutEntryArraySize&() const noexcept {
+    return *reinterpret_cast<const WGPUBindGroupLayoutEntryArraySize*>(this);
+}
+
+static_assert(sizeof(BindGroupLayoutEntryArraySize) == sizeof(WGPUBindGroupLayoutEntryArraySize), "sizeof mismatch for BindGroupLayoutEntryArraySize");
+static_assert(alignof(BindGroupLayoutEntryArraySize) == alignof(WGPUBindGroupLayoutEntryArraySize), "alignof mismatch for BindGroupLayoutEntryArraySize");
+static_assert(offsetof(BindGroupLayoutEntryArraySize, arraySize) == offsetof(WGPUBindGroupLayoutEntryArraySize, arraySize),
+        "offsetof mismatch for BindGroupLayoutEntryArraySize::arraySize");
 
 // BlendComponent implementation
 

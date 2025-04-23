@@ -41,15 +41,15 @@ OPTIONS = {
     'cpp_bindings':
     'Add the include path for <webgpu/webgpu_cpp.h> C++ bindings. Default: true.',
     'opt_level':
-    "Optimization (-O) level for the bindings' Wasm layer. Default: inherit from link flags.",
+    "Optimization (-O) level for the bindings' Wasm layer. Default: choose based on -sASSERTIONS.",
 }
 _VALID_OPTION_VALUES = {
     'cpp_bindings': ['true', 'false'],
-    'opt_level': ['inherit', '0', '1', '2', '3', 'g', 's', 'z'],
+    'opt_level': ['auto', '0', '2'],
 }
 _opts: Dict[str, Union[Optional[str], bool]] = {
     'cpp_bindings': True,
-    'opt_level': 'inherit',
+    'opt_level': 'auto',
 }
 
 
@@ -103,19 +103,14 @@ def process_args(ports):
 # Hooks that affect linker invocations
 
 
-# If not explicitly set, derive the -O flag for webgpu.cpp based on the settings
-# of the linker invocation that has --use-port.
-# (Emscripten automatically handles LTO, PIC, and wasm64 options.)
+# If not explicitly set, use -O0 when linking with -sASSERTIONS builds, and -O2
+# otherwise. (ASSERTIONS implicitly affects library_webgpu.js, so it makes sense
+# for it to control this too - debuggability is most useful with assertions.)
+# Emscripten automatically handles necessary compile flags (LTO, PIC, wasm64).
 def _compute_flags(settings):
     value = _opts['opt_level']
-    if value == 'inherit':
-        if settings.SHRINK_LEVEL == 2:
-            value = 'z'
-        elif settings.SHRINK_LEVEL == 1:
-            value = 's'
-        else:
-            value = settings.OPT_LEVEL
-
+    if value == 'auto':
+        value = '0' if settings.ASSERTIONS else '2'
     return [f'-O{value}']
 
 
@@ -139,14 +134,16 @@ def linker_setup(ports, settings):
     if settings.USE_WEBGPU:
         raise Exception('emdawnwebgpu may not be used with -sUSE_WEBGPU=1')
 
+    # These will be processed in order; library_webgpu.js must come after
+    # the generated files, because it depends on them.
     settings.JS_LIBRARIES += [
         os.path.join(_src_dir, 'library_webgpu_enum_tables.js'),
         os.path.join(_src_dir, 'library_webgpu_generated_struct_info.js'),
         os.path.join(_src_dir, 'library_webgpu_generated_sig_info.js'),
         os.path.join(_src_dir, 'library_webgpu.js'),
     ]
-    # TODO(crbug.com/371024051): Emscripten needs a way for us to pass
-    # --closure-args too.
+    # TODO(crbug.com/371024051): Pass --closure-args here too, when possible.
+    # https://github.com/emscripten-core/emscripten/issues/24109
 
 
 def get(ports, settings, shared):
