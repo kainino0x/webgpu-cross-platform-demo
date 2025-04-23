@@ -1,7 +1,7 @@
 #!/bin/bash
 
-if [ ! -f "build_all.sh" ] ; then
-    echo "build_all.sh must be called from project root"
+if [ ! -f "build_web_many_configs.sh" ] ; then
+    echo "build_web_many_configs.sh must be called from project root"
     exit 1
 fi
 
