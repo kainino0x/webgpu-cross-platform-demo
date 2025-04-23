@@ -1,0 +1,2 @@
+Switch to stackSave/stackRestore, see https://github.com/emscripten-core/emscripten/pull/21764
+(As a bonus this _may_ fix the "depends on internal symbol" warning, but it doesn't really matter.)

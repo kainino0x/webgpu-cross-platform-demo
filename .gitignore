@@ -1,9 +1,3 @@
-/out/*/*
-!/out/webdbg/hello.html
-!/out/webdbg/hello.js
-!/out/webdbg/hello.wasm
-!/out/webdbg/hello.wasm.map
-!/out/webrel/hello.html
-!/out/webrel/hello.js
-!/out/webrel/hello.wasm
-/third_party/dawn/
+/index.html
+/out/
+/third_party/

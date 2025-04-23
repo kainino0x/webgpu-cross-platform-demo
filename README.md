@@ -1,12 +1,14 @@
-This is a small test app that uses WebGPU's unofficial
+This is a small test app that uses WebGPU's
 [`webgpu.h` header](https://github.com/webgpu-native/webgpu-headers/blob/main/webgpu.h)
 as a platform-agnostic hardware abstraction layer.
 It uses a C++ layer over `webgpu.h`, called `webgpu_cpp.h`.
+
 On native platforms, this project can be built against
 [Dawn](https://dawn.googlesource.com/dawn/), Chromium's native WebGPU implementation.
-On the Web, this project can be built against Emscripten, which implements `webgpu.h`
-on top of the browser's own WebGPU JavaScript API (if
-[enabled](https://github.com/gpuweb/gpuweb/wiki/Implementation-Status)).
+
+On the Web, this project can be built against Emscripten, using Dawn's "emdawnwebgpu"
+implementation of `webgpu.h` on top of the browser's own WebGPU JavaScript API.
+
 It currently hasn't been set up to build against
 [wgpu-native](https://github.com/gfx-rs/wgpu-native)'s `webgpu.h` implementation,
 but that is a goal.
@@ -20,29 +22,53 @@ but that is a goal.
 
 ## Building
 
-Instructions are for Linux/Mac; they will need to be adapted to work on Windows.
+Instructions are for Linux/Mac; Windows builds should work, but you need to
+adjust the command syntax accordingly.
+
+This setup step is always required for native builds.
+For web builds, it is only strictly needed if you need to rebuild `emdawnwebgpu_pkg` (but
+without it, you'll need to build manually with your own emsdk, because `build_all.sh` uses Dawn's).
+
+### Web build
+
+The web build has been mainly tested with Chrome Canary on Mac, but it should
+work on any conformant browser and supported platform.
+
+Once you have an [Emscripten SDK](https://emscripten.org/docs/tools_reference/emsdk.html), you can
+simply build it using `emcmake`. This will use the snapshot of `emdawnwebgpu` in this repository.
+You can also get newer releases of `emdawnwebgpu` from <https://github.com/google/dawn/releases>.
+
+```sh
+mkdir out/web
+cd out/web
+path/to/emcmake cmake ../.. -DDEMO_USE_ASYNCIFY=1  # Add other flags here as desired
+make -j4
+```
+
+For development of emdawnwebgpu, there's a script that will build a bunch of
+different variants. To use this, set up the Dawn dependency, which regenerates
+`emdawnwebgpu_pkg`, and then run this script (which uses Dawn's copy of emsdk):
+
+```sh
+./setup_build.sh --checkout=1
+./build_web_many_configs.sh --parallel=0
+```
 
 ### Native build
 
-Build has been tested on Linux/Mac/Win10.
+Build has been tested on Linux/Mac/Win10 (though may be broken on some platforms).
 
 ```sh
-./setup_native_build.sh
 mkdir -p out/native
 cd out/native
-```
 
-Then:
+# Using Make:
+cmake ../..  # Add -DCMAKE_BUILD_TYPE=Release, -DDEMO_USE_GLFW=OFF, etc. here as desired
+make clean
+make -j4 all
 
-```sh
-cmake ../..
-make -j4 clean all
-```
-
-Or, to use Ninja instead of Make:
-
-```sh
-cmake -GNinja ../..
+# Or, to use Ninja instead of Make:
+cmake -GNinja ../..  # Add flags here as desired
 ninja
 ```
 
@@ -75,37 +101,3 @@ Alternatively, you can disable using glfw and window display by
 ```sh
 cmake ../.. -DDEMO_USE_GLFW=OFF
 ```
-
-### Web build
-
-This has been mainly tested with Chrome Canary on Mac, but should work on
-Chrome/Edge/Firefox on any platform with support (modulo compatibility differences due to
-pre-release spec changes).
-Requires `chrome://flags/#enable-unsafe-webgpu` on Chrome/Edge.
-
-**Note:** To build, the active Emscripten version must be recent.
-Use the latest Emscripten version for best results including bugfixes to the WebGPU bindings.
-
-```sh
-# Make sure Emscripten tools are in the path.
-source /path/to/emsdk/emsdk_env.sh
-
-mkdir -p out/web
-cd out/web
-```
-
-Then:
-
-```sh
-emcmake cmake ../..
-make -j4 clean all
-```
-
-Or, to use Ninja instead of Make:
-
-```sh
-emcmake cmake -GNinja ../..
-ninja
-```
-
-There are shorthands for these in `package.json` so you can use, for example, `npm run ninja-web`.
