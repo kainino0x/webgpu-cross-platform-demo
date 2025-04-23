@@ -403,7 +403,7 @@ void init() {
     {
         wgpu::BufferDescriptor descriptor{};
         descriptor.usage = wgpu::BufferUsage::CopyDst;
-        descriptor.size = 0x1000'0000'0000ULL;
+        descriptor.size = 0x10'0000'0000'0000ULL;
         descriptor.mappedAtCreation = true;
         wgpu::Buffer bufferTooLarge = device.CreateBuffer(&descriptor);
         assert(bufferTooLarge == nullptr);
