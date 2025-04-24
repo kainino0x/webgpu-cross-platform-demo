@@ -20,10 +20,6 @@ project_dir="$PWD"
 emsdk="$project_dir/third_party/dawn/third_party/emsdk"
 emscripten="$emsdk/upstream/emscripten"
 
-# Dawn sets up $emsdk/.emscripten to point to a copy of LLVM that's missing a file. Use the default
-# one instead. If you use a normal copy of emsdk to build, then you don't have to worry about this.
-export EM_CONFIG="$emsdk/.emscripten.emsdk_original"
-
 # build_one BUILD_DIR CMAKE_FLAGS...
 function build_one {
     build_dir="$1"

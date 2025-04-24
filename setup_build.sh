@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-dawn_revision=7237138b9eadb747658cbc6c08881c5493997e2e
+dawn_revision=3c86bd24092e8be1f80fb42b9f8195e8e8136e09
 
 function usage {
     echo "Usage:"
@@ -28,13 +28,13 @@ else
     cd dawn
 fi
 if [ "$1" == "--checkout=1" ] ; then
-    git checkout --detach $dawn_revision -- || ( git fetch --tags --depth 1 origin $dawn_revision && git checkout --detach FETCH_HEAD )
+    git checkout --detach $dawn_revision -- || ( git fetch --depth=1 origin $dawn_revision && git checkout --detach FETCH_HEAD )
 
-    # Set up the repo for a build, needed regardless of native vs. wasm or gn vs. cmake.
+    # Set up the repo for a build, needed regardless of build system, both for
+    # native and for rebuilding emdawnwebgpu_pkg.
+    git submodule update --init --depth=1 third_party/depot_tools
     cp scripts/standalone-with-wasm.gclient .gclient
-    # TODO: perhaps get our own copy of gclient so the user of this script doesn't have to install it
-    # ... or alternatively, use Dawn's scripts/fetch_dawn_dependencies.py instead
-    gclient sync -D
+    third_party/depot_tools/gclient sync -D
 
     rm -rf out/wasm/
 elif [ "$1" == "--checkout=0" ] ; then
