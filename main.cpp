@@ -790,7 +790,7 @@ bool frame() {
     swapChain.Present();
 #endif
 
-    return true; // Continue the requestAnimationFrame loop
+    return true; // Continue the requestAnimationFrame loop (Wasm) or main loop (native)
 }
 
 void run() {
