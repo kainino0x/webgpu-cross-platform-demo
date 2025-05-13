@@ -572,6 +572,9 @@ var LibraryWebGPU = {
       setLimitValueU32('maxComputeWorkgroupSizeY', {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupSizeY }}});
       setLimitValueU32('maxComputeWorkgroupSizeZ', {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupSizeZ }}});
       setLimitValueU32('maxComputeWorkgroupsPerDimension', {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupsPerDimension }}});
+
+      // Non-standard. If this is undefined, it will correctly just cast to 0.
+      setLimitValueU32('maxImmediateSize', {{{ C_STRUCTS.WGPULimits.maxImmediateSize }}});
     },
 
     // Maps from enum string back to enum number, for callbacks.
@@ -763,10 +766,10 @@ var LibraryWebGPU = {
       if (limitsPtr) {
         {{{ gpu.makeCheckDescriptor('limitsPtr') }}}
         var requiredLimits = {};
-        function setLimitU32IfDefined(name, limitOffset) {
+        function setLimitU32IfDefined(name, limitOffset, ignoreIfZero=false) {
           var ptr = limitsPtr + limitOffset;
           var value = {{{ gpu.makeGetU32('ptr', 0) }}};
-          if (value != {{{ gpu.LIMIT_U32_UNDEFINED }}}) {
+          if (value != {{{ gpu.LIMIT_U32_UNDEFINED }}} && (!ignoreIfZero || value != 0)) {
             requiredLimits[name] = value;
           }
         }
@@ -810,6 +813,10 @@ var LibraryWebGPU = {
         setLimitU32IfDefined("maxComputeWorkgroupSizeY", {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupSizeY }}});
         setLimitU32IfDefined("maxComputeWorkgroupSizeZ", {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupSizeZ }}});
         setLimitU32IfDefined("maxComputeWorkgroupsPerDimension", {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupsPerDimension }}});
+
+        // Non-standard. If this is 0, avoid passing it through so it won't cause an error.
+        setLimitU32IfDefined("maxImmediateSize", {{{ C_STRUCTS.WGPULimits.maxImmediateSize }}}, true);
+
         desc["requiredLimits"] = requiredLimits;
       }
 
@@ -1229,7 +1236,7 @@ var LibraryWebGPU = {
     return ptr;
   },
 
-  wgpuCommandEncoderInsertDebugMarker2: (encoderPtr, markerLabelPtr) => {
+  wgpuCommandEncoderInsertDebugMarker: (encoderPtr, markerLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.insertDebugMarker(WebGPU.makeStringFromStringView(markerLabelPtr));
   },
@@ -1239,7 +1246,7 @@ var LibraryWebGPU = {
     encoder.popDebugGroup();
   },
 
-  wgpuCommandEncoderPushDebugGroup2: (encoderPtr, groupLabelPtr) => {
+  wgpuCommandEncoderPushDebugGroup: (encoderPtr, groupLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.pushDebugGroup(WebGPU.makeStringFromStringView(groupLabelPtr));
   },
@@ -1278,7 +1285,7 @@ var LibraryWebGPU = {
     pass.end();
   },
 
-  wgpuComputePassEncoderInsertDebugMarker2: (encoderPtr, markerLabelPtr) => {
+  wgpuComputePassEncoderInsertDebugMarker: (encoderPtr, markerLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.insertDebugMarker(WebGPU.makeStringFromStringView(markerLabelPtr));
   },
@@ -1288,7 +1295,7 @@ var LibraryWebGPU = {
     encoder.popDebugGroup();
   },
 
-  wgpuComputePassEncoderPushDebugGroup2: (encoderPtr, groupLabelPtr) => {
+  wgpuComputePassEncoderPushDebugGroup: (encoderPtr, groupLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.pushDebugGroup(WebGPU.makeStringFromStringView(groupLabelPtr));
   },
@@ -2163,7 +2170,7 @@ var LibraryWebGPU = {
     return ptr;
   },
 
-  wgpuRenderBundleEncoderInsertDebugMarker2: (encoderPtr, markerLabelPtr) => {
+  wgpuRenderBundleEncoderInsertDebugMarker: (encoderPtr, markerLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.insertDebugMarker(WebGPU.makeStringFromStringView(markerLabelPtr));
   },
@@ -2173,7 +2180,7 @@ var LibraryWebGPU = {
     encoder.popDebugGroup();
   },
 
-  wgpuRenderBundleEncoderPushDebugGroup2: (encoderPtr, groupLabelPtr) => {
+  wgpuRenderBundleEncoderPushDebugGroup: (encoderPtr, groupLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.pushDebugGroup(WebGPU.makeStringFromStringView(groupLabelPtr));
   },
@@ -2227,16 +2234,30 @@ var LibraryWebGPU = {
     pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
   },
 
-  wgpuRenderPassEncoderDrawIndexedIndirect: (passPtr, indirectBufferPtr, indirectOffset) => {
-    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
+  wgpuRenderPassEncoderDrawIndirect: (passPtr, indirectBufferPtr, indirectOffset) => {
     var pass = WebGPU.getJsObject(passPtr);
+    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
+    pass.drawIndirect(indirectBuffer, indirectOffset);
+  },
+
+  wgpuRenderPassEncoderDrawIndexedIndirect: (passPtr, indirectBufferPtr, indirectOffset) => {
+    var pass = WebGPU.getJsObject(passPtr);
+    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
     pass.drawIndexedIndirect(indirectBuffer, indirectOffset);
   },
 
-  wgpuRenderPassEncoderDrawIndirect: (passPtr, indirectBufferPtr, indirectOffset) => {
-    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
+  wgpuRenderPassEncoderMultiDrawIndirect: (passPtr, indirectBufferPtr, indirectOffset, maxDrawCount, drawCountBufferPtr, drawCountBufferOffset) => {
     var pass = WebGPU.getJsObject(passPtr);
-    pass.drawIndirect(indirectBuffer, indirectOffset);
+    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
+    var drawCountBuffer = WebGPU.getJsObject(drawCountBufferPtr);
+    pass.multiDrawIndirect(indirectBuffer, indirectOffset, maxDrawCount, drawCountBuffer, drawCountBufferOffset);
+  },
+
+  wgpuRenderPassEncoderMultiDrawIndexedIndirect: (passPtr, indirectBufferPtr, indirectOffset, maxDrawCount, drawCountBufferPtr, drawCountBufferOffset) => {
+    var pass = WebGPU.getJsObject(passPtr);
+    var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
+    var drawCountBuffer = WebGPU.getJsObject(drawCountBufferPtr);
+    pass.multiDrawIndexedIndirect(indirectBuffer, indirectOffset, maxDrawCount, drawCountBuffer, drawCountBufferOffset);
   },
 
   wgpuRenderPassEncoderEnd: (encoderPtr) => {
@@ -2261,7 +2282,7 @@ var LibraryWebGPU = {
     pass.executeBundles(bundles);
   },
 
-  wgpuRenderPassEncoderInsertDebugMarker2: (encoderPtr, markerLabelPtr) => {
+  wgpuRenderPassEncoderInsertDebugMarker: (encoderPtr, markerLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.insertDebugMarker(WebGPU.makeStringFromStringView(markerLabelPtr));
   },
@@ -2271,7 +2292,7 @@ var LibraryWebGPU = {
     encoder.popDebugGroup();
   },
 
-  wgpuRenderPassEncoderPushDebugGroup2: (encoderPtr, groupLabelPtr) => {
+  wgpuRenderPassEncoderPushDebugGroup: (encoderPtr, groupLabelPtr) => {
     var encoder = WebGPU.getJsObject(encoderPtr);
     encoder.pushDebugGroup(WebGPU.makeStringFromStringView(groupLabelPtr));
   },

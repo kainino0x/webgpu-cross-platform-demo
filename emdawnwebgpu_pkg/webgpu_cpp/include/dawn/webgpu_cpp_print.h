@@ -38,29 +38,6 @@
 namespace wgpu {
 
   template <typename CharT, typename Traits>
-  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, WGSLLanguageFeatureName value) {
-      switch (value) {
-      case WGSLLanguageFeatureName::ReadonlyAndReadwriteStorageTextures:
-        o << "WGSLLanguageFeatureName::ReadonlyAndReadwriteStorageTextures";
-        break;
-      case WGSLLanguageFeatureName::Packed4x8IntegerDotProduct:
-        o << "WGSLLanguageFeatureName::Packed4x8IntegerDotProduct";
-        break;
-      case WGSLLanguageFeatureName::UnrestrictedPointerParameters:
-        o << "WGSLLanguageFeatureName::UnrestrictedPointerParameters";
-        break;
-      case WGSLLanguageFeatureName::PointerCompositeAccess:
-        o << "WGSLLanguageFeatureName::PointerCompositeAccess";
-        break;
-      case WGSLLanguageFeatureName::SizedBindingArray:
-        o << "WGSLLanguageFeatureName::SizedBindingArray";
-        break;
-          default:
-            o << "WGSLLanguageFeatureName::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<WGSLLanguageFeatureName>::type>(value);
-      }
-      return o;
-  }
-  template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, AdapterType value) {
       switch (value) {
       case AdapterType::DiscreteGPU:
@@ -828,62 +805,6 @@ namespace wgpu {
       return o;
   }
   template <typename CharT, typename Traits>
-  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, SType value) {
-      switch (value) {
-      case SType::ShaderSourceSPIRV:
-        o << "SType::ShaderSourceSPIRV";
-        break;
-      case SType::ShaderSourceWGSL:
-        o << "SType::ShaderSourceWGSL";
-        break;
-      case SType::RenderPassMaxDrawCount:
-        o << "SType::RenderPassMaxDrawCount";
-        break;
-      case SType::SurfaceSourceMetalLayer:
-        o << "SType::SurfaceSourceMetalLayer";
-        break;
-      case SType::SurfaceSourceWindowsHWND:
-        o << "SType::SurfaceSourceWindowsHWND";
-        break;
-      case SType::SurfaceSourceXlibWindow:
-        o << "SType::SurfaceSourceXlibWindow";
-        break;
-      case SType::SurfaceSourceWaylandSurface:
-        o << "SType::SurfaceSourceWaylandSurface";
-        break;
-      case SType::SurfaceSourceAndroidNativeWindow:
-        o << "SType::SurfaceSourceAndroidNativeWindow";
-        break;
-      case SType::SurfaceSourceXCBWindow:
-        o << "SType::SurfaceSourceXCBWindow";
-        break;
-      case SType::SurfaceColorManagement:
-        o << "SType::SurfaceColorManagement";
-        break;
-      case SType::RequestAdapterWebXROptions:
-        o << "SType::RequestAdapterWebXROptions";
-        break;
-      case SType::AdapterPropertiesSubgroups:
-        o << "SType::AdapterPropertiesSubgroups";
-        break;
-      case SType::BindGroupLayoutEntryArraySize:
-        o << "SType::BindGroupLayoutEntryArraySize";
-        break;
-      case SType::TextureBindingViewDimensionDescriptor:
-        o << "SType::TextureBindingViewDimensionDescriptor";
-        break;
-      case SType::EmscriptenSurfaceSourceCanvasHTMLSelector:
-        o << "SType::EmscriptenSurfaceSourceCanvasHTMLSelector";
-        break;
-      case SType::DawnCompilationMessageUtf16:
-        o << "SType::DawnCompilationMessageUtf16";
-        break;
-          default:
-            o << "SType::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<SType>::type>(value);
-      }
-      return o;
-  }
-  template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, SamplerBindingType value) {
       switch (value) {
       case SamplerBindingType::BindingNotUsed:
@@ -992,6 +913,62 @@ namespace wgpu {
         break;
           default:
             o << "StoreOp::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<StoreOp>::type>(value);
+      }
+      return o;
+  }
+  template <typename CharT, typename Traits>
+  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, SType value) {
+      switch (value) {
+      case SType::ShaderSourceSPIRV:
+        o << "SType::ShaderSourceSPIRV";
+        break;
+      case SType::ShaderSourceWGSL:
+        o << "SType::ShaderSourceWGSL";
+        break;
+      case SType::RenderPassMaxDrawCount:
+        o << "SType::RenderPassMaxDrawCount";
+        break;
+      case SType::SurfaceSourceMetalLayer:
+        o << "SType::SurfaceSourceMetalLayer";
+        break;
+      case SType::SurfaceSourceWindowsHWND:
+        o << "SType::SurfaceSourceWindowsHWND";
+        break;
+      case SType::SurfaceSourceXlibWindow:
+        o << "SType::SurfaceSourceXlibWindow";
+        break;
+      case SType::SurfaceSourceWaylandSurface:
+        o << "SType::SurfaceSourceWaylandSurface";
+        break;
+      case SType::SurfaceSourceAndroidNativeWindow:
+        o << "SType::SurfaceSourceAndroidNativeWindow";
+        break;
+      case SType::SurfaceSourceXCBWindow:
+        o << "SType::SurfaceSourceXCBWindow";
+        break;
+      case SType::SurfaceColorManagement:
+        o << "SType::SurfaceColorManagement";
+        break;
+      case SType::RequestAdapterWebXROptions:
+        o << "SType::RequestAdapterWebXROptions";
+        break;
+      case SType::AdapterPropertiesSubgroups:
+        o << "SType::AdapterPropertiesSubgroups";
+        break;
+      case SType::BindGroupLayoutEntryArraySize:
+        o << "SType::BindGroupLayoutEntryArraySize";
+        break;
+      case SType::TextureBindingViewDimensionDescriptor:
+        o << "SType::TextureBindingViewDimensionDescriptor";
+        break;
+      case SType::EmscriptenSurfaceSourceCanvasHTMLSelector:
+        o << "SType::EmscriptenSurfaceSourceCanvasHTMLSelector";
+        break;
+      case SType::DawnCompilationMessageUtf16:
+        o << "SType::DawnCompilationMessageUtf16";
+        break;
+          default:
+            o << "SType::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<SType>::type>(value);
       }
       return o;
   }
@@ -1611,6 +1588,29 @@ namespace wgpu {
         break;
           default:
             o << "WaitStatus::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<WaitStatus>::type>(value);
+      }
+      return o;
+  }
+  template <typename CharT, typename Traits>
+  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, WGSLLanguageFeatureName value) {
+      switch (value) {
+      case WGSLLanguageFeatureName::ReadonlyAndReadwriteStorageTextures:
+        o << "WGSLLanguageFeatureName::ReadonlyAndReadwriteStorageTextures";
+        break;
+      case WGSLLanguageFeatureName::Packed4x8IntegerDotProduct:
+        o << "WGSLLanguageFeatureName::Packed4x8IntegerDotProduct";
+        break;
+      case WGSLLanguageFeatureName::UnrestrictedPointerParameters:
+        o << "WGSLLanguageFeatureName::UnrestrictedPointerParameters";
+        break;
+      case WGSLLanguageFeatureName::PointerCompositeAccess:
+        o << "WGSLLanguageFeatureName::PointerCompositeAccess";
+        break;
+      case WGSLLanguageFeatureName::SizedBindingArray:
+        o << "WGSLLanguageFeatureName::SizedBindingArray";
+        break;
+          default:
+            o << "WGSLLanguageFeatureName::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<WGSLLanguageFeatureName>::type>(value);
       }
       return o;
   }

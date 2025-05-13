@@ -424,6 +424,7 @@ void init() {
         wgpu::BindGroupLayoutEntry bglEntry{
             .binding = 0,
             .visibility = wgpu::ShaderStage::Fragment,
+            //.bindingArraySize = 1,
             .buffer = {
                 .type = wgpu::BufferBindingType::Uniform,
                 .hasDynamicOffset = true,
@@ -886,6 +887,7 @@ int main() {
     {
         wgpu::Limits limits;
         //limits.maxBufferSize = 0xffff'ffff'ffffLLU; // Uncomment to make requestDevice fail
+        //limits.maxImmediateSize = 1; // Uncomment to test maxImmediateSize passthrough
         wgpu::DeviceDescriptor desc;
         desc.requiredLimits = &limits;
         desc.SetUncapturedErrorCallback(

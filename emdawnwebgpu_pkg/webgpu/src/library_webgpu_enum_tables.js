@@ -5,13 +5,6 @@
     // These will not appear in the final build result, so we can just dump
     // every enum here without affecting binary size.
     globalThis.WEBGPU_ENUM_CONSTANT_TABLES = {
-        WGSLLanguageFeatureName: {
-            'ReadonlyAndReadwriteStorageTextures': 1,
-            'Packed4x8IntegerDotProduct': 2,
-            'UnrestrictedPointerParameters': 3,
-            'PointerCompositeAccess': 4,
-            'SizedBindingArray': 5,
-        },
         AdapterType: {
             'DiscreteGPU': 1,
             'IntegratedGPU': 2,
@@ -250,24 +243,6 @@
             'CallbackCancelled': 2,
             'Error': 3,
         },
-        SType: {
-            'ShaderSourceSPIRV': 1,
-            'ShaderSourceWGSL': 2,
-            'RenderPassMaxDrawCount': 3,
-            'SurfaceSourceMetalLayer': 4,
-            'SurfaceSourceWindowsHWND': 5,
-            'SurfaceSourceXlibWindow': 6,
-            'SurfaceSourceWaylandSurface': 7,
-            'SurfaceSourceAndroidNativeWindow': 8,
-            'SurfaceSourceXCBWindow': 9,
-            'SurfaceColorManagement': 10,
-            'RequestAdapterWebXROptions': 11,
-            'AdapterPropertiesSubgroups': 12,
-            'BindGroupLayoutEntryArraySize': 13,
-            'TextureBindingViewDimensionDescriptor': 131072,
-            'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
-            'DawnCompilationMessageUtf16': 327743,
-        },
         SamplerBindingType: {
             'BindingNotUsed': 0,
             'Undefined': 1,
@@ -301,6 +276,24 @@
             'Undefined': 0,
             'Store': 1,
             'Discard': 2,
+        },
+        SType: {
+            'ShaderSourceSPIRV': 1,
+            'ShaderSourceWGSL': 2,
+            'RenderPassMaxDrawCount': 3,
+            'SurfaceSourceMetalLayer': 4,
+            'SurfaceSourceWindowsHWND': 5,
+            'SurfaceSourceXlibWindow': 6,
+            'SurfaceSourceWaylandSurface': 7,
+            'SurfaceSourceAndroidNativeWindow': 8,
+            'SurfaceSourceXCBWindow': 9,
+            'SurfaceColorManagement': 10,
+            'RequestAdapterWebXROptions': 11,
+            'AdapterPropertiesSubgroups': 12,
+            'BindGroupLayoutEntryArraySize': 13,
+            'TextureBindingViewDimensionDescriptor': 131072,
+            'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
+            'DawnCompilationMessageUtf16': 327743,
         },
         SubgroupMatrixComponentType: {
             'F32': 1,
@@ -501,6 +494,13 @@
             'TimedOut': 2,
             'Error': 3,
         },
+        WGSLLanguageFeatureName: {
+            'ReadonlyAndReadwriteStorageTextures': 1,
+            'Packed4x8IntegerDotProduct': 2,
+            'UnrestrictedPointerParameters': 3,
+            'PointerCompositeAccess': 4,
+            'SizedBindingArray': 5,
+        },
         BufferUsage: {
             'None': 0,
             'MapRead': 1,
@@ -570,13 +570,6 @@
     // Maps from enum number to enum string.
     // These appear in the final build result so should be kept minimal.
     globalThis.WEBGPU_INT_TO_STRING_TABLES = `
-        WGSLLanguageFeatureName: {
-            1: 'readonly_and_readwrite_storage_textures',
-            2: 'packed_4x8_integer_dot_product',
-            3: 'unrestricted_pointer_parameters',
-            4: 'pointer_composite_access',
-            5: 'sized_binding_array',
-        },
         AddressMode: [
             undefined,
             'clamp-to-edge',
@@ -957,6 +950,13 @@
             'vertex',
             'instance',
         ],
+        WGSLLanguageFeatureName: {
+            1: 'readonly_and_readwrite_storage_textures',
+            2: 'packed_4x8_integer_dot_product',
+            3: 'unrestricted_pointer_parameters',
+            4: 'pointer_composite_access',
+            5: 'sized_binding_array',
+        },
 `;
 
     null;
