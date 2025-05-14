@@ -32,24 +32,23 @@
 
 import os
 import zlib
-from typing import Union, Dict, Optional
 
 LICENSE = 'mixed licenses, see license files'
 
-# User options, e.g. --use-port=path/to/emdawnwebgpu.port.py:cpp_bindings=false:g=3:O=0
+# User options, e.g. --use-port=path/to/emdawnwebgpu.port.py:cpp_bindings=false
 OPTIONS = {
     'cpp_bindings':
     'Add the include path for <webgpu/webgpu_cpp.h> C++ bindings. Default: true.',
-    'opt_level':
-    "Optimization (-O) level for the bindings' Wasm layer. Default: choose based on -sASSERTIONS.",
+    'assertions':
+    'Whether to enable assertions. Normally, leave this as default (which is to match -sASSERTIONS), but set this if using embuilder to pre-build the port.'
 }
 _VALID_OPTION_VALUES = {
     'cpp_bindings': ['true', 'false'],
-    'opt_level': ['auto', '0', '2'],
+    'assertions': ['auto', 'true', 'false'],
 }
-_opts: Dict[str, Union[Optional[str], bool]] = {
-    'cpp_bindings': True,
-    'opt_level': 'auto',
+_opts = {
+    'cpp_bindings': 'true',
+    'assertions': 'auto',
 }
 
 
@@ -91,8 +90,6 @@ def _check_option(option, value, error_handler):
         error_handler(
             f'[{option}] can be {list(_VALID_OPTION_VALUES[option])}, got [{value}]'
         )
-    if isinstance(_opts[option], bool):
-        value = value == 'true'
     return value
 
 
@@ -106,7 +103,7 @@ def process_args(ports):
     # It's important that these take precedent over Emscripten's builtin
     # system/include/, which also currently has webgpu headers.
     args = ['-isystem', _c_include_dir]
-    if _opts['cpp_bindings']:
+    if _opts['cpp_bindings'] == 'true':
         args += ['-isystem', _cpp_include_dir]
     return args
 
@@ -114,19 +111,28 @@ def process_args(ports):
 # Hooks that affect linker invocations
 
 
-# If not explicitly set, use -O0 when linking with -sASSERTIONS builds, and -O2
-# otherwise. (ASSERTIONS implicitly affects library_webgpu.js, so it makes sense
-# for it to control this too - debuggability is most useful with assertions.)
-# Emscripten automatically handles necessary compile flags (LTO, PIC, wasm64).
-def _compute_flags(settings):
-    value = _opts['opt_level']
+# Determine whether assertions should be enabled in this build
+# (based on compiler settings and port options).
+def _assertions_enabled(settings):
+    value = _opts['assertions']
     if value == 'auto':
-        value = '0' if settings.ASSERTIONS else '2'
-    return [f'-O{value}']
+        return settings.ASSERTIONS > 0
+    return value == 'true'
+
+
+# Compute the library compile flags, either `-O0` or `-O2 -DNDEBUG`
+# (based on compiler settings and port options). NDEBUG affects <assert.h>.
+def _compute_flags(settings):
+    assertions = _assertions_enabled(settings)
+    opt_level = '0' if assertions else '2'
+    flags = [f'-O{opt_level}']
+    if not assertions:
+        flags.append('-DNDEBUG')
+    return flags
 
 
 # Create a unique lib name for this version of the port and compile flags.
-def _get_lib_name(flags):
+def _get_lib_name(settings):
     # Compute a hash from all of the inputs to ports.build_port() so that
     # Emscripten knows when it needs to recompile.
     hash_value = 0
@@ -138,7 +144,8 @@ def _get_lib_name(flags):
     for filename in _files_affecting_port_build:
         add(open(filename, 'rb').read())
 
-    return f'lib_emdawnwebgpu-{hash_value:08x}{"".join(flags)}.a'
+    build_type = 'dbg' if _assertions_enabled(settings) else 'rel'
+    return f'lib_emdawnwebgpu-{hash_value:08x}-{build_type}.a'
 
 
 def linker_setup(ports, settings):
@@ -166,15 +173,14 @@ def get(ports, settings, shared):
         # isn't needed until linking.
         return []
 
-    computed_flags = _compute_flags(settings)
-
     def create(final):
         # Note we don't use ports.install_header; instead we directly add the
         # include path via process_args(). The only thing we cache is the
         # compiled webgpu.cpp (which also includes webgpu/webgpu.h).
         includes = [_c_include_dir]
         # Always use -g. The linker can remove debug symbols in release builds.
-        flags = ['-g', '-std=c++17', '-fno-exceptions'] + computed_flags
+        flags = ['-g', '-std=c++17', '-fno-exceptions']
+        flags += _compute_flags(settings)
 
         # IMPORTANT: Keep `_files_affecting_port_build` in sync with this.
         ports.build_port(_src_dir,
@@ -184,10 +190,9 @@ def get(ports, settings, shared):
                          flags=flags,
                          srcs=_srcs)
 
-    lib_name = _get_lib_name(computed_flags)
+    lib_name = _get_lib_name(settings)
     return [shared.cache.get_lib(lib_name, create, what='port')]
 
 
 def clear(ports, settings, shared):
-    computed_flags = _compute_flags(settings)
-    shared.cache.erase_lib(_get_lib_name(computed_flags))
+    shared.cache.erase_lib(_get_lib_name(settings))
