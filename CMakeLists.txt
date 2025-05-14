@@ -109,7 +109,6 @@ if (EMSCRIPTEN)
         PRIVATE
             # Link to the webgpu.h implementation.
             "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
-            "--closure-args=--externs=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/webgpu/src/webgpu-externs.js"
 
             # DWARF symbols are enabled by default (-g). To use, follow:
             # https://developer.chrome.com/blog/wasm-debugging-2020/
