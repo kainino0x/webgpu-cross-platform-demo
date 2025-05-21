@@ -45,9 +45,26 @@ if (DEMO_USE_SANITIZERS)
 endif()
 
 if (EMSCRIPTEN)
-    add_compile_options(
-        # Use ports at compile time, to set include paths.
+    # Linking to Emdawnwebgpu can be done in several ways:
+    # - Using the version of the remote port built into Emscripten:
+    #     --use-port=emdawnwebgpu
+    #   (Easiest. Note -sUSE_WEBGPU is deprecated!)
+    # - Using a local copy of the `emdawnwebgpu.remoteport.py` file from the release.
+    #     --use-port=path/to/emdawnwebgpu.remoteport.py
+    # - Using an unpacked Emdawnwebgpu package directly instead of downloading:
+    #     --use-port=path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py
+    #   (Used here.)
+    # - Using the CMake build files provided by Dawn: see
+    #     https://github.com/beaufortfrancois/webgpu-cross-platform-app/tree/cac870f60927bb1200ff0d866bfec193aca8fa2a
+    #   (Uses a single dependency for both Web and Native, but more complex build setup.)
+    set(EMDAWNWEBGPU_PORT_FLAG
         "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
+    )
+
+    add_compile_options(
+        # Use port at compile time, to set include paths.
+        "${EMDAWNWEBGPU_PORT_FLAG}"
+
         "-Wall"
         "-Wextra"
         #"-Weverything"
@@ -107,8 +124,8 @@ if (EMSCRIPTEN)
         SUFFIX ".html")
     target_link_options(hello
         PRIVATE
-            # Link to the webgpu.h implementation.
-            "--use-port=${PROJECT_SOURCE_DIR}/emdawnwebgpu_pkg/emdawnwebgpu.port.py"
+            # Use port at link time, to link the implementation.
+            "${EMDAWNWEBGPU_PORT_FLAG}"
 
             # DWARF symbols are enabled by default (-g). To use, follow:
             # https://developer.chrome.com/blog/wasm-debugging-2020/
