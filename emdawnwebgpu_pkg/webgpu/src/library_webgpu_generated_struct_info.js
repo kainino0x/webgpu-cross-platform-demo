@@ -18,12 +18,6 @@ const structInfo32 = (
             "vendor": 4,
             "vendorID": 44
         },
-        "WGPUAdapterPropertiesSubgroups": {
-            "__size__": 16,
-            "chain": 0,
-            "subgroupMaxSize": 12,
-            "subgroupMinSize": 8
-        },
         "WGPUBindGroupDescriptor": {
             "__size__": 24,
             "entries": 20,
@@ -50,19 +44,15 @@ const structInfo32 = (
             "nextInChain": 0
         },
         "WGPUBindGroupLayoutEntry": {
-            "__size__": 80,
+            "__size__": 88,
             "binding": 4,
-            "buffer": 16,
+            "bindingArraySize": 16,
+            "buffer": 24,
             "nextInChain": 0,
-            "sampler": 40,
-            "storageTexture": 64,
-            "texture": 48,
+            "sampler": 48,
+            "storageTexture": 72,
+            "texture": 56,
             "visibility": 8
-        },
-        "WGPUBindGroupLayoutEntryArraySize": {
-            "__size__": 12,
-            "arraySize": 8,
-            "chain": 0
         },
         "WGPUBlendComponent": {
             "__size__": 12,
@@ -616,12 +606,6 @@ const structInfo64 = (
             "vendor": 8,
             "vendorID": 80
         },
-        "WGPUAdapterPropertiesSubgroups": {
-            "__size__": 24,
-            "chain": 0,
-            "subgroupMaxSize": 20,
-            "subgroupMinSize": 16
-        },
         "WGPUBindGroupDescriptor": {
             "__size__": 48,
             "entries": 40,
@@ -648,19 +632,15 @@ const structInfo64 = (
             "nextInChain": 0
         },
         "WGPUBindGroupLayoutEntry": {
-            "__size__": 112,
+            "__size__": 120,
             "binding": 8,
-            "buffer": 24,
+            "bindingArraySize": 24,
+            "buffer": 32,
             "nextInChain": 0,
-            "sampler": 48,
-            "storageTexture": 88,
-            "texture": 64,
+            "sampler": 56,
+            "storageTexture": 96,
+            "texture": 72,
             "visibility": 16
-        },
-        "WGPUBindGroupLayoutEntryArraySize": {
-            "__size__": 24,
-            "arraySize": 16,
-            "chain": 0
         },
         "WGPUBlendComponent": {
             "__size__": 12,

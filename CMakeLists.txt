@@ -46,10 +46,11 @@ endif()
 
 if (EMSCRIPTEN)
     # Linking to Emdawnwebgpu can be done in several ways:
-    # - Using the version of the remote port built into Emscripten:
+    # - Using the version of the remote port built into Emscripten 4.0.10+:
     #     --use-port=emdawnwebgpu
     #   (Easiest. Note -sUSE_WEBGPU is deprecated!)
-    # - Using a local copy of the `emdawnwebgpu.remoteport.py` file from the release.
+    # - Using a local copy of the `emdawnwebgpu.remoteport.py` file from the
+    #   release. Also requires Emscripten 4.0.10+.
     #     --use-port=path/to/emdawnwebgpu.remoteport.py
     # - Using an unpacked Emdawnwebgpu package directly instead of downloading:
     #     --use-port=path/to/emdawnwebgpu_pkg/emdawnwebgpu.port.py

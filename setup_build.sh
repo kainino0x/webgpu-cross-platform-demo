@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-dawn_revision=4b580a7fff5d8cc652e7c58d1e105bed31c67100
+dawn_revision=2972f0c5be0b900bc8974848608b34e798802049
 
 function usage {
     echo "Usage:"
@@ -16,7 +16,7 @@ fi
 
 third_party="$(dirname "$0")"/third_party
 mkdir -p "$third_party"
-cd "$third_party"
+pushd "$third_party"
 third_party=$PWD
 
 if [ ! -e dawn ] ; then
@@ -55,4 +55,6 @@ cd out/wasm
 "$emscripten/emcmake" cmake ../..
 make clean
 make -j4 emdawnwebgpu_pkg
-rsync -av --delete emdawnwebgpu_pkg/ ../../../../emdawnwebgpu_pkg/
+
+popd
+rsync -av --delete third_party/dawn/out/wasm/emdawnwebgpu_pkg/ emdawnwebgpu_pkg/

@@ -93,7 +93,10 @@ var LibraryWebGPU = {
       // care about object type, and is keyed on the pointer address.
       jsObjects: [],
       jsObjectInsert: (ptr, jsObject) => {
-        WebGPU.Internals.jsObjects[ptr] = jsObject;
+        // TODO(crbug.com/422847728): If the bindings aren't built with the same
+        // linkopts as dependencies, i.e. in google3, the pointers can be signed
+        // ints and results in crashes, so force the pointers to be unsigned.
+        WebGPU.Internals.jsObjects[(ptr >>>= 0)] = jsObject;
       },
 
       // Buffer unmapping callbacks are stored in a separate table to keep
@@ -129,10 +132,14 @@ var LibraryWebGPU = {
     // because importing is not a "move" into the API, rather just a "copy".
     getJsObject: (ptr) => {
       if (!ptr) return undefined;
+      // TODO(crbug.com/422847728): If the bindings aren't built with the same
+      // linkopts as dependencies, i.e. in google3, the pointers can be signed
+      // ints and results in crashes, so force the pointers to be unsigned.
+      var key = (ptr >>>= 0);
 #if ASSERTIONS
-      assert(ptr in WebGPU.Internals.jsObjects);
+      assert(key in WebGPU.Internals.jsObjects);
 #endif
-      return WebGPU.Internals.jsObjects[ptr];
+      return WebGPU.Internals.jsObjects[key];
     },
     {{{ gpu.makeImportJsObject('Adapter') }}}
     {{{ gpu.makeImportJsObject('BindGroup') }}}
@@ -574,7 +581,44 @@ var LibraryWebGPU = {
       setLimitValueU32('maxComputeWorkgroupsPerDimension', {{{ C_STRUCTS.WGPULimits.maxComputeWorkgroupsPerDimension }}});
 
       // Non-standard. If this is undefined, it will correctly just cast to 0.
-      setLimitValueU32('maxImmediateSize', {{{ C_STRUCTS.WGPULimits.maxImmediateSize }}});
+      if (limits.maxImmediateSize !== undefined) {
+        setLimitValueU32('maxImmediateSize', {{{ C_STRUCTS.WGPULimits.maxImmediateSize }}});
+      }
+    },
+
+    fillAdapterInfoStruct__deps: ['$stringToNewUTF8', '$lengthBytesUTF8'],
+    fillAdapterInfoStruct: (info, infoStruct) => {
+      {{{ gpu.makeCheckDescriptor('infoStruct') }}}
+
+      // Populate subgroup limits.
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.subgroupMinSize, 'info.subgroupMinSize', 'i32') }}};
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.subgroupMaxSize, 'info.subgroupMaxSize', 'i32') }}};
+
+      // Append all the strings together to condense into a single malloc.
+      var strs = info.vendor + info.architecture + info.device + info.description;
+      var strPtr = stringToNewUTF8(strs);
+
+      var vendorLen = lengthBytesUTF8(info.vendor);
+      WebGPU.setStringView(infoStruct + {{{ C_STRUCTS.WGPUAdapterInfo.vendor }}}, strPtr, vendorLen);
+      strPtr += vendorLen;
+
+      var architectureLen = lengthBytesUTF8(info.architecture);
+      WebGPU.setStringView(infoStruct + {{{ C_STRUCTS.WGPUAdapterInfo.architecture }}}, strPtr, architectureLen);
+      strPtr += architectureLen;
+
+      var deviceLen = lengthBytesUTF8(info.device);
+      WebGPU.setStringView(infoStruct + {{{ C_STRUCTS.WGPUAdapterInfo.device }}}, strPtr, deviceLen);
+      strPtr += deviceLen;
+
+      var descriptionLen = lengthBytesUTF8(info.description);
+      WebGPU.setStringView(infoStruct + {{{ C_STRUCTS.WGPUAdapterInfo.description }}}, strPtr, descriptionLen);
+      strPtr += descriptionLen;
+
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.backendType, gpu.BackendType.WebGPU, 'i32') }}};
+      var adapterType = info.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.adapterType, 'adapterType', 'i32') }}};
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.vendorID, '0', 'i32') }}};
+      {{{ makeSetValue('infoStruct', C_STRUCTS.WGPUAdapterInfo.deviceID, '0', 'i32') }}};
     },
 
     // Maps from enum string back to enum number, for callbacks.
@@ -622,10 +666,10 @@ var LibraryWebGPU = {
   emwgpuWaitAny__sig: 'jppp',
 #if ASYNCIFY
   emwgpuWaitAny__async: true,
-  emwgpuWaitAny: (futurePtr, futureCount, timeoutNSPtr) => Asyncify.handleAsync(async () => {
+  emwgpuWaitAny: (futurePtr, futureCount, timeoutMSPtr) => Asyncify.handleAsync(async () => {
     var promises = [];
-    if (timeoutNSPtr) {
-      var timeoutMS = {{{ gpu.makeGetU64('timeoutNSPtr', 0) }}} / 1000000;
+    if (timeoutMSPtr) {
+      var timeoutMS = {{{ makeGetValue('timeoutMSPtr', 0, 'i32') }}};
       promises.length = futureCount + 1;
       promises[futureCount] = new Promise((resolve) => setTimeout(resolve, timeoutMS, 0));
     } else {
@@ -703,36 +747,9 @@ var LibraryWebGPU = {
     {{{ makeSetValue('supportedFeatures', C_STRUCTS.WGPUSupportedFeatures.featureCount, 'numFeatures', '*') }}};
   },
 
-  wgpuAdapterGetInfo__deps: ['$stringToNewUTF8', '$lengthBytesUTF8'],
   wgpuAdapterGetInfo: (adapterPtr, info) => {
     var adapter = WebGPU.getJsObject(adapterPtr);
-    {{{ gpu.makeCheckDescriptor('info') }}}
-
-    // Append all the strings together to condense into a single malloc.
-    var strs = adapter.info.vendor + adapter.info.architecture + adapter.info.device + adapter.info.description;
-    var strPtr = stringToNewUTF8(strs);
-
-    var vendorLen = lengthBytesUTF8(adapter.info.vendor);
-    WebGPU.setStringView(info + {{{ C_STRUCTS.WGPUAdapterInfo.vendor }}}, strPtr, vendorLen);
-    strPtr += vendorLen;
-
-    var architectureLen = lengthBytesUTF8(adapter.info.architecture);
-    WebGPU.setStringView(info + {{{ C_STRUCTS.WGPUAdapterInfo.architecture }}}, strPtr, architectureLen);
-    strPtr += architectureLen;
-
-    var deviceLen = lengthBytesUTF8(adapter.info.device);
-    WebGPU.setStringView(info + {{{ C_STRUCTS.WGPUAdapterInfo.device }}}, strPtr, deviceLen);
-    strPtr += deviceLen;
-
-    var descriptionLen = lengthBytesUTF8(adapter.info.description);
-    WebGPU.setStringView(info + {{{ C_STRUCTS.WGPUAdapterInfo.description }}}, strPtr, descriptionLen);
-    strPtr += descriptionLen;
-
-    {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.backendType, gpu.BackendType.WebGPU, 'i32') }}};
-    var adapterType = adapter.info.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
-    {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.adapterType, 'adapterType', 'i32') }}};
-    {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.vendorID, '0', 'i32') }}};
-    {{{ makeSetValue('info', C_STRUCTS.WGPUAdapterInfo.deviceID, '0', 'i32') }}};
+    WebGPU.fillAdapterInfoStruct(adapter.info, info);
     return {{{ gpu.Status.Success }}};
   },
 
@@ -1471,6 +1488,13 @@ var LibraryWebGPU = {
 
     function makeEntry(entryPtr) {
       {{{ gpu.makeCheck('entryPtr') }}}
+#if ASSERTIONS
+      // bindingArraySize is not specced and thus not implemented yet. We don't pass it through
+      // because if we did, then existing apps using this version of the bindings could break when
+      // browsers start accepting bindingArraySize.
+      var bindingArraySize = {{{ gpu.makeGetU32('entryPtr', C_STRUCTS.WGPUBindGroupLayoutEntry.bindingArraySize) }}};
+      assert(bindingArraySize == 0 || bindingArraySize == 1);
+#endif
 
       return {
         "binding":
@@ -1728,6 +1752,7 @@ var LibraryWebGPU = {
         "lodMaxClamp": {{{ makeGetValue('descriptor', C_STRUCTS.WGPUSamplerDescriptor.lodMaxClamp, 'float') }}},
         "compare": WebGPU.CompareFunction[
             {{{ gpu.makeGetU32('descriptor', C_STRUCTS.WGPUSamplerDescriptor.compare) }}}],
+        "maxAnisotropy": {{{ makeGetValue('descriptor', C_STRUCTS.WGPUSamplerDescriptor.maxAnisotropy, 'u16') }}},
       };
     }
 
@@ -1834,38 +1859,9 @@ var LibraryWebGPU = {
     return device.features.has(WebGPU.FeatureName[featureEnumValue]);
   },
 
-  wgpuDeviceGetAdapterInfo__deps: ['$stringToNewUTF8', '$lengthBytesUTF8'],
   wgpuDeviceGetAdapterInfo: (devicePtr, adapterInfo) => {
-    // TODO(crbug.com/377760848): Avoid duplicated code with wgpuAdapterGetInfo,
-    // for example by deferring to wgpuAdapterGetInfo from webgpu.cpp.
     var device = WebGPU.getJsObject(devicePtr);
-    {{{ gpu.makeCheckDescriptor('adapterInfo') }}}
-
-    // Append all the strings together to condense into a single malloc.
-    var strs = device.adapterInfo.vendor + device.adapterInfo.architecture + device.adapterInfo.device + device.adapterInfo.description;
-    var strPtr = stringToNewUTF8(strs);
-
-    var vendorLen = lengthBytesUTF8(device.adapterInfo.vendor);
-    WebGPU.setStringView(adapterInfo + {{{ C_STRUCTS.WGPUAdapterInfo.vendor }}}, strPtr, vendorLen);
-    strPtr += vendorLen;
-
-    var architectureLen = lengthBytesUTF8(device.adapterInfo.architecture);
-    WebGPU.setStringView(adapterInfo + {{{ C_STRUCTS.WGPUAdapterInfo.architecture }}}, strPtr, architectureLen);
-    strPtr += architectureLen;
-
-    var deviceLen = lengthBytesUTF8(device.adapterInfo.device);
-    WebGPU.setStringView(adapterInfo + {{{ C_STRUCTS.WGPUAdapterInfo.device }}}, strPtr, deviceLen);
-    strPtr += deviceLen;
-
-    var descriptionLen = lengthBytesUTF8(device.adapterInfo.description);
-    WebGPU.setStringView(adapterInfo + {{{ C_STRUCTS.WGPUAdapterInfo.description }}}, strPtr, descriptionLen);
-    strPtr += descriptionLen;
-
-    {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.backendType, gpu.BackendType.WebGPU, 'i32') }}};
-    var adapterType = device.adapterInfo.isFallbackAdapter ? {{{ gpu.AdapterType.CPU }}} : {{{ gpu.AdapterType.Unknown }}};
-    {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.adapterType, 'adapterType', 'i32') }}};
-    {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.vendorID, '0', 'i32') }}};
-    {{{ makeSetValue('adapterInfo', C_STRUCTS.WGPUAdapterInfo.deviceID, '0', 'i32') }}};
+    WebGPU.fillAdapterInfoStruct(device.adapterInfo, adapterInfo);
     return {{{ gpu.Status.Success }}};
   },
 
@@ -2089,6 +2085,7 @@ var LibraryWebGPU = {
       _emwgpuOnWorkDoneCompleted(futureId, {{{ gpu.QueueWorkDoneStatus.Success }}});
     }, () => {
       {{{ runtimeKeepalivePop() }}}
+      // We could translate this into a status+message, but it's not supposed to ever happen.
       abort('Unexpected failure in GPUQueue.onSubmittedWorkDone().')
     }));
   },

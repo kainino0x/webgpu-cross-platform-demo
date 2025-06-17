@@ -289,8 +289,6 @@
             'SurfaceSourceXCBWindow': 9,
             'SurfaceColorManagement': 10,
             'RequestAdapterWebXROptions': 11,
-            'AdapterPropertiesSubgroups': 12,
-            'BindGroupLayoutEntryArraySize': 13,
             'TextureBindingViewDimensionDescriptor': 131072,
             'EmscriptenSurfaceSourceCanvasHTMLSelector': 262144,
             'DawnCompilationMessageUtf16': 327743,
@@ -500,6 +498,7 @@
             'UnrestrictedPointerParameters': 3,
             'PointerCompositeAccess': 4,
             'SizedBindingArray': 5,
+            'TexelBuffers': 6,
         },
         BufferUsage: {
             'None': 0,
@@ -956,6 +955,7 @@
             3: 'unrestricted_pointer_parameters',
             4: 'pointer_composite_access',
             5: 'sized_binding_array',
+            6: 'texel_buffers',
         },
 `;
 

@@ -952,12 +952,6 @@ namespace wgpu {
       case SType::RequestAdapterWebXROptions:
         o << "SType::RequestAdapterWebXROptions";
         break;
-      case SType::AdapterPropertiesSubgroups:
-        o << "SType::AdapterPropertiesSubgroups";
-        break;
-      case SType::BindGroupLayoutEntryArraySize:
-        o << "SType::BindGroupLayoutEntryArraySize";
-        break;
       case SType::TextureBindingViewDimensionDescriptor:
         o << "SType::TextureBindingViewDimensionDescriptor";
         break;
@@ -1608,6 +1602,9 @@ namespace wgpu {
         break;
       case WGSLLanguageFeatureName::SizedBindingArray:
         o << "WGSLLanguageFeatureName::SizedBindingArray";
+        break;
+      case WGSLLanguageFeatureName::TexelBuffers:
+        o << "WGSLLanguageFeatureName::TexelBuffers";
         break;
           default:
             o << "WGSLLanguageFeatureName::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<WGSLLanguageFeatureName>::type>(value);

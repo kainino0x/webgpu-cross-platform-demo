@@ -455,8 +455,6 @@ enum class SType : uint32_t {
     SurfaceSourceXCBWindow = WGPUSType_SurfaceSourceXCBWindow,
     SurfaceColorManagement = WGPUSType_SurfaceColorManagement,
     RequestAdapterWebXROptions = WGPUSType_RequestAdapterWebXROptions,
-    AdapterPropertiesSubgroups = WGPUSType_AdapterPropertiesSubgroups,
-    BindGroupLayoutEntryArraySize = WGPUSType_BindGroupLayoutEntryArraySize,
     TextureBindingViewDimensionDescriptor = WGPUSType_TextureBindingViewDimensionDescriptor,
     EmscriptenSurfaceSourceCanvasHTMLSelector = WGPUSType_EmscriptenSurfaceSourceCanvasHTMLSelector,
     DawnCompilationMessageUtf16 = WGPUSType_DawnCompilationMessageUtf16,
@@ -702,6 +700,7 @@ enum class WGSLLanguageFeatureName : uint32_t {
     UnrestrictedPointerParameters = WGPUWGSLLanguageFeatureName_UnrestrictedPointerParameters,
     PointerCompositeAccess = WGPUWGSLLanguageFeatureName_PointerCompositeAccess,
     SizedBindingArray = WGPUWGSLLanguageFeatureName_SizedBindingArray,
+    TexelBuffers = WGPUWGSLLanguageFeatureName_TexelBuffers,
 };
 static_assert(sizeof(WGSLLanguageFeatureName) == sizeof(WGPUWGSLLanguageFeatureName), "sizeof mismatch for WGSLLanguageFeatureName");
 static_assert(alignof(WGSLLanguageFeatureName) == alignof(WGPUWGSLLanguageFeatureName), "alignof mismatch for WGSLLanguageFeatureName");
@@ -964,9 +963,8 @@ class Texture;
 class TextureView;
 
 struct StringView;
-struct AdapterPropertiesSubgroups;
+struct AdapterInfo;
 struct BindGroupEntry;
-struct BindGroupLayoutEntryArraySize;
 struct BlendComponent;
 struct BufferBindingLayout;
 struct BufferDescriptor;
@@ -1010,7 +1008,6 @@ struct TextureBindingLayout;
 struct TextureBindingViewDimensionDescriptor;
 struct TextureViewDescriptor;
 struct VertexAttribute;
-struct AdapterInfo;
 struct BindGroupDescriptor;
 struct BindGroupLayoutEntry;
 struct BlendState;
@@ -1185,7 +1182,7 @@ using CreateRenderPipelineAsyncCallback = typename detail::CallbackTypeBase<std:
 template <typename... T>
 using PopErrorScopeCallback = typename detail::CallbackTypeBase<std::tuple<PopErrorScopeStatus , ErrorType , StringView >, T...>::Callback;
 template <typename... T>
-using QueueWorkDoneCallback = typename detail::CallbackTypeBase<std::tuple<QueueWorkDoneStatus >, T...>::Callback;
+using QueueWorkDoneCallback = typename detail::CallbackTypeBase<std::tuple<QueueWorkDoneStatus , StringView >, T...>::Callback;
 template <typename... T>
 using RequestAdapterCallback = typename detail::CallbackTypeBase<std::tuple<RequestAdapterStatus , Adapter , StringView >, T...>::Callback;
 template <typename... T>
@@ -1496,12 +1493,12 @@ class Queue : public ObjectBase<Queue, WGPUQueue> {
 
     template <typename F, typename T,
               typename Cb = QueueWorkDoneCallback<T>,
-              typename CbChar = void (QueueWorkDoneStatus status, T userdata),
+              typename CbChar = void (QueueWorkDoneStatus status, const char* message, T userdata),
               typename = std::enable_if_t<std::is_convertible_v<F, Cb*> || std::is_convertible_v<F, CbChar*>>>
     Future OnSubmittedWorkDone(CallbackMode callbackMode,F callback, T userdata) const;
     template <typename L,
               typename Cb = QueueWorkDoneCallback<>,
-              typename CbChar = std::function<void(QueueWorkDoneStatus status)>,
+              typename CbChar = std::function<void(QueueWorkDoneStatus status, const char* message)>,
               typename = std::enable_if_t<std::is_convertible_v<L, Cb> || std::is_convertible_v<L, CbChar>>>
     Future OnSubmittedWorkDone(CallbackMode callbackMode,L callback) const;
     inline void SetLabel(StringView label) const;
@@ -1714,17 +1711,30 @@ static_assert(offsetof(ChainedStruct, sType) == offsetof(WGPUChainedStruct, sTyp
     "offsetof mismatch for ChainedStruct::sType");
 
 
-// Can be chained in AdapterInfo
-struct AdapterPropertiesSubgroups : ChainedStructOut {
-    inline AdapterPropertiesSubgroups();
+struct AdapterInfo {
+    inline AdapterInfo();
+    inline ~AdapterInfo();
+    AdapterInfo(const AdapterInfo&) = delete;
+    AdapterInfo& operator=(const AdapterInfo&) = delete;
+    inline AdapterInfo(AdapterInfo&&);
+    inline AdapterInfo& operator=(AdapterInfo&&);
+    inline operator const WGPUAdapterInfo&() const noexcept;
 
-    struct Init;
-    inline AdapterPropertiesSubgroups(Init&& init);
-    inline operator const WGPUAdapterPropertiesSubgroups&() const noexcept;
+    ChainedStructOut  * nextInChain = nullptr;
+    StringView const vendor = {};
+    StringView const architecture = {};
+    StringView const device = {};
+    StringView const description = {};
+    BackendType const backendType = BackendType::Undefined;
+    AdapterType const adapterType = {};
+    uint32_t const vendorID = {};
+    uint32_t const deviceID = {};
+    uint32_t const subgroupMinSize = {};
+    uint32_t const subgroupMaxSize = {};
 
-    static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(uint32_t ));
-    alignas(kFirstMemberAlignment) uint32_t subgroupMinSize = kLimitU32Undefined;
-    uint32_t subgroupMaxSize = kLimitU32Undefined;
+  private:
+    inline void FreeMembers();
+    static inline void Reset(AdapterInfo& value);
 };
 
 struct BindGroupEntry {
@@ -1737,18 +1747,6 @@ struct BindGroupEntry {
     uint64_t size = kWholeSize;
     Sampler sampler = nullptr;
     TextureView textureView = nullptr;
-};
-
-// Can be chained in BindGroupLayoutEntry
-struct BindGroupLayoutEntryArraySize : ChainedStruct {
-    inline BindGroupLayoutEntryArraySize();
-
-    struct Init;
-    inline BindGroupLayoutEntryArraySize(Init&& init);
-    inline operator const WGPUBindGroupLayoutEntryArraySize&() const noexcept;
-
-    static constexpr size_t kFirstMemberAlignment = detail::ConstexprMax(alignof(ChainedStruct), alignof(uint32_t ));
-    alignas(kFirstMemberAlignment) uint32_t arraySize = 0;
 };
 
 struct BlendComponent {
@@ -2240,32 +2238,6 @@ struct VertexAttribute {
     uint32_t shaderLocation;
 };
 
-struct AdapterInfo {
-    inline AdapterInfo();
-    inline ~AdapterInfo();
-    AdapterInfo(const AdapterInfo&) = delete;
-    AdapterInfo& operator=(const AdapterInfo&) = delete;
-    inline AdapterInfo(AdapterInfo&&);
-    inline AdapterInfo& operator=(AdapterInfo&&);
-    inline operator const WGPUAdapterInfo&() const noexcept;
-
-    ChainedStructOut  * nextInChain = nullptr;
-    StringView const vendor = {};
-    StringView const architecture = {};
-    StringView const device = {};
-    StringView const description = {};
-    BackendType const backendType = BackendType::Undefined;
-    AdapterType const adapterType = {};
-    uint32_t const vendorID = {};
-    uint32_t const deviceID = {};
-    uint32_t const subgroupMinSize = {};
-    uint32_t const subgroupMaxSize = {};
-
-  private:
-    inline void FreeMembers();
-    static inline void Reset(AdapterInfo& value);
-};
-
 struct BindGroupDescriptor {
     inline operator const WGPUBindGroupDescriptor&() const noexcept;
 
@@ -2282,6 +2254,7 @@ struct BindGroupLayoutEntry {
     ChainedStruct const * nextInChain = nullptr;
     uint32_t binding;
     ShaderStage visibility = ShaderStage::None;
+    uint32_t bindingArraySize = 0;
     BufferBindingLayout buffer = { nullptr, BufferBindingType::BindingNotUsed, false, 0 };
     SamplerBindingLayout sampler = { nullptr, SamplerBindingType::BindingNotUsed };
     TextureBindingLayout texture = { nullptr, TextureSampleType::BindingNotUsed, TextureViewDimension::e2D, false };
@@ -2569,29 +2542,95 @@ struct DeviceDescriptor : protected detail::DeviceDescriptor {
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 #endif
 
-// AdapterPropertiesSubgroups implementation
-AdapterPropertiesSubgroups::AdapterPropertiesSubgroups()
-  : ChainedStructOut { nullptr, SType::AdapterPropertiesSubgroups } {}
-struct AdapterPropertiesSubgroups::Init {
-    ChainedStructOut *  nextInChain;
-    uint32_t subgroupMinSize = kLimitU32Undefined;
-    uint32_t subgroupMaxSize = kLimitU32Undefined;
-};
-AdapterPropertiesSubgroups::AdapterPropertiesSubgroups(AdapterPropertiesSubgroups::Init&& init)
-  : ChainedStructOut { init.nextInChain, SType::AdapterPropertiesSubgroups }, 
-    subgroupMinSize(std::move(init.subgroupMinSize)), 
-    subgroupMaxSize(std::move(init.subgroupMaxSize)){}
-
-AdapterPropertiesSubgroups::operator const WGPUAdapterPropertiesSubgroups&() const noexcept {
-    return *reinterpret_cast<const WGPUAdapterPropertiesSubgroups*>(this);
+// AdapterInfo implementation
+AdapterInfo::AdapterInfo() = default;
+AdapterInfo::~AdapterInfo() {
+    FreeMembers();
 }
 
-static_assert(sizeof(AdapterPropertiesSubgroups) == sizeof(WGPUAdapterPropertiesSubgroups), "sizeof mismatch for AdapterPropertiesSubgroups");
-static_assert(alignof(AdapterPropertiesSubgroups) == alignof(WGPUAdapterPropertiesSubgroups), "alignof mismatch for AdapterPropertiesSubgroups");
-static_assert(offsetof(AdapterPropertiesSubgroups, subgroupMinSize) == offsetof(WGPUAdapterPropertiesSubgroups, subgroupMinSize),
-        "offsetof mismatch for AdapterPropertiesSubgroups::subgroupMinSize");
-static_assert(offsetof(AdapterPropertiesSubgroups, subgroupMaxSize) == offsetof(WGPUAdapterPropertiesSubgroups, subgroupMaxSize),
-        "offsetof mismatch for AdapterPropertiesSubgroups::subgroupMaxSize");
+AdapterInfo::AdapterInfo(AdapterInfo&& rhs)
+    : vendor(rhs.vendor),
+            architecture(rhs.architecture),
+            device(rhs.device),
+            description(rhs.description),
+            backendType(rhs.backendType),
+            adapterType(rhs.adapterType),
+            vendorID(rhs.vendorID),
+            deviceID(rhs.deviceID),
+            subgroupMinSize(rhs.subgroupMinSize),
+            subgroupMaxSize(rhs.subgroupMaxSize){
+    Reset(rhs);
+}
+
+AdapterInfo& AdapterInfo::operator=(AdapterInfo&& rhs) {
+    if (&rhs == this) {
+        return *this;
+    }
+    FreeMembers();
+    detail::AsNonConstReference(this->vendor) = std::move(rhs.vendor);
+    detail::AsNonConstReference(this->architecture) = std::move(rhs.architecture);
+    detail::AsNonConstReference(this->device) = std::move(rhs.device);
+    detail::AsNonConstReference(this->description) = std::move(rhs.description);
+    detail::AsNonConstReference(this->backendType) = std::move(rhs.backendType);
+    detail::AsNonConstReference(this->adapterType) = std::move(rhs.adapterType);
+    detail::AsNonConstReference(this->vendorID) = std::move(rhs.vendorID);
+    detail::AsNonConstReference(this->deviceID) = std::move(rhs.deviceID);
+    detail::AsNonConstReference(this->subgroupMinSize) = std::move(rhs.subgroupMinSize);
+    detail::AsNonConstReference(this->subgroupMaxSize) = std::move(rhs.subgroupMaxSize);
+    Reset(rhs);
+    return *this;
+}
+
+void AdapterInfo::FreeMembers() {
+    bool needsFreeing = false;    if (this->vendor.data != nullptr) { needsFreeing = true; }    if (this->architecture.data != nullptr) { needsFreeing = true; }    if (this->device.data != nullptr) { needsFreeing = true; }    if (this->description.data != nullptr) { needsFreeing = true; }if (needsFreeing) {
+        wgpuAdapterInfoFreeMembers(
+            *reinterpret_cast<WGPUAdapterInfo*>(this));
+    }
+}
+
+// static
+void AdapterInfo::Reset(AdapterInfo& value) {
+    AdapterInfo defaultValue{};
+    detail::AsNonConstReference(value.vendor) = defaultValue.vendor;
+    detail::AsNonConstReference(value.architecture) = defaultValue.architecture;
+    detail::AsNonConstReference(value.device) = defaultValue.device;
+    detail::AsNonConstReference(value.description) = defaultValue.description;
+    detail::AsNonConstReference(value.backendType) = defaultValue.backendType;
+    detail::AsNonConstReference(value.adapterType) = defaultValue.adapterType;
+    detail::AsNonConstReference(value.vendorID) = defaultValue.vendorID;
+    detail::AsNonConstReference(value.deviceID) = defaultValue.deviceID;
+    detail::AsNonConstReference(value.subgroupMinSize) = defaultValue.subgroupMinSize;
+    detail::AsNonConstReference(value.subgroupMaxSize) = defaultValue.subgroupMaxSize;
+}
+
+AdapterInfo::operator const WGPUAdapterInfo&() const noexcept {
+    return *reinterpret_cast<const WGPUAdapterInfo*>(this);
+}
+
+static_assert(sizeof(AdapterInfo) == sizeof(WGPUAdapterInfo), "sizeof mismatch for AdapterInfo");
+static_assert(alignof(AdapterInfo) == alignof(WGPUAdapterInfo), "alignof mismatch for AdapterInfo");
+static_assert(offsetof(AdapterInfo, nextInChain) == offsetof(WGPUAdapterInfo, nextInChain),
+        "offsetof mismatch for AdapterInfo::nextInChain");
+static_assert(offsetof(AdapterInfo, vendor) == offsetof(WGPUAdapterInfo, vendor),
+        "offsetof mismatch for AdapterInfo::vendor");
+static_assert(offsetof(AdapterInfo, architecture) == offsetof(WGPUAdapterInfo, architecture),
+        "offsetof mismatch for AdapterInfo::architecture");
+static_assert(offsetof(AdapterInfo, device) == offsetof(WGPUAdapterInfo, device),
+        "offsetof mismatch for AdapterInfo::device");
+static_assert(offsetof(AdapterInfo, description) == offsetof(WGPUAdapterInfo, description),
+        "offsetof mismatch for AdapterInfo::description");
+static_assert(offsetof(AdapterInfo, backendType) == offsetof(WGPUAdapterInfo, backendType),
+        "offsetof mismatch for AdapterInfo::backendType");
+static_assert(offsetof(AdapterInfo, adapterType) == offsetof(WGPUAdapterInfo, adapterType),
+        "offsetof mismatch for AdapterInfo::adapterType");
+static_assert(offsetof(AdapterInfo, vendorID) == offsetof(WGPUAdapterInfo, vendorID),
+        "offsetof mismatch for AdapterInfo::vendorID");
+static_assert(offsetof(AdapterInfo, deviceID) == offsetof(WGPUAdapterInfo, deviceID),
+        "offsetof mismatch for AdapterInfo::deviceID");
+static_assert(offsetof(AdapterInfo, subgroupMinSize) == offsetof(WGPUAdapterInfo, subgroupMinSize),
+        "offsetof mismatch for AdapterInfo::subgroupMinSize");
+static_assert(offsetof(AdapterInfo, subgroupMaxSize) == offsetof(WGPUAdapterInfo, subgroupMaxSize),
+        "offsetof mismatch for AdapterInfo::subgroupMaxSize");
 
 // BindGroupEntry implementation
 
@@ -2615,26 +2654,6 @@ static_assert(offsetof(BindGroupEntry, sampler) == offsetof(WGPUBindGroupEntry, 
         "offsetof mismatch for BindGroupEntry::sampler");
 static_assert(offsetof(BindGroupEntry, textureView) == offsetof(WGPUBindGroupEntry, textureView),
         "offsetof mismatch for BindGroupEntry::textureView");
-
-// BindGroupLayoutEntryArraySize implementation
-BindGroupLayoutEntryArraySize::BindGroupLayoutEntryArraySize()
-  : ChainedStruct { nullptr, SType::BindGroupLayoutEntryArraySize } {}
-struct BindGroupLayoutEntryArraySize::Init {
-    ChainedStruct * const nextInChain;
-    uint32_t arraySize = 0;
-};
-BindGroupLayoutEntryArraySize::BindGroupLayoutEntryArraySize(BindGroupLayoutEntryArraySize::Init&& init)
-  : ChainedStruct { init.nextInChain, SType::BindGroupLayoutEntryArraySize }, 
-    arraySize(std::move(init.arraySize)){}
-
-BindGroupLayoutEntryArraySize::operator const WGPUBindGroupLayoutEntryArraySize&() const noexcept {
-    return *reinterpret_cast<const WGPUBindGroupLayoutEntryArraySize*>(this);
-}
-
-static_assert(sizeof(BindGroupLayoutEntryArraySize) == sizeof(WGPUBindGroupLayoutEntryArraySize), "sizeof mismatch for BindGroupLayoutEntryArraySize");
-static_assert(alignof(BindGroupLayoutEntryArraySize) == alignof(WGPUBindGroupLayoutEntryArraySize), "alignof mismatch for BindGroupLayoutEntryArraySize");
-static_assert(offsetof(BindGroupLayoutEntryArraySize, arraySize) == offsetof(WGPUBindGroupLayoutEntryArraySize, arraySize),
-        "offsetof mismatch for BindGroupLayoutEntryArraySize::arraySize");
 
 // BlendComponent implementation
 
@@ -3615,96 +3634,6 @@ static_assert(offsetof(VertexAttribute, offset) == offsetof(WGPUVertexAttribute,
 static_assert(offsetof(VertexAttribute, shaderLocation) == offsetof(WGPUVertexAttribute, shaderLocation),
         "offsetof mismatch for VertexAttribute::shaderLocation");
 
-// AdapterInfo implementation
-AdapterInfo::AdapterInfo() = default;
-AdapterInfo::~AdapterInfo() {
-    FreeMembers();
-}
-
-AdapterInfo::AdapterInfo(AdapterInfo&& rhs)
-    : vendor(rhs.vendor),
-            architecture(rhs.architecture),
-            device(rhs.device),
-            description(rhs.description),
-            backendType(rhs.backendType),
-            adapterType(rhs.adapterType),
-            vendorID(rhs.vendorID),
-            deviceID(rhs.deviceID),
-            subgroupMinSize(rhs.subgroupMinSize),
-            subgroupMaxSize(rhs.subgroupMaxSize){
-    Reset(rhs);
-}
-
-AdapterInfo& AdapterInfo::operator=(AdapterInfo&& rhs) {
-    if (&rhs == this) {
-        return *this;
-    }
-    FreeMembers();
-    detail::AsNonConstReference(this->vendor) = std::move(rhs.vendor);
-    detail::AsNonConstReference(this->architecture) = std::move(rhs.architecture);
-    detail::AsNonConstReference(this->device) = std::move(rhs.device);
-    detail::AsNonConstReference(this->description) = std::move(rhs.description);
-    detail::AsNonConstReference(this->backendType) = std::move(rhs.backendType);
-    detail::AsNonConstReference(this->adapterType) = std::move(rhs.adapterType);
-    detail::AsNonConstReference(this->vendorID) = std::move(rhs.vendorID);
-    detail::AsNonConstReference(this->deviceID) = std::move(rhs.deviceID);
-    detail::AsNonConstReference(this->subgroupMinSize) = std::move(rhs.subgroupMinSize);
-    detail::AsNonConstReference(this->subgroupMaxSize) = std::move(rhs.subgroupMaxSize);
-    Reset(rhs);
-    return *this;
-}
-
-void AdapterInfo::FreeMembers() {
-    bool needsFreeing = false;    if (this->vendor.data != nullptr) { needsFreeing = true; }    if (this->architecture.data != nullptr) { needsFreeing = true; }    if (this->device.data != nullptr) { needsFreeing = true; }    if (this->description.data != nullptr) { needsFreeing = true; }if (needsFreeing) {
-        wgpuAdapterInfoFreeMembers(
-            *reinterpret_cast<WGPUAdapterInfo*>(this));
-    }
-}
-
-// static
-void AdapterInfo::Reset(AdapterInfo& value) {
-    AdapterInfo defaultValue{};
-    detail::AsNonConstReference(value.vendor) = defaultValue.vendor;
-    detail::AsNonConstReference(value.architecture) = defaultValue.architecture;
-    detail::AsNonConstReference(value.device) = defaultValue.device;
-    detail::AsNonConstReference(value.description) = defaultValue.description;
-    detail::AsNonConstReference(value.backendType) = defaultValue.backendType;
-    detail::AsNonConstReference(value.adapterType) = defaultValue.adapterType;
-    detail::AsNonConstReference(value.vendorID) = defaultValue.vendorID;
-    detail::AsNonConstReference(value.deviceID) = defaultValue.deviceID;
-    detail::AsNonConstReference(value.subgroupMinSize) = defaultValue.subgroupMinSize;
-    detail::AsNonConstReference(value.subgroupMaxSize) = defaultValue.subgroupMaxSize;
-}
-
-AdapterInfo::operator const WGPUAdapterInfo&() const noexcept {
-    return *reinterpret_cast<const WGPUAdapterInfo*>(this);
-}
-
-static_assert(sizeof(AdapterInfo) == sizeof(WGPUAdapterInfo), "sizeof mismatch for AdapterInfo");
-static_assert(alignof(AdapterInfo) == alignof(WGPUAdapterInfo), "alignof mismatch for AdapterInfo");
-static_assert(offsetof(AdapterInfo, nextInChain) == offsetof(WGPUAdapterInfo, nextInChain),
-        "offsetof mismatch for AdapterInfo::nextInChain");
-static_assert(offsetof(AdapterInfo, vendor) == offsetof(WGPUAdapterInfo, vendor),
-        "offsetof mismatch for AdapterInfo::vendor");
-static_assert(offsetof(AdapterInfo, architecture) == offsetof(WGPUAdapterInfo, architecture),
-        "offsetof mismatch for AdapterInfo::architecture");
-static_assert(offsetof(AdapterInfo, device) == offsetof(WGPUAdapterInfo, device),
-        "offsetof mismatch for AdapterInfo::device");
-static_assert(offsetof(AdapterInfo, description) == offsetof(WGPUAdapterInfo, description),
-        "offsetof mismatch for AdapterInfo::description");
-static_assert(offsetof(AdapterInfo, backendType) == offsetof(WGPUAdapterInfo, backendType),
-        "offsetof mismatch for AdapterInfo::backendType");
-static_assert(offsetof(AdapterInfo, adapterType) == offsetof(WGPUAdapterInfo, adapterType),
-        "offsetof mismatch for AdapterInfo::adapterType");
-static_assert(offsetof(AdapterInfo, vendorID) == offsetof(WGPUAdapterInfo, vendorID),
-        "offsetof mismatch for AdapterInfo::vendorID");
-static_assert(offsetof(AdapterInfo, deviceID) == offsetof(WGPUAdapterInfo, deviceID),
-        "offsetof mismatch for AdapterInfo::deviceID");
-static_assert(offsetof(AdapterInfo, subgroupMinSize) == offsetof(WGPUAdapterInfo, subgroupMinSize),
-        "offsetof mismatch for AdapterInfo::subgroupMinSize");
-static_assert(offsetof(AdapterInfo, subgroupMaxSize) == offsetof(WGPUAdapterInfo, subgroupMaxSize),
-        "offsetof mismatch for AdapterInfo::subgroupMaxSize");
-
 // BindGroupDescriptor implementation
 
 BindGroupDescriptor::operator const WGPUBindGroupDescriptor&() const noexcept {
@@ -3738,6 +3667,8 @@ static_assert(offsetof(BindGroupLayoutEntry, binding) == offsetof(WGPUBindGroupL
         "offsetof mismatch for BindGroupLayoutEntry::binding");
 static_assert(offsetof(BindGroupLayoutEntry, visibility) == offsetof(WGPUBindGroupLayoutEntry, visibility),
         "offsetof mismatch for BindGroupLayoutEntry::visibility");
+static_assert(offsetof(BindGroupLayoutEntry, bindingArraySize) == offsetof(WGPUBindGroupLayoutEntry, bindingArraySize),
+        "offsetof mismatch for BindGroupLayoutEntry::bindingArraySize");
 static_assert(offsetof(BindGroupLayoutEntry, buffer) == offsetof(WGPUBindGroupLayoutEntry, buffer),
         "offsetof mismatch for BindGroupLayoutEntry::buffer");
 static_assert(offsetof(BindGroupLayoutEntry, sampler) == offsetof(WGPUBindGroupLayoutEntry, sampler),
@@ -5159,14 +5090,17 @@ Future Queue::OnSubmittedWorkDone(CallbackMode callbackMode,F callback, T userda
     WGPUQueueWorkDoneCallbackInfo callbackInfo = {};
     callbackInfo.mode = static_cast<WGPUCallbackMode>(callbackMode);
     if constexpr (std::is_convertible_v<F, Cb*>) {
-        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, void* callback_param, void* userdata_param) {
+        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, WGPUStringView message, void* callback_param, void* userdata_param) {
             auto cb = reinterpret_cast<Cb*>(callback_param);
-            (*cb)(static_cast<QueueWorkDoneStatus>(status), static_cast<T>(userdata_param));
+            (*cb)(static_cast<QueueWorkDoneStatus>(status), StringView {
+    message.data,
+    message.length
+}, static_cast<T>(userdata_param));
         };
     } else {
-        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, void* callback_param, void* userdata_param) {
+        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, WGPUStringView message, void* callback_param, void* userdata_param) {
             auto cb = reinterpret_cast<CbChar*>(callback_param);
-            (*cb)(static_cast<QueueWorkDoneStatus>(status), static_cast<T>(userdata_param));
+            (*cb)(static_cast<QueueWorkDoneStatus>(status), {detail::StringViewAdapter(message)}, static_cast<T>(userdata_param));
         };
     }
     callbackInfo.userdata1 = reinterpret_cast<void*>(+callback);
@@ -5186,17 +5120,20 @@ Future Queue::OnSubmittedWorkDone(CallbackMode callbackMode,L callback) const {
     WGPUQueueWorkDoneCallbackInfo callbackInfo = {};
     callbackInfo.mode = static_cast<WGPUCallbackMode>(callbackMode);
     if constexpr (std::is_convertible_v<L, F*>) {
-        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, void* callback_param, void*) {
+        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, WGPUStringView message, void* callback_param, void*) {
             auto cb = reinterpret_cast<F*>(callback_param);
-            (*cb)(static_cast<QueueWorkDoneStatus>(status));
+            (*cb)(static_cast<QueueWorkDoneStatus>(status), StringView {
+    message.data,
+    message.length
+});
         };
         callbackInfo.userdata1 = reinterpret_cast<void*>(+callback);
         callbackInfo.userdata2 = nullptr;
     } else {
         auto* lambda = new L(std::move(callback));
-        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, void* callback_param, void*) {
+        callbackInfo.callback = [](WGPUQueueWorkDoneStatus status, WGPUStringView message, void* callback_param, void*) {
             std::unique_ptr<L> the_lambda(reinterpret_cast<L*>(callback_param));
-            (*the_lambda)(static_cast<QueueWorkDoneStatus>(status));
+            (*the_lambda)(static_cast<QueueWorkDoneStatus>(status), {detail::StringViewAdapter(message)});
         };
         callbackInfo.userdata1 = reinterpret_cast<void*>(lambda);
         callbackInfo.userdata2 = nullptr;

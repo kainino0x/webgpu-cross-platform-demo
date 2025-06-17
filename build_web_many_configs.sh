@@ -74,6 +74,7 @@ cat > index.html <<EOF
     <ul>
 EOF
 
+# TODO: Also need pthread builds
 for buildtype in Debug Release ; do
     # TODO make asyncify=0 work
     for asyncify in 1 2 ; do

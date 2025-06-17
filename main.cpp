@@ -18,6 +18,8 @@
 #include <dawn/webgpu_cpp.h>
 
 #ifdef DEMO_USE_GLFW
+// TODO: use webgpu/webgpu_glfw.h, see
+// https://github.com/beaufortfrancois/webgpu-cross-platform-app/pull/18
 #include "window.h"
 #endif
 
