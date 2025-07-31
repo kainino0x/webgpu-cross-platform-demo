@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-dawn_revision=2972f0c5be0b900bc8974848608b34e798802049
+dawn_revision=6149fcf7fdf70c88a3b267f62c7f21eea85a4bc9
 
 function usage {
     echo "Usage:"
@@ -29,13 +29,6 @@ else
 fi
 if [ "$1" == "--checkout=1" ] ; then
     git checkout --detach $dawn_revision -- || ( git fetch --depth=1 origin $dawn_revision && git checkout --detach FETCH_HEAD )
-
-    # Set up the repo for a build, needed regardless of build system, both for
-    # native and for rebuilding emdawnwebgpu_pkg.
-    git submodule update --init --depth=1 third_party/depot_tools
-    cp scripts/standalone-with-wasm.gclient .gclient
-    third_party/depot_tools/gclient sync -D
-
     rm -rf out/wasm/
 elif [ "$1" == "--checkout=0" ] ; then
     rm -rf out/wasm/emdawnwebgpu_pkg/
@@ -44,7 +37,9 @@ else
 fi
 
 # Dawn provides a copy of emsdk already. Note you don't have to use this specific one,
-# we just use it because it's already set up.
+# we just use it because it's already there.
+git submodule update --init --depth=1 third_party/emsdk
+python3 tools/activate-emsdk
 emsdk="$third_party/dawn/third_party/emsdk"
 emscripten="$emsdk/upstream/emscripten"
 
@@ -52,7 +47,7 @@ emscripten="$emsdk/upstream/emscripten"
 mkdir -p out/wasm
 cd out/wasm
 
-"$emscripten/emcmake" cmake ../..
+"$emscripten/emcmake" cmake ../.. -DDAWN_WERROR=1 -DDAWN_FETCH_DEPENDENCIES=ON
 make clean
 make -j4 emdawnwebgpu_pkg
 

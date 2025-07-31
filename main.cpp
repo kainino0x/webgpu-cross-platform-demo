@@ -883,7 +883,9 @@ void run() {
 int main() {
     printf("Initializing...\n");
     wgpu::InstanceDescriptor desc;
-    desc.capabilities.timedWaitAnyEnable = true;
+    static constexpr auto kTimedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;
+    desc.requiredFeatureCount = 1;
+    desc.requiredFeatures = &kTimedWaitAny;
     instance = wgpu::CreateInstance(&desc);
 
     {

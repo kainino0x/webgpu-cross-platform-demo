@@ -466,14 +466,14 @@ namespace wgpu {
   template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, FeatureName value) {
       switch (value) {
+      case FeatureName::CoreFeaturesAndLimits:
+        o << "FeatureName::CoreFeaturesAndLimits";
+        break;
       case FeatureName::DepthClipControl:
         o << "FeatureName::DepthClipControl";
         break;
       case FeatureName::Depth32FloatStencil8:
         o << "FeatureName::Depth32FloatStencil8";
-        break;
-      case FeatureName::TimestampQuery:
-        o << "FeatureName::TimestampQuery";
         break;
       case FeatureName::TextureCompressionBC:
         o << "FeatureName::TextureCompressionBC";
@@ -489,6 +489,9 @@ namespace wgpu {
         break;
       case FeatureName::TextureCompressionASTCSliced3D:
         o << "FeatureName::TextureCompressionASTCSliced3D";
+        break;
+      case FeatureName::TimestampQuery:
+        o << "FeatureName::TimestampQuery";
         break;
       case FeatureName::IndirectFirstInstance:
         o << "FeatureName::IndirectFirstInstance";
@@ -517,8 +520,11 @@ namespace wgpu {
       case FeatureName::Subgroups:
         o << "FeatureName::Subgroups";
         break;
-      case FeatureName::CoreFeaturesAndLimits:
-        o << "FeatureName::CoreFeaturesAndLimits";
+      case FeatureName::TextureFormatsTier1:
+        o << "FeatureName::TextureFormatsTier1";
+        break;
+      case FeatureName::TextureFormatsTier2:
+        o << "FeatureName::TextureFormatsTier2";
         break;
       case FeatureName::Unorm16TextureFormats:
         o << "FeatureName::Unorm16TextureFormats";
@@ -582,6 +588,23 @@ namespace wgpu {
         break;
           default:
             o << "IndexFormat::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<IndexFormat>::type>(value);
+      }
+      return o;
+  }
+  template <typename CharT, typename Traits>
+  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, InstanceFeatureName value) {
+      switch (value) {
+      case InstanceFeatureName::TimedWaitAny:
+        o << "InstanceFeatureName::TimedWaitAny";
+        break;
+      case InstanceFeatureName::ShaderSourceSPIRV:
+        o << "InstanceFeatureName::ShaderSourceSPIRV";
+        break;
+      case InstanceFeatureName::MultipleDevicesPerAdapter:
+        o << "InstanceFeatureName::MultipleDevicesPerAdapter";
+        break;
+          default:
+            o << "InstanceFeatureName::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<InstanceFeatureName>::type>(value);
       }
       return o;
   }
@@ -952,6 +975,9 @@ namespace wgpu {
       case SType::RequestAdapterWebXROptions:
         o << "SType::RequestAdapterWebXROptions";
         break;
+      case SType::CompatibilityModeLimits:
+        o << "SType::CompatibilityModeLimits";
+        break;
       case SType::TextureBindingViewDimensionDescriptor:
         o << "SType::TextureBindingViewDimensionDescriptor";
         break;
@@ -963,26 +989,6 @@ namespace wgpu {
         break;
           default:
             o << "SType::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<SType>::type>(value);
-      }
-      return o;
-  }
-  template <typename CharT, typename Traits>
-  std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, SubgroupMatrixComponentType value) {
-      switch (value) {
-      case SubgroupMatrixComponentType::F32:
-        o << "SubgroupMatrixComponentType::F32";
-        break;
-      case SubgroupMatrixComponentType::F16:
-        o << "SubgroupMatrixComponentType::F16";
-        break;
-      case SubgroupMatrixComponentType::U32:
-        o << "SubgroupMatrixComponentType::U32";
-        break;
-      case SubgroupMatrixComponentType::I32:
-        o << "SubgroupMatrixComponentType::I32";
-        break;
-          default:
-            o << "SubgroupMatrixComponentType::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<SubgroupMatrixComponentType>::type>(value);
       }
       return o;
   }
@@ -1070,6 +1076,12 @@ namespace wgpu {
       case TextureFormat::R8Sint:
         o << "TextureFormat::R8Sint";
         break;
+      case TextureFormat::R16Unorm:
+        o << "TextureFormat::R16Unorm";
+        break;
+      case TextureFormat::R16Snorm:
+        o << "TextureFormat::R16Snorm";
+        break;
       case TextureFormat::R16Uint:
         o << "TextureFormat::R16Uint";
         break;
@@ -1099,6 +1111,12 @@ namespace wgpu {
         break;
       case TextureFormat::R32Sint:
         o << "TextureFormat::R32Sint";
+        break;
+      case TextureFormat::RG16Unorm:
+        o << "TextureFormat::RG16Unorm";
+        break;
+      case TextureFormat::RG16Snorm:
+        o << "TextureFormat::RG16Snorm";
         break;
       case TextureFormat::RG16Uint:
         o << "TextureFormat::RG16Uint";
@@ -1150,6 +1168,12 @@ namespace wgpu {
         break;
       case TextureFormat::RG32Sint:
         o << "TextureFormat::RG32Sint";
+        break;
+      case TextureFormat::RGBA16Unorm:
+        o << "TextureFormat::RGBA16Unorm";
+        break;
+      case TextureFormat::RGBA16Snorm:
+        o << "TextureFormat::RGBA16Snorm";
         break;
       case TextureFormat::RGBA16Uint:
         o << "TextureFormat::RGBA16Uint";
@@ -1599,12 +1623,6 @@ namespace wgpu {
         break;
       case WGSLLanguageFeatureName::PointerCompositeAccess:
         o << "WGSLLanguageFeatureName::PointerCompositeAccess";
-        break;
-      case WGSLLanguageFeatureName::SizedBindingArray:
-        o << "WGSLLanguageFeatureName::SizedBindingArray";
-        break;
-      case WGSLLanguageFeatureName::TexelBuffers:
-        o << "WGSLLanguageFeatureName::TexelBuffers";
         break;
           default:
             o << "WGSLLanguageFeatureName::" << std::showbase << std::hex << std::setfill('0') << std::setw(4) << static_cast<typename std::underlying_type<WGSLLanguageFeatureName>::type>(value);

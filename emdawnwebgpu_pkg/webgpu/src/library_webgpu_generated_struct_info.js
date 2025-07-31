@@ -109,6 +109,14 @@ const structInfo32 = (
             "label": 4,
             "nextInChain": 0
         },
+        "WGPUCompatibilityModeLimits": {
+            "__size__": 24,
+            "chain": 0,
+            "maxStorageBuffersInFragmentStage": 16,
+            "maxStorageBuffersInVertexStage": 8,
+            "maxStorageTexturesInFragmentStage": 20,
+            "maxStorageTexturesInVertexStage": 12
+        },
         "WGPUCompilationInfo": {
             "__size__": 12,
             "messageCount": 4,
@@ -218,19 +226,20 @@ const structInfo32 = (
             "__size__": 4,
             "unused": 0
         },
-        "WGPUInstanceCapabilities": {
-            "__size__": 12,
-            "nextInChain": 0,
-            "timedWaitAnyEnable": 4,
-            "timedWaitAnyMaxCount": 8
-        },
         "WGPUInstanceDescriptor": {
             "__size__": 16,
-            "capabilities": 4,
-            "nextInChain": 0
+            "nextInChain": 0,
+            "requiredFeatureCount": 4,
+            "requiredFeatures": 8,
+            "requiredLimits": 12
+        },
+        "WGPUInstanceLimits": {
+            "__size__": 8,
+            "nextInChain": 0,
+            "timedWaitAnyMaxCount": 4
         },
         "WGPULimits": {
-            "__size__": 168,
+            "__size__": 152,
             "maxBindGroups": 20,
             "maxBindGroupsPlusVertexBuffers": 24,
             "maxBindingsPerBindGroup": 28,
@@ -250,11 +259,7 @@ const structInfo32 = (
             "maxSampledTexturesPerShaderStage": 40,
             "maxSamplersPerShaderStage": 44,
             "maxStorageBufferBindingSize": 72,
-            "maxStorageBuffersInFragmentStage": 160,
-            "maxStorageBuffersInVertexStage": 152,
             "maxStorageBuffersPerShaderStage": 48,
-            "maxStorageTexturesInFragmentStage": 164,
-            "maxStorageTexturesInVertexStage": 156,
             "maxStorageTexturesPerShaderStage": 52,
             "maxTextureArrayLayers": 16,
             "maxTextureDimension1D": 4,
@@ -453,6 +458,11 @@ const structInfo32 = (
             "length": 4
         },
         "WGPUSupportedFeatures": {
+            "__size__": 8,
+            "featureCount": 0,
+            "features": 4
+        },
+        "WGPUSupportedInstanceFeatures": {
             "__size__": 8,
             "featureCount": 0,
             "features": 4
@@ -697,6 +707,14 @@ const structInfo64 = (
             "label": 8,
             "nextInChain": 0
         },
+        "WGPUCompatibilityModeLimits": {
+            "__size__": 32,
+            "chain": 0,
+            "maxStorageBuffersInFragmentStage": 24,
+            "maxStorageBuffersInVertexStage": 16,
+            "maxStorageTexturesInFragmentStage": 28,
+            "maxStorageTexturesInVertexStage": 20
+        },
         "WGPUCompilationInfo": {
             "__size__": 24,
             "messageCount": 8,
@@ -806,19 +824,20 @@ const structInfo64 = (
             "__size__": 4,
             "unused": 0
         },
-        "WGPUInstanceCapabilities": {
-            "__size__": 24,
-            "nextInChain": 0,
-            "timedWaitAnyEnable": 8,
-            "timedWaitAnyMaxCount": 16
-        },
         "WGPUInstanceDescriptor": {
             "__size__": 32,
-            "capabilities": 8,
-            "nextInChain": 0
+            "nextInChain": 0,
+            "requiredFeatureCount": 8,
+            "requiredFeatures": 16,
+            "requiredLimits": 24
+        },
+        "WGPUInstanceLimits": {
+            "__size__": 16,
+            "nextInChain": 0,
+            "timedWaitAnyMaxCount": 8
         },
         "WGPULimits": {
-            "__size__": 168,
+            "__size__": 152,
             "maxBindGroups": 24,
             "maxBindGroupsPlusVertexBuffers": 28,
             "maxBindingsPerBindGroup": 32,
@@ -838,11 +857,7 @@ const structInfo64 = (
             "maxSampledTexturesPerShaderStage": 44,
             "maxSamplersPerShaderStage": 48,
             "maxStorageBufferBindingSize": 72,
-            "maxStorageBuffersInFragmentStage": 160,
-            "maxStorageBuffersInVertexStage": 152,
             "maxStorageBuffersPerShaderStage": 52,
-            "maxStorageTexturesInFragmentStage": 164,
-            "maxStorageTexturesInVertexStage": 156,
             "maxStorageTexturesPerShaderStage": 56,
             "maxTextureArrayLayers": 20,
             "maxTextureDimension1D": 8,
@@ -1041,6 +1056,11 @@ const structInfo64 = (
             "length": 8
         },
         "WGPUSupportedFeatures": {
+            "__size__": 16,
+            "featureCount": 0,
+            "features": 8
+        },
+        "WGPUSupportedInstanceFeatures": {
             "__size__": 16,
             "featureCount": 0,
             "features": 8
