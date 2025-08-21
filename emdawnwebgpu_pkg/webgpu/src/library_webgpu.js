@@ -32,6 +32,18 @@
     passAsPointer: value => MEMORY64 ? `BigInt(${value})` : value,
     convertToPassAsPointer: variable => MEMORY64 ? `${variable} = BigInt(${variable});` : '',
 
+    // Helpers used to convert from the default JS interpretation of signed ints to unsigned ints.
+    // Note that we use |convertToU31| for values we assume should always be small so that we only
+    // assert it in debug mode. We use |convertToU32| for values that may be unsigned values that
+    // can validly be larger than 2^31 such that the signed bit may be flipped.
+    convertToU31: function(value) {
+      if (!ASSERTIONS) return '';
+      return `assert(${value} >= 0);`;
+    },
+    convertToU32: function(value) {
+      return `${value} >>>= 0;`;
+    },
+
     makeGetBool: function(struct, offset) {
       return `!!(${makeGetValue(struct, offset, 'u32')})`;
     },
@@ -728,7 +740,7 @@ var LibraryWebGPU = {
   // Methods of Adapter
   // --------------------------------------------------------------------------
 
-  wgpuAdapterGetFeatures__deps: ['malloc'],
+  wgpuAdapterGetFeatures__deps: ['malloc', '$emwgpuStringToInt_FeatureName'],
   wgpuAdapterGetFeatures: (adapterPtr, supportedFeatures) => {
     var adapter = WebGPU.getJsObject(adapterPtr);
 
@@ -737,8 +749,8 @@ var LibraryWebGPU = {
     var offset = 0;
     var numFeatures = 0;
     adapter.features.forEach(feature => {
-      var featureEnumValue = WebGPU.FeatureNameString2Enum[feature];
-      if (featureEnumValue !== undefined) {
+      var featureEnumValue = emwgpuStringToInt_FeatureName[feature];
+      if (featureEnumValue >= 0) {
         {{{ makeSetValue('featuresPtr', 'offset', 'featureEnumValue', 'i32') }}};
         offset += 4;
         numFeatures++;
@@ -1270,6 +1282,8 @@ var LibraryWebGPU = {
   },
 
   wgpuCommandEncoderResolveQuerySet: (encoderPtr, querySetPtr, firstQuery, queryCount, destinationPtr, destinationOffset) => {
+    {{{ gpu.convertToU31('firstQuery') }}}
+    {{{ gpu.convertToU31('queryCount') }}}
     var commandEncoder = WebGPU.getJsObject(encoderPtr);
     var querySet = WebGPU.getJsObject(querySetPtr);
     var destination = WebGPU.getJsObject(destinationPtr);
@@ -1278,6 +1292,7 @@ var LibraryWebGPU = {
   },
 
   wgpuCommandEncoderWriteTimestamp: (encoderPtr, querySetPtr, queryIndex) => {
+    {{{ gpu.convertToU31('queryIndex') }}}
     var commandEncoder = WebGPU.getJsObject(encoderPtr);
     var querySet = WebGPU.getJsObject(querySetPtr);
     commandEncoder.writeTimestamp(querySet, queryIndex);
@@ -1288,6 +1303,9 @@ var LibraryWebGPU = {
   // --------------------------------------------------------------------------
 
   wgpuComputePassEncoderDispatchWorkgroups: (passPtr, x, y, z) => {
+    {{{ gpu.convertToU31('x') }}}
+    {{{ gpu.convertToU31('y') }}}
+    {{{ gpu.convertToU31('z') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.dispatchWorkgroups(x, y, z);
   },
@@ -1319,6 +1337,7 @@ var LibraryWebGPU = {
   },
 
   wgpuComputePassEncoderSetBindGroup: (passPtr, groupIndex, groupPtr, dynamicOffsetCount, dynamicOffsetsPtr) => {
+    {{{ gpu.convertToU31('groupIndex') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var group = WebGPU.getJsObject(groupPtr);
     if (dynamicOffsetCount == 0) {
@@ -1335,6 +1354,7 @@ var LibraryWebGPU = {
   },
 
   wgpuComputePassEncoderWriteTimestamp: (encoderPtr, querySetPtr, queryIndex) => {
+    {{{ gpu.convertToU31('queryIndex') }}}
     var encoder = WebGPU.getJsObject(encoderPtr);
     var querySet = WebGPU.getJsObject(querySetPtr);
     encoder.writeTimestamp(querySet, queryIndex);
@@ -1346,6 +1366,7 @@ var LibraryWebGPU = {
 
   wgpuComputePipelineGetBindGroupLayout__deps: ['emwgpuCreateBindGroupLayout'],
   wgpuComputePipelineGetBindGroupLayout: (pipelinePtr, groupIndex) => {
+    {{{ gpu.convertToU31('groupIndex') }}}
     var pipeline = WebGPU.getJsObject(pipelinePtr);
     var ptr = _emwgpuCreateBindGroupLayout({{{ gpu.NULLPTR }}});
     WebGPU.Internals.jsObjectInsert(ptr, pipeline.getBindGroupLayout(groupIndex));
@@ -1826,10 +1847,13 @@ var LibraryWebGPU = {
   },
 
   emwgpuDeviceDestroy: (devicePtr) => {
-    WebGPU.getJsObject(devicePtr).destroy()
+    const device = WebGPU.getJsObject(devicePtr);
+    // Remove the onuncapturederror handler which holds a pointer to the WGPUDevice.
+    device.onuncapturederror = null;
+    device.destroy()
   },
 
-  wgpuDeviceGetFeatures__deps: ['malloc'],
+  wgpuDeviceGetFeatures__deps: ['malloc', '$emwgpuStringToInt_FeatureName'],
   wgpuDeviceGetFeatures: (devicePtr, supportedFeatures) => {
     var device = WebGPU.getJsObject(devicePtr);
 
@@ -1838,8 +1862,8 @@ var LibraryWebGPU = {
     var offset = 0;
     var numFeatures = 0;
     device.features.forEach(feature => {
-      var featureEnumValue = WebGPU.FeatureNameString2Enum[feature];
-      if (featureEnumValue !== undefined) {
+      var featureEnumValue = emwgpuStringToInt_FeatureName[feature];
+      if (featureEnumValue >= 0) {
         {{{ makeSetValue('featuresPtr', 'offset', 'featureEnumValue', 'i32') }}};
         offset += 4;
         numFeatures++;
@@ -1977,8 +2001,8 @@ var LibraryWebGPU = {
     var offset = 0;
     var numFeatures = 0;
     navigator["gpu"]["wgslLanguageFeatures"].forEach(feature => {
-      var featureEnumValue = WebGPU.WGSLLanguageFeatureNameString2Enum[feature];
-      if (featureEnumValue !== undefined) {
+      var featureEnumValue = WebGPU.WGSLLanguageFeatureName.indexOf(feature);
+      if (featureEnumValue >= 0) {
         {{{ makeSetValue('featuresPtr', 'offset', 'featureEnumValue', 'i32') }}};
         offset += 4;
         numFeatures++;
@@ -2131,11 +2155,19 @@ var LibraryWebGPU = {
   // --------------------------------------------------------------------------
 
   wgpuRenderBundleEncoderDraw: (passPtr, vertexCount, instanceCount, firstVertex, firstInstance) => {
+    {{{ gpu.convertToU31('vertexCount') }}}
+    {{{ gpu.convertToU31('instanceCount') }}}
+    {{{ gpu.convertToU32('firstVertex') }}}
+    {{{ gpu.convertToU32('firstInstance') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
   },
 
   wgpuRenderBundleEncoderDrawIndexed: (passPtr, indexCount, instanceCount, firstIndex, baseVertex, firstInstance) => {
+    {{{ gpu.convertToU31('indexCount') }}}
+    {{{ gpu.convertToU31('instanceCount') }}}
+    {{{ gpu.convertToU32('firstIndex') }}}
+    {{{ gpu.convertToU32('firstInstance') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
   },
@@ -2184,6 +2216,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderBundleEncoderSetBindGroup: (passPtr, groupIndex, groupPtr, dynamicOffsetCount, dynamicOffsetsPtr) => {
+    {{{ gpu.convertToU31('groupIndex') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var group = WebGPU.getJsObject(groupPtr);
     if (dynamicOffsetCount == 0) {
@@ -2207,6 +2240,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderBundleEncoderSetVertexBuffer: (passPtr, slot, bufferPtr, offset, size) => {
+    {{{ gpu.convertToU31('slot') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var buffer = WebGPU.getJsObject(bufferPtr);
     {{{ gpu.convertSentinelToUndefined('size') }}}
@@ -2218,16 +2252,25 @@ var LibraryWebGPU = {
   // --------------------------------------------------------------------------
 
   wgpuRenderPassEncoderBeginOcclusionQuery: (passPtr, queryIndex) => {
+    {{{ gpu.convertToU31('queryIndex') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.beginOcclusionQuery(queryIndex);
   },
 
   wgpuRenderPassEncoderDraw: (passPtr, vertexCount, instanceCount, firstVertex, firstInstance) => {
+    {{{ gpu.convertToU31('vertexCount') }}}
+    {{{ gpu.convertToU31('instanceCount') }}}
+    {{{ gpu.convertToU32('firstVertex') }}}
+    {{{ gpu.convertToU32('firstInstance') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.draw(vertexCount, instanceCount, firstVertex, firstInstance);
   },
 
   wgpuRenderPassEncoderDrawIndexed: (passPtr, indexCount, instanceCount, firstIndex, baseVertex, firstInstance) => {
+    {{{ gpu.convertToU31('indexCount') }}}
+    {{{ gpu.convertToU31('instanceCount') }}}
+    {{{ gpu.convertToU32('firstIndex') }}}
+    {{{ gpu.convertToU32('firstInstance') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.drawIndexed(indexCount, instanceCount, firstIndex, baseVertex, firstInstance);
   },
@@ -2245,6 +2288,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderPassEncoderMultiDrawIndirect: (passPtr, indirectBufferPtr, indirectOffset, maxDrawCount, drawCountBufferPtr, drawCountBufferOffset) => {
+    {{{ gpu.convertToU31('maxDrawCount') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
     var drawCountBuffer = WebGPU.getJsObject(drawCountBufferPtr);
@@ -2252,6 +2296,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderPassEncoderMultiDrawIndexedIndirect: (passPtr, indirectBufferPtr, indirectOffset, maxDrawCount, drawCountBufferPtr, drawCountBufferOffset) => {
+    {{{ gpu.convertToU31('maxDrawCount') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var indirectBuffer = WebGPU.getJsObject(indirectBufferPtr);
     var drawCountBuffer = WebGPU.getJsObject(drawCountBufferPtr);
@@ -2296,6 +2341,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderPassEncoderSetBindGroup: (passPtr, groupIndex, groupPtr, dynamicOffsetCount, dynamicOffsetsPtr) => {
+    {{{ gpu.convertToU31('groupIndex') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var group = WebGPU.getJsObject(groupPtr);
     if (dynamicOffsetCount == 0) {
@@ -2325,16 +2371,22 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderPassEncoderSetScissorRect: (passPtr, x, y, w, h) => {
+    {{{ gpu.convertToU31('x') }}}
+    {{{ gpu.convertToU31('y') }}}
+    {{{ gpu.convertToU31('w') }}}
+    {{{ gpu.convertToU31('h') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.setScissorRect(x, y, w, h);
   },
 
   wgpuRenderPassEncoderSetStencilReference: (passPtr, reference) => {
+    {{{ gpu.convertToU32('reference') }}}
     var pass = WebGPU.getJsObject(passPtr);
     pass.setStencilReference(reference);
   },
 
   wgpuRenderPassEncoderSetVertexBuffer: (passPtr, slot, bufferPtr, offset, size) => {
+    {{{ gpu.convertToU31('slot') }}}
     var pass = WebGPU.getJsObject(passPtr);
     var buffer = WebGPU.getJsObject(bufferPtr);
     {{{ gpu.convertSentinelToUndefined('size') }}}
@@ -2347,6 +2399,7 @@ var LibraryWebGPU = {
   },
 
   wgpuRenderPassEncoderWriteTimestamp: (encoderPtr, querySetPtr, queryIndex) => {
+    {{{ gpu.convertToU31('queryIndex') }}}
     var encoder = WebGPU.getJsObject(encoderPtr);
     var querySet = WebGPU.getJsObject(querySetPtr);
     encoder.writeTimestamp(querySet, queryIndex);
@@ -2358,6 +2411,7 @@ var LibraryWebGPU = {
 
   wgpuRenderPipelineGetBindGroupLayout__deps: ['emwgpuCreateBindGroupLayout'],
   wgpuRenderPipelineGetBindGroupLayout: (pipelinePtr, groupIndex) => {
+    {{{ gpu.convertToU31('groupIndex') }}}
     var pipeline = WebGPU.getJsObject(pipelinePtr);
     var ptr = _emwgpuCreateBindGroupLayout({{{ gpu.NULLPTR }}});
     WebGPU.Internals.jsObjectInsert(ptr, pipeline.getBindGroupLayout(groupIndex));
@@ -2379,57 +2433,66 @@ var LibraryWebGPU = {
     {{{ runtimeKeepalivePush() }}}
     WebGPU.Internals.futureInsert(futureId, shaderModule.getCompilationInfo().then((compilationInfo) => {
       {{{ runtimeKeepalivePop() }}}
-      // Calculate the total length of strings and offsets here to malloc them
-      // all at once. Note that we start at 1 instead of 0 for the total size
-      // to ensure there's enough space for the null terminator that is always
-      // added by stringToUTF8.
-      var totalMessagesSize = 1;
-      var messageLengths = [];
-      for (var i = 0; i < compilationInfo.messages.length; ++i) {
-        var messageLength = lengthBytesUTF8(compilationInfo.messages[i].message);
-        totalMessagesSize += messageLength;
-        messageLengths.push(messageLength);
+      const messageCount = compilationInfo.messages.length;
+      {{{ makeSetValue('compilationInfoPtr', C_STRUCTS.WGPUCompilationInfo.messageCount, 'messageCount', '*') }}}
+
+      // If there are messages, allocate and initialize them.
+      // TODO(crbug.com/377760848): This giant if-block makes the function hard to read. See if
+      // there's a way to factor out the initialization of compilationInfoPtr without increasing
+      // code size significantly.
+      if (messageCount) {
+        // Calculate the total length of strings and offsets here to malloc them
+        // all at once. Note that we start at 1 instead of 0 for the total size
+        // to ensure there's enough space for the null terminator that is always
+        // added by stringToUTF8.
+        var totalMessagesSize = 1;
+        var messageLengths = [];
+        for (var i = 0; i < messageCount; ++i) {
+          var messageLength = lengthBytesUTF8(compilationInfo.messages[i].message);
+          totalMessagesSize += messageLength;
+          messageLengths.push(messageLength);
+        }
+        var messagesPtr = _malloc(totalMessagesSize);
+
+        // Allocate space for all WGPUCompilationMessage values.
+        var compilationMessagesPtr = _malloc({{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * messageCount);
+        {{{ makeSetValue('compilationInfoPtr', C_STRUCTS.WGPUCompilationInfo.messages, 'compilationMessagesPtr', '*') }}};
+        // Allocate space for all WGPUDawnCompilationMessageUtf16 values.
+        var utf16sPtr = _malloc({{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * messageCount);
+        // Fill in the arrays and link the pointers.
+        for (var i = 0; i < messageCount; ++i) {
+          var compilationMessage = compilationInfo.messages[i];
+          var compilationMessagePtr = compilationMessagesPtr + {{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * i;
+          var utf16Ptr = utf16sPtr + {{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * i;
+
+          // Write out the values to the CompilationMessage.
+          WebGPU.setStringView(compilationMessagePtr + {{{ C_STRUCTS.WGPUCompilationMessage.message }}}, messagesPtr, messageLengths[i]);
+          // TODO(crbug.com/435488557): Convert JavaScript's UTF-16-code-unit offsets to
+          // UTF-8-code-unit offsets. https://github.com/webgpu-native/webgpu-headers/issues/246
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.nextInChain, 'utf16Ptr', '*') }}};
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.type,    'emwgpuStringToInt_CompilationMessageType[compilationMessage.type]', 'i32') }}};
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.lineNum, 'compilationMessage.lineNum', 'i64') }}};
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.linePos, 'compilationMessage.linePos', 'i64') }}};
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.offset,  'compilationMessage.offset', 'i64') }}};
+          {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.length,  'compilationMessage.length', 'i64') }}};
+
+          {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.next, '0', '*') }}};
+          {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.sType, gpu.SType.DawnCompilationMessageUtf16, 'i32') }}};
+          {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.linePos, 'compilationMessage.linePos', 'i64') }}};
+          {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.offset,  'compilationMessage.offset', 'i64') }}};
+          {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.length,  'compilationMessage.length', 'i64') }}};
+
+          // Write the string out to the allocated buffer. Note we have to add 1
+          // to the length of the string to ensure enough space for the null
+          // terminator. However, we only increment the pointer by the exact
+          // length so we overwrite the null terminators except for the last one.
+          stringToUTF8(compilationMessage.message, messagesPtr, messageLengths[i] + 1);
+          messagesPtr += messageLengths[i];
+        }
       }
-      var messagesPtr = _malloc(totalMessagesSize);
 
-      // Allocate and fill out each CompilationMessage.
-      var compilationMessagesPtr = _malloc({{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * compilationInfo.messages.length);
-      var utf16sPtr = _malloc({{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * compilationInfo.messages.length);
-      for (var i = 0; i < compilationInfo.messages.length; ++i) {
-        var compilationMessage = compilationInfo.messages[i];
-        var compilationMessagePtr = compilationMessagesPtr + {{{ C_STRUCTS.WGPUCompilationMessage.__size__ }}} * i;
-        var utf16Ptr = utf16sPtr + {{{ C_STRUCTS.WGPUDawnCompilationMessageUtf16.__size__ }}} * i;
-
-        // Write out the values to the CompilationMessage.
-        WebGPU.setStringView(compilationMessagePtr + {{{ C_STRUCTS.WGPUCompilationMessage.message }}}, messagesPtr, messageLengths[i]);
-        // TODO: Convert JavaScript's UTF-16-code-unit offsets to UTF-8-code-unit offsets.
-        // https://github.com/webgpu-native/webgpu-headers/issues/246
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.nextInChain, 'utf16Ptr', '*') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.type, 'emwgpuStringToInt_CompilationMessageType[compilationMessage.type]', 'i32') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.lineNum, 'compilationMessage.lineNum', 'i64') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.linePos, 'compilationMessage.linePos', 'i64') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.offset, 'compilationMessage.offset', 'i64') }}};
-        {{{ makeSetValue('compilationMessagePtr', C_STRUCTS.WGPUCompilationMessage.length, 'compilationMessage.length', 'i64') }}};
-
-        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.next, '0', '*') }}};
-        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUChainedStruct.sType, gpu.SType.DawnCompilationMessageUtf16, 'i32') }}};
-        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.linePos, 'compilationMessage.linePos', 'i64') }}};
-        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.offset, 'compilationMessage.offset', 'i64') }}};
-        {{{ makeSetValue('utf16Ptr', C_STRUCTS.WGPUDawnCompilationMessageUtf16.length, 'compilationMessage.length', 'i64') }}};
-
-        // Write the string out to the allocated buffer. Note we have to add 1
-        // to the length of the string to ensure enough space for the null
-        // terminator. However, we only increment the pointer by the exact
-        // length so we overwrite the null terminators except for the last one.
-        stringToUTF8(compilationMessage.message, messagesPtr, messageLengths[i] + 1);
-        messagesPtr += messageLengths[i];
-      }
-
-      // Allocate and fill out the wrapping CompilationInfo struct.
-      {{{ makeSetValue('compilationInfoPtr', C_STRUCTS.WGPUCompilationInfo.messageCount, 'compilationInfo.messages.length', '*') }}}
-      {{{ makeSetValue('compilationInfoPtr', C_STRUCTS.WGPUCompilationInfo.messages, 'compilationMessagesPtr', '*') }}};
-
-      _emwgpuOnCompilationInfoCompleted(futureId, {{{ gpu.CompilationInfoRequestStatus.Success }}}, {{{ gpu.passAsPointer('compilationInfoPtr') }}});
+      _emwgpuOnCompilationInfoCompleted(futureId, {{{ gpu.CompilationInfoRequestStatus.Success }}},
+        {{{ gpu.passAsPointer('compilationInfoPtr') }}});
     }, () => {
       abort('Unexpected failure in GPUShaderModule.getCompilationInfo().')
     }));
@@ -2617,16 +2680,6 @@ var LibraryWebGPU = {
   // --------------------------------------------------------------------------
 };
 
-// Inverted index used by GetFeatures/HasFeature
-LibraryWebGPU.$WebGPU.FeatureNameString2Enum = {};
-for (var value in LibraryWebGPU.$WebGPU.FeatureName) {
-  LibraryWebGPU.$WebGPU.FeatureNameString2Enum[LibraryWebGPU.$WebGPU.FeatureName[value]] = value;
-}
-LibraryWebGPU.$WebGPU.WGSLLanguageFeatureNameString2Enum = {};
-for (var value in LibraryWebGPU.$WebGPU.WGSLLanguageFeatureName) {
-  LibraryWebGPU.$WebGPU.WGSLLanguageFeatureNameString2Enum[LibraryWebGPU.$WebGPU.WGSLLanguageFeatureName[value]] = value;
-}
-
 // Add and set __i53abi to true for functions with 64-bit value in their
 // signatures, if not explicitly set otherwise.
 for (const key of Object.keys(LibraryWebGPU)) {
@@ -2650,6 +2703,8 @@ function moveDeps(object, targetDeps) {
     }
   }
 }
+// TODO(crbug.com/377760848): Investigate whether Closure is able
+// to dead-code-eliminate these; if not, make them library-level items.
 moveDeps(LibraryWebGPU.$WebGPU, LibraryWebGPU.$WebGPU__deps)
 
 autoAddDeps(LibraryWebGPU, '$WebGPU');

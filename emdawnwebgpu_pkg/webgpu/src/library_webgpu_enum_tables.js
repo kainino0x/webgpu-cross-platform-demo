@@ -571,6 +571,31 @@
             'unknown': 1,
             'destroyed': 2,
         }\`,
+        $emwgpuStringToInt_FeatureName: \`{
+            'core-features-and-limits': 1,
+            'depth-clip-control': 2,
+            'depth32float-stencil8': 3,
+            'texture-compression-bc': 4,
+            'texture-compression-bc-sliced-3d': 5,
+            'texture-compression-etc2': 6,
+            'texture-compression-astc': 7,
+            'texture-compression-astc-sliced-3d': 8,
+            'timestamp-query': 9,
+            'indirect-first-instance': 10,
+            'shader-f16': 11,
+            'rg11b10ufloat-renderable': 12,
+            'bgra8unorm-storage': 13,
+            'float32-filterable': 14,
+            'float32-blendable': 15,
+            'clip-distances': 16,
+            'dual-source-blending': 17,
+            'subgroups': 18,
+            'texture-formats-tier1': 19,
+            'texture-formats-tier2': 20,
+            'chromium-experimental-unorm16-texture-formats': 327692,
+            'chromium-experimental-snorm16-texture-formats': 327693,
+            'chromium-experimental-multi-draw-indirect': 327732,
+        }\`,
         $emwgpuStringToInt_PreferredFormat: \`{
             'rgba8unorm': 22,
             'bgra8unorm': 27,
@@ -579,8 +604,9 @@
 
     // Maps from enum number to enum string.
     // These appear in the final build result so should be kept minimal.
-    // TODO(crbug.com/377760848): Make these library-level items like the
-    // string-to-int tables, so they can be dead-code-eliminated.
+    // TODO(crbug.com/377760848): Investigate whether Closure is able
+    // to dead-code-eliminate these; if not, make them library-level
+    // items like the string-to-int tables.
     globalThis.WEBGPU_INT_TO_STRING_TABLES = `
         AddressMode: [
             ,
