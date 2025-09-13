@@ -412,6 +412,7 @@ typedef enum WGPUFeatureName {
     WGPUFeatureName_Subgroups = 0x00000012,
     WGPUFeatureName_TextureFormatsTier1 = 0x00000013,
     WGPUFeatureName_TextureFormatsTier2 = 0x00000014,
+    WGPUFeatureName_PrimitiveIndex = 0x00000015,
     WGPUFeatureName_Unorm16TextureFormats = 0x0005000C,
     WGPUFeatureName_Snorm16TextureFormats = 0x0005000D,
     WGPUFeatureName_MultiDrawIndirect = 0x00050034,

@@ -526,6 +526,9 @@ namespace wgpu {
       case FeatureName::TextureFormatsTier2:
         o << "FeatureName::TextureFormatsTier2";
         break;
+      case FeatureName::PrimitiveIndex:
+        o << "FeatureName::PrimitiveIndex";
+        break;
       case FeatureName::Unorm16TextureFormats:
         o << "FeatureName::Unorm16TextureFormats";
         break;
@@ -1970,6 +1973,10 @@ namespace wgpu {
     }
     return o;
   }
+
+}  // namespace wgpu
+
+namespace wgpu {
 
   template <typename CharT, typename Traits>
   std::basic_ostream<CharT, Traits>& operator<<(std::basic_ostream<CharT, Traits>& o, StringView value) {

@@ -264,6 +264,7 @@ enum class FeatureName : uint32_t {
     Subgroups = WGPUFeatureName_Subgroups,
     TextureFormatsTier1 = WGPUFeatureName_TextureFormatsTier1,
     TextureFormatsTier2 = WGPUFeatureName_TextureFormatsTier2,
+    PrimitiveIndex = WGPUFeatureName_PrimitiveIndex,
     Unorm16TextureFormats = WGPUFeatureName_Unorm16TextureFormats,
     Snorm16TextureFormats = WGPUFeatureName_Snorm16TextureFormats,
     MultiDrawIndirect = WGPUFeatureName_MultiDrawIndirect,
@@ -2236,7 +2237,7 @@ struct BindGroupDescriptor {
     ChainedStruct const * nextInChain = nullptr;
     StringView label = {};
     BindGroupLayout layout = nullptr;
-    size_t entryCount;
+    size_t entryCount = 0;
     BindGroupEntry const * entries = nullptr;
 };
 
@@ -2443,7 +2444,7 @@ struct BindGroupLayoutDescriptor {
 
     ChainedStruct const * nextInChain = nullptr;
     StringView label = {};
-    size_t entryCount;
+    size_t entryCount = 0;
     BindGroupLayoutEntry const * entries = nullptr;
 };
 
