@@ -35,6 +35,10 @@
 #include <iostream>
 #include <memory>
 
+#ifdef DEMO_USE_PTHREAD
+#    include <thread>
+#endif
+
 static wgpu::Instance instance;
 static wgpu::Device device;
 static wgpu::Queue queue;
@@ -881,6 +885,14 @@ void run() {
 }
 
 int main() {
+#ifdef DEMO_USE_PTHREAD
+    std::thread([]() {
+        EM_ASM({
+            console.log("Hello from thread");
+        });
+    }).join();
+#endif
+
     printf("Initializing...\n");
     wgpu::InstanceDescriptor desc;
     static constexpr auto kTimedWaitAny = wgpu::InstanceFeatureName::TimedWaitAny;

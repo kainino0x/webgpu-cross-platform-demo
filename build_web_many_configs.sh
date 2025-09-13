@@ -74,17 +74,19 @@ cat > index.html <<EOF
     <ul>
 EOF
 
-# TODO: Also need pthread builds
 for buildtype in Debug Release ; do
-    # TODO make asyncify=0 work
+    # TODO: make asyncify=0 work
     for asyncify in 1 2 ; do
         for sanitizers in ON OFF ; do
             if [ $sanitizers == ON ] ; then
                 sanitizers_label32=-ubsan-asan
                 sanitizers_label64=-ubsan
+                build out/web-${buildtype:0:3}-asyncify${asyncify}-shmem${sanitizers_label32}   -DDEMO_USE_ASYNCIFY=$asyncify -DCMAKE_BUILD_TYPE=$buildtype -DDEMO_USE_SANITIZERS=$sanitizers -DDEMO_USE_SHMEM=SHMEM
+                build out/web-${buildtype:0:3}-asyncify${asyncify}-pthread${sanitizers_label32} -DDEMO_USE_ASYNCIFY=$asyncify -DCMAKE_BUILD_TYPE=$buildtype -DDEMO_USE_SANITIZERS=$sanitizers -DDEMO_USE_SHMEM=PTHREAD
             else
                 sanitizers_label32=
                 sanitizers_label64=
+                build out/web-${buildtype:0:3}-asyncify${asyncify}-worker${sanitizers_label32}  -DDEMO_USE_ASYNCIFY=$asyncify -DCMAKE_BUILD_TYPE=$buildtype -DDEMO_USE_SANITIZERS=$sanitizers -DDEMO_USE_SHMEM=WORKER
             fi
             build out/web-${buildtype:0:3}-asyncify${asyncify}${sanitizers_label32}            -DDEMO_USE_ASYNCIFY=$asyncify -DCMAKE_BUILD_TYPE=$buildtype -DDEMO_USE_SANITIZERS=$sanitizers
             build out/web-${buildtype:0:3}-asyncify${asyncify}-bigint${sanitizers_label32}     -DDEMO_USE_ASYNCIFY=$asyncify -DCMAKE_BUILD_TYPE=$buildtype -DDEMO_USE_SANITIZERS=$sanitizers -DDEMO_USE_WASM_BIGINT=ON

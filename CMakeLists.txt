@@ -25,11 +25,12 @@ option(DEMO_USE_WASM_MEMORY64 "Use Wasm Memory64" OFF)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_compile_options(
-    "-fno-exceptions"
-    "$<$<CONFIG:Release>:-flto>"
-    )
-add_link_options(
+function(add_compile_link_options)
+    add_compile_options("${ARGV}")
+    add_link_options("${ARGV}")
+endfunction()
+
+add_compile_link_options(
     "-fno-exceptions"
     "$<$<CONFIG:Release>:-flto>"
     )
@@ -37,11 +38,23 @@ add_link_options(
 if (DEMO_USE_SANITIZERS)
     # "error: MEMORY64 does not yet work with ASAN"
     if (EMSCRIPTEN AND NOT DEMO_USE_WASM_MEMORY64)
-        add_compile_options("-fsanitize=address")
-        add_link_options("-fsanitize=address")
+        add_compile_link_options("-fsanitize=address")
     endif()
-    add_compile_options("-fsanitize=undefined")
-    add_link_options("-fsanitize=undefined")
+    list(APPEND COMPILE_LINK_FLAGS "-fsanitize=undefined")
+endif()
+
+if (DEMO_USE_SHMEM)
+    if (DEMO_USE_SHMEM STREQUAL "SHMEM")
+        add_compile_link_options("-sSHARED_MEMORY=1")
+    elseif (DEMO_USE_SHMEM STREQUAL "WORKER")
+        add_compile_link_options("-sWASM_WORKERS")
+    elseif (DEMO_USE_SHMEM STREQUAL "PTHREAD")
+        add_compile_link_options("-pthread")
+        add_link_options("-sPTHREAD_POOL_SIZE=1")
+        add_compile_definitions(DEMO_USE_PTHREAD=1)
+    else()
+        message(FATAL_ERROR "unrecognized value for DEMO_USE_SHMEM: ${DEMO_USE_SHMEM}")
+    endif()
 endif()
 
 if (EMSCRIPTEN)
